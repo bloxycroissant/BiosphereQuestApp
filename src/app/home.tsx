@@ -111,7 +111,11 @@ export default function HomeScreen() {
 
   const handleGradePress = (gradeCategory: string) => {
     if (gradeLocks[gradeCategory]) {
-      Alert.alert("Content Locked", `Your parent has locked access for ${gradeCategory}.`);
+      Alert.alert(
+        "Content Locked", 
+        `Your parent has locked access for ${gradeCategory}. Returning to login.`,
+        [{ text: "OK", onPress: () => router.replace('/') }]
+      );
       return;
     }
     navigateToRoute('/explore');
@@ -307,13 +311,22 @@ export default function HomeScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Bedtime Lock Overlay Modal */}
+      {/* Bedtime Lock Overlay Modal -> Automatically redirects back to welcome/login page when clicked/tapped */}
       <Modal visible={isLocked} animationType="fade" transparent={true}>
-        <View style={styles.lockOverlay}>
-          <Text style={styles.lockEmoji}>🛡️</Text>
-          <Text style={styles.lockTitle}>Locked by Parent</Text>
-          <Text style={styles.lockDesc}>{lockMessage}</Text>
-        </View>
+        <Pressable 
+          style={styles.lockOverlay} 
+          onPress={() => {
+            setIsLocked(false);
+            router.replace('/');
+          }}
+        >
+          <View style={styles.lockContentContainer}>
+            <Text style={styles.lockEmoji}>🛡️</Text>
+            <Text style={styles.lockTitle}>Locked by Parent</Text>
+            <Text style={styles.lockDesc}>{lockMessage}</Text>
+            <Text style={styles.lockActionHint}>Tap anywhere to return to the welcome screen</Text>
+          </View>
+        </Pressable>
       </Modal>
     </GradientSafeAreaView>
   );
@@ -469,7 +482,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  lockContentContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    width: '100%',
+  },
   lockEmoji: { fontSize: 50, marginBottom: 12 },
   lockTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 8, textAlign: 'center' },
-  lockDesc: { color: '#94a3b8', fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 20 },
+  lockDesc: { color: '#94a3b8', fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  lockActionHint: { color: '#818cf8', fontSize: 12, fontWeight: '800', textAlign: 'center', textDecorationLine: 'underline' },
 });

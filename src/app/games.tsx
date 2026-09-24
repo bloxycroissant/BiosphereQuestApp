@@ -4,6 +4,7 @@ import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View, Dimensi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientSafeAreaView } from '@/components/gradient-safe-area';
 import { useProgress } from '@/hooks/use-progress';
+import { useAudioPlayer } from 'expo-audio';
 import { CodebreakerGame } from './components/minigames/CodebreakerGame';
 import { FlashcardGame } from './components/minigames/FlashcardGame';
 import { MemoryMatchGame } from './components/minigames/MemoryMatchGame';
@@ -16,6 +17,7 @@ import GradeSelectModal from './components/GradeSelectModal';
 import { generateQuizQuestion, QuizQuestion, GradeLevel } from './data/questionGenerators';
 
 const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
+const gameThemeMusic = require('../../assets/BiosphereQuestBackgroundMusic/The Game Show Theme Music - (192 Kbps).mp3');
 
 const gameCatalog = [
   {
@@ -146,6 +148,10 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   const [showGradeModal, setShowGradeModal] = useState<boolean>(false);
   const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(null);
 
+  // Background Music & Mute States using expo-audio
+  const musicPlayer = useAudioPlayer(gameThemeMusic);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+
   // New State for custom Grade Locked Pop-up Screen
   const [lockedModalInfo, setLockedModalInfo] = useState<{ visible: boolean; gradeNum: number }>({
     visible: false,
@@ -183,7 +189,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
 
   const tutorialAnim = useRef(new Animated.Value(0)).current;
   const gradeModalAnim = useRef(new Animated.Value(0)).current;
-  const lockedModalAnim = useRef(new Animated.Value(0)).current; // Animation ref for the new pop-up
+  const lockedModalAnim = useRef(new Animated.Value(0)).current;
   const gridAnim = useRef(new Animated.Value(1)).current;
   const entrance = useRef(new Animated.Value(0)).current;
   const leaderboardPulse = useRef(new Animated.Value(1)).current;
@@ -192,6 +198,45 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   useEffect(() => {
     fetchParentControls();
   }, []);
+
+  // Handle music playback using regular useEffect with unmount cleanup
+  useEffect(() => {
+    if (musicPlayer) {
+      try {
+        musicPlayer.loop = true;
+        musicPlayer.volume = isMuted ? 0 : 0.4;
+        musicPlayer.play();
+      } catch (e) {
+        console.log('Error playing background music', e);
+      }
+    }
+
+    return () => {
+      if (musicPlayer) {
+        try {
+          musicPlayer.pause();
+          musicPlayer.seekTo(0);
+        } catch (e) {
+          console.log('Error pausing background music on unmount', e);
+        }
+      }
+    };
+  }, [musicPlayer, isMuted]);
+
+  const toggleMute = () => {
+    if (!musicPlayer) return;
+    try {
+      if (isMuted) {
+        musicPlayer.volume = 0.4;
+        setIsMuted(false);
+      } else {
+        musicPlayer.volume = 0;
+        setIsMuted(true);
+      }
+    } catch (error) {
+      console.log('Failed to toggle audio mute', error);
+    }
+  };
 
   const fetchParentControls = async () => {
     try {
@@ -266,7 +311,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   }, [showGradeModal, gradeModalAnim]);
 
-  // Trigger smooth animation when custom Grade Locked popup opens
   useEffect(() => {
     if (lockedModalInfo.visible) {
       lockedModalAnim.setValue(0);
@@ -296,7 +340,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   };
 
   const handleGamePress = (gameItem: any) => {
-    // Check Study-First Rule (Lessons before games)
     if (studyFirstEnabled) {
       Alert.alert(
         "Mini-Games Locked", 
@@ -348,7 +391,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       ? parseInt(grade.replace(/[^0-9]/g, ''), 10) || 1 
       : Number(grade);
 
-    // Check if parent locked specific grade level content filter using the new custom pop-up screen
     const gradeKey = `Grade ${numericGrade}`;
     if (gradeLocks[gradeKey]) {
       setShowGradeModal(false);
@@ -419,8 +461,14 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         <Pressable onPress={handleCancel} style={styles.cancelButton}>
           <Text style={styles.cancelText}>← Back</Text>
         </Pressable>
-        <View style={styles.levelIndicatorBadge}>
-          <Text style={styles.levelIndicatorText}>🌟 Grade {selectedGrade}</Text>
+        <View style={styles.topBarRightContainer}>
+          {/* Mute / Unmute Button */}
+          <Pressable onPress={toggleMute} style={styles.muteButton}>
+            <Text style={styles.muteIconText}>{isMuted ? '🔇' : '🔊'}</Text>
+          </Pressable>
+          <View style={styles.levelIndicatorBadge}>
+            <Text style={styles.levelIndicatorText}>🌟 Grade {selectedGrade}</Text>
+          </View>
         </View>
       </View>
 
@@ -666,7 +714,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
                     useNativeDriver: true,
                   }).start(() => {
                     setLockedModalInfo({ visible: false, gradeNum: 1 });
-                    setShowGradeModal(true); // Re-open Grade Select modal so they can pick another grade
+                    setShowGradeModal(true);
                   });
                 }}
               >
@@ -744,6 +792,24 @@ const styles = StyleSheet.create({
   },
   cancelButton: { paddingVertical: 4 },
   cancelText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  topBarRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  muteButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#30478a',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteIconText: {
+    fontSize: 14,
+  },
   levelIndicatorBadge: {
     backgroundColor: 'rgba(241, 198, 91, 0.2)',
     borderColor: '#f1c65b',
@@ -918,7 +984,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
   },
-  // Custom styles for the Grade Locked Pop-up Screen
   modalBackdropCenter: {
     flex: 1,
     backgroundColor: 'rgba(5, 11, 24, 0.8)',
