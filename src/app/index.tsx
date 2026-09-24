@@ -47,7 +47,7 @@ export default function WelcomeScreen() {
         />
         <Link href="/signup" asChild>
           <Pressable style={styles.primary}>
-            <Text style={styles.primaryText}>Get started for free</Text>
+            <Text style={styles.primaryText}>Getting Started</Text>
           </Pressable>
         </Link>
         <Link href="/login" asChild>

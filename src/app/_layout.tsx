@@ -10,17 +10,21 @@ import { ProgressProvider } from '@/hooks/use-progress';
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
+  
+  // Check if current route is Welcome, Auth, or part of the Parent Portal group
   const isWelcomeOrAuth = pathname === '/' || pathname === '/login' || pathname === '/signup';
+  const isParentRoute = pathname.includes('/parent-dashboard') || pathname.startsWith('/parent');
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ProgressProvider>
         <LinearGradient colors={['#090b20', '#28285e', '#0b4070']} style={styles.background}>
           <AnimatedSplashOverlay />
-          {isWelcomeOrAuth ? <AnimatedRoute /> : <AppTabs />}
+          {/* If it's Auth, Welcome, OR a Parent route, render plain Slot with animation. Otherwise, render Student AppTabs. */}
+          {isWelcomeOrAuth || isParentRoute ? <AnimatedRoute /> : <AppTabs />}
         </LinearGradient>
       </ProgressProvider>
     </ThemeProvider>
@@ -36,7 +40,17 @@ function AnimatedRoute() {
     Animated.spring(entrance, { toValue: 1, useNativeDriver: true, tension: 55, friction: 9 }).start();
   }, [entrance, pathname]);
 
-  return <Animated.View style={{ flex: 1, opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}><Slot /></Animated.View>;
+  return (
+    <Animated.View 
+      style={{ 
+        flex: 1, 
+        opacity: entrance, 
+        transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] 
+      }}
+    >
+      <Slot />
+    </Animated.View>
+  );
 }
 
 const styles = StyleSheet.create({
