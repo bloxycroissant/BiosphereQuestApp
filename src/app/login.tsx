@@ -96,14 +96,14 @@ export default function LoginScreen() {
       Alert.alert("Login Error", "Something went wrong opening the login window. Please try again.");
     }
   };
-
+  
   const navigateBasedOnRole = async () => {
     const isParentEmail = email.toLowerCase().includes("parent"); 
 
     if (role === "parent" || isParentEmail) {
-      router.replace("/parent-dashboard" as any);
+      router.replace("/parent-dashboard" as any); // If parent-dashboard is in a folder or root, check its path
     } else {
-      router.replace("/(tabs)/home" as any);
+      router.replace("/home" as any); // Maps to src/app/home.tsx
     }
   };
 
@@ -112,6 +112,14 @@ export default function LoginScreen() {
       Alert.alert("Required Field", "Please enter your email address.");
       return;
     }
+
+    // Strict email format validation to block random letters or non-email inputs
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert("Invalid Email", "Please type a valid email address (e.g., student@email.com).");
+      return;
+    }
+
     if (!password) {
       Alert.alert("Required Field", "Please enter your password.");
       return;

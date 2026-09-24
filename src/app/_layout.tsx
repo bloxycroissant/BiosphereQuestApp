@@ -18,13 +18,25 @@ export default function RootLayout() {
   const isWelcomeOrAuth = pathname === '/' || pathname === '/login' || pathname === '/signup';
   const isParentRoute = pathname.includes('/parent-dashboard') || pathname.startsWith('/parent');
 
+  // Also check if we are explicitly on a standalone screen outside tabs if any (e.g. games, settings)
+  // If it's a student tab route, we render AppTabs. Otherwise, we render AnimatedRoute with Slot.
+  const isStudentTabRoute = 
+    pathname.includes('/home') || 
+    pathname.includes('/courses') || 
+    pathname.includes('/games') || 
+    pathname.includes('/profile') ||
+    pathname === '/(tabs)/home' || 
+    pathname === '/(tabs)/courses' || 
+    pathname === '/(tabs)/games' || 
+    pathname === '/(tabs)/profile';
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ProgressProvider>
         <LinearGradient colors={['#090b20', '#28285e', '#0b4070']} style={styles.background}>
           <AnimatedSplashOverlay />
-          {/* If it's Auth, Welcome, OR a Parent route, render plain Slot with animation. Otherwise, render Student AppTabs. */}
-          {isWelcomeOrAuth || isParentRoute ? <AnimatedRoute /> : <AppTabs />}
+          {/* Render plain Slot for Auth, Welcome, Parent routes, or explicit secondary screens; use AppTabs for student tabs */}
+          {isWelcomeOrAuth || isParentRoute || !isStudentTabRoute ? <AnimatedRoute /> : <AppTabs />}
         </LinearGradient>
       </ProgressProvider>
     </ThemeProvider>

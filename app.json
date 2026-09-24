@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "25PercentBiosphereQuestApp",
-    "slug": "25PercentBiosphereQuestApp",
+    "name": "50% BiosphereQuestApp",
+    "slug": "50% BiosphereQuestApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "25percentbiospherequestapp",
+    "scheme": "50% BiosphereQuestApp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
