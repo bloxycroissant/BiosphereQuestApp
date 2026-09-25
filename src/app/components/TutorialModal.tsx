@@ -13,11 +13,14 @@ export default function TutorialModal({ game, onClose, onContinue }: Props) {
   // Supports both 'steps' and legacy 'howToPlay' property names
   const tutorialSteps = game.tutorial?.steps || game.tutorial?.howToPlay || [];
 
+  // Safe image source validator for React Native assets
+  const hasValidImageIcon = typeof game.icon === 'number' || (typeof game.icon === 'object' && game.icon !== null);
+
   return (
     <Modal animationType="slide" transparent visible={!!game} onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {typeof game.icon === 'number' ? (
+          {hasValidImageIcon ? (
             <Image source={game.icon} style={styles.iconImage} resizeMode="contain" />
           ) : (
             <Text style={styles.icon}>{game.icon || '🎮'}</Text>
