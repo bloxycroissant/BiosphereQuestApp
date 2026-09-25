@@ -1,36 +1,46 @@
 {
   "expo": {
-    "name": "50% BiosphereQuestApp",
-    "slug": "50% BiosphereQuestApp",
+    "name": "50% Biosphere Quest",
+    "slug": "50% biosphere-quest",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "50% BiosphereQuestApp",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
+    "scheme": "biospherequest",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#091426"
+    },
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": true,
+      "userInterfaceStyle": "dark",
+      "icon": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
     },
     "android": {
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#091426",
+        "foregroundImage": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#091426",
+          "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
+          "imageWidth": 150,
+          "dark": {
+            "backgroundColor": "#091426",
+            "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
+          }
         }
       ]
     ],
