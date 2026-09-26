@@ -45,14 +45,9 @@ export default function WelcomeScreen() {
           title="Quiz & Flashcards"
           subtitle="Test yourself and master every concept"
         />
-        <Link href="/signup" asChild>
+        <Link href="/welcome" asChild>
           <Pressable style={styles.primary}>
             <Text style={styles.primaryText}>Getting Started</Text>
-          </Pressable>
-        </Link>
-        <Link href="/login" asChild>
-          <Pressable style={styles.secondary}>
-            <Text style={styles.secondaryText}>I already have an account</Text>
           </Pressable>
         </Link>
       </View>
@@ -88,6 +83,7 @@ function WelcomeRow({
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -194,18 +190,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "900",
     fontSize: 15,
-  },
-  secondary: {
-    borderColor: "#6558df",
-    borderWidth: 1,
-    borderRadius: 9,
-    alignItems: "center",
-    padding: 13,
-    marginTop: 14,
-  },
-  secondaryText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 14,
   },
 });
