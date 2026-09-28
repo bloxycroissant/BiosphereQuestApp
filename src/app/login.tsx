@@ -1,10 +1,11 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
+import { useProgress } from "@/hooks/use-progress";
 import { Ionicons } from "@expo/vector-icons";
 import { makeRedirectUri } from "expo-auth-session";
 import { Image } from "expo-image";
 import { Link, router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useState, useRef } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,11 +16,8 @@ import {
   Text,
   TextInput,
   View,
-  Animated,
 } from "react-native";
 import { supabase } from "../lib/supabase";
-import { useProgress } from "@/hooks/use-progress";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -34,34 +32,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<"student" | "parent">("student");
-
-  // Animation values for sliding & scaling
-  const roleTabScale = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-
-  const handleRoleSwitch = (newRole: "student" | "parent") => {
-    if (role === newRole) return;
-
-    Animated.sequence([
-      Animated.spring(roleTabScale, { toValue: 0.96, useNativeDriver: true }),
-      Animated.spring(roleTabScale, { toValue: 1, friction: 4, useNativeDriver: true }),
-    ]).start();
-
-    const direction = newRole === "parent" ? 1 : -1;
-    slideAnim.setValue(direction * 30);
-    
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setRole(newRole);
-  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -75,35 +45,26 @@ export default function LoginScreen() {
       });
 
       if (error) throw error;
-      
+
       if (!data?.url) {
-        console.error("No OAuth URL returned from Supabase");
         Alert.alert("Login Error", "Could not generate Google sign-in URL.");
         return;
       }
 
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
-        redirectUrl
+        redirectUrl,
       );
 
       if (result.type === "success" && result.url) {
-        console.log("Successfully logged in via Google!");
-        navigateBasedOnRole();
+        router.replace("/home" as any);
       }
     } catch (error) {
       console.error("WebBrowser auth error:", error);
-      Alert.alert("Login Error", "Something went wrong opening the login window. Please try again.");
-    }
-  };
-  
-  const navigateBasedOnRole = async () => {
-    const isParentEmail = email.toLowerCase().includes("parent"); 
-
-    if (role === "parent" || isParentEmail) {
-      router.replace("/parent-dashboard" as any); // If parent-dashboard is in a folder or root, check its path
-    } else {
-      router.replace("/home" as any); // Maps to src/app/home.tsx
+      Alert.alert(
+        "Login Error",
+        "Something went wrong opening the login window.",
+      );
     }
   };
 
@@ -113,10 +74,9 @@ export default function LoginScreen() {
       return;
     }
 
-    // Strict email format validation to block random letters or non-email inputs
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert("Invalid Email", "Please type a valid email address (e.g., student@email.com).");
+      Alert.alert("Invalid Email", "Please type a valid email address.");
       return;
     }
 
@@ -130,12 +90,15 @@ export default function LoginScreen() {
 
     if (targetEmail && targetPassword) {
       if (email.trim() === targetEmail && password === targetPassword) {
-        navigateBasedOnRole();
+        router.replace("/home" as any);
       } else {
-        Alert.alert("Login Failed", "Incorrect email or password. Please check your credentials.");
+        Alert.alert(
+          "Login Failed",
+          "Incorrect email or password. Please check your credentials.",
+        );
       }
     } else {
-      navigateBasedOnRole();
+      router.replace("/home" as any);
     }
   };
 
@@ -145,16 +108,27 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.content}>
             <Pressable onPress={() => router.back()}>
               <Text style={styles.back}>‹ Back</Text>
             </Pressable>
 
             <View style={styles.mascots}>
-              <Image source={astro} style={styles.mascot} contentFit="contain" />
+              <Image
+                source={astro}
+                style={styles.mascot}
+                contentFit="contain"
+              />
               <Image source={logo} style={styles.logo} contentFit="contain" />
-              <Image source={stella} style={styles.mascot} contentFit="contain" />
+              <Image
+                source={stella}
+                style={styles.mascot}
+                contentFit="contain"
+              />
             </View>
 
             <Text style={styles.brand}>Biosphere Quest</Text>
@@ -162,40 +136,10 @@ export default function LoginScreen() {
               Rocket your knowledge to the stars
             </Text>
 
-            {/* Role Switcher Selector with Animated Container */}
-            <Animated.View style={[styles.roleContainer, { transform: [{ scale: roleTabScale }] }]}>
-              <Pressable
-                style={[styles.roleTab, role === "student" && styles.roleTabActive]}
-                onPress={() => handleRoleSwitch("student")}
-              >
-                <Text style={[styles.roleText, role === "student" && styles.roleTextActive]}>
-                  🎓 Student Login
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.roleTab, role === "parent" && styles.roleTabActive]}
-                onPress={() => handleRoleSwitch("parent")}
-              >
-                <Text style={[styles.roleText, role === "parent" && styles.roleTextActive]}>
-                  🛡️ Parent Login
-                </Text>
-              </Pressable>
-            </Animated.View>
-
-            {/* Sliding Form Container */}
-            <Animated.View 
-              style={[
-                styles.formContainer, 
-                { transform: [{ translateX: slideAnim }] }
-              ]}
-            >
-              <Text style={styles.title}>
-                {role === "student" ? "Welcome Back, Explorer!" : "Parent Portal Access"}
-              </Text>
+            <View style={styles.formContainer}>
+              <Text style={styles.title}>Welcome Back, Explorer!</Text>
               <Text style={styles.subtitle}>
-                {role === "student" 
-                  ? "Continue your learning journey" 
-                  : "Manage screentime, limits, and student progress"}
+                Continue your learning journey
               </Text>
 
               <Field
@@ -204,8 +148,9 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholder={role === "student" ? "student@email.com" : "parent@email.com"}
+                placeholder="student@email.com"
               />
+
               <View style={styles.field}>
                 <Text style={styles.label}>PASSWORD</Text>
                 <View style={styles.inputContainer}>
@@ -235,9 +180,7 @@ export default function LoginScreen() {
               </Link>
 
               <Pressable onPress={handleLogin} style={styles.primary}>
-                <Text style={styles.primaryText}>
-                  {role === "student" ? "Log In as Student" : "Log In as Parent"}
-                </Text>
+                <Text style={styles.primaryText}>Log In</Text>
               </Pressable>
 
               <View style={styles.divider}>
@@ -261,7 +204,7 @@ export default function LoginScreen() {
                   Sign Up Free
                 </Link>
               </Text>
-            </Animated.View>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -272,7 +215,7 @@ export default function LoginScreen() {
 function Field({
   label,
   ...props
-}: { label: string } & React.ComponentProps<typeof TextInput>) {
+}: { label: string } & ComponentProps<typeof TextInput>) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -298,6 +241,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "center",
+    marginTop: 10,
   },
   mascot: { width: 70, height: 100 },
   logo: { width: 105, height: 105, marginHorizontal: -4 },
@@ -312,39 +256,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
-    marginBottom: 4,
-  },
-  roleContainer: {
-    flexDirection: "row",
-    backgroundColor: "#1f2942",
-    borderRadius: 12,
-    padding: 4,
-    marginVertical: 6,
-    borderWidth: 1,
-    borderColor: "#374151",
-  },
-  roleTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 9,
-  },
-  roleTabActive: {
-    backgroundColor: "#5857e4",
-  },
-  roleText: {
-    color: "#94a3b8",
-    fontWeight: "800",
-    fontSize: 13,
-  },
-  roleTextActive: {
-    color: "#ffffff",
+    marginBottom: 20,
   },
   formContainer: {
     gap: 10,
   },
   title: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 2 },
-  subtitle: { color: "#c7d0e8", fontSize: 12, marginBottom: 4 },
+  subtitle: { color: "#c7d0e8", fontSize: 12, marginBottom: 8 },
   field: { marginTop: 4 },
   label: { color: "#fff", fontWeight: "800", fontSize: 11, marginBottom: 4 },
   input: {
@@ -381,7 +299,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   primaryText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 6 },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginVertical: 6,
+  },
   line: { flex: 1, height: 1, backgroundColor: "#aaa9c6" },
   or: { color: "#fff", fontWeight: "900" },
   google: {
@@ -395,6 +318,11 @@ const styles = StyleSheet.create({
   },
   googleLogo: { width: 20, height: 20, marginRight: 8 },
   googleText: { color: "#fff", fontWeight: "900", fontSize: 14 },
-  footer: { color: "#fff", textAlign: "center", fontWeight: "800", marginTop: 8 },
+  footer: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "800",
+    marginTop: 8,
+  },
   link: { color: "#63e1e8", fontWeight: "900" },
 });

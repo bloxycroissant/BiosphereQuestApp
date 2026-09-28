@@ -4,16 +4,16 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 const subjectsList = ["Math", "Patterns", "Matter", "Force", "Geometry"];
@@ -56,6 +56,8 @@ export default function WelcomeWizardScreen() {
     }
 
     try {
+      await AsyncStorage.removeItem("@biosphere_profile_data_v1");
+
       await AsyncStorage.setItem("explorerName", name);
       await AsyncStorage.setItem("explorerGrade", selectedGrade.toString());
       await AsyncStorage.setItem(

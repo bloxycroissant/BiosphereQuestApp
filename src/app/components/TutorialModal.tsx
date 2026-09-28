@@ -1,5 +1,4 @@
-import React from 'react';
-import { Modal, StyleSheet, Text, View, TouchableOpacity, Image, ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import { Image, ImageStyle, Modal, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 interface Props {
   game: any | null;
@@ -55,7 +54,7 @@ export default function TutorialModal({ game, onClose, onContinue }: Props) {
           ) : null}
 
           <TouchableOpacity style={styles.primaryButton} onPress={onContinue} activeOpacity={0.8}>
-            <Text style={styles.primaryButtonText}>Select Grade Level →</Text>
+            <Text style={styles.primaryButtonText}> Start </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onClose} activeOpacity={0.7}>

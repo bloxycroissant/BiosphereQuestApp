@@ -1,10 +1,9 @@
-import { Image } from 'react-native';
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View, Dimensions, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientSafeAreaView } from '@/components/gradient-safe-area';
 import { useProgress } from '@/hooks/use-progress';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CodebreakerGame } from './components/minigames/CodebreakerGame';
 import { FlashcardGame } from './components/minigames/FlashcardGame';
 import { MemoryMatchGame } from './components/minigames/MemoryMatchGame';
@@ -13,8 +12,7 @@ import { QuizGame } from './components/minigames/QuizGame';
 import { WhackANumberGame } from './components/minigames/WhackANumberGame';
 import { WordScrambleGame } from './components/minigames/WordScrambleGame';
 import TutorialModal from './components/TutorialModal';
-import GradeSelectModal from './components/GradeSelectModal';
-import { generateQuizQuestion, QuizQuestion, GradeLevel } from './data/questionGenerators';
+import { GradeLevel } from './data/questionGenerators';
 
 const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
 const gameThemeMusic = require('../../assets/BiosphereQuestBackgroundMusic/The Game Show Theme Music - (192 Kbps).mp3');
@@ -141,16 +139,15 @@ const getDifficultyColor = (difficulty: string) => {
 
 export default function GamesScreen({ navigation }: { navigation?: any }) {
   const { leaderboardXp, addXp } = useProgress();
-  const [difficulty, setDifficulty] = useState<string>('All');
+  const [difficulty, setDifficulty] = useState('All');
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
-  const [activeGameRunning, setActiveGameRunning] = useState<boolean>(false);
-  const [selectedGrade, setSelectedGrade] = useState<GradeLevel>(1);
-  const [showGradeModal, setShowGradeModal] = useState<boolean>(false);
+  const [activeGameRunning, setActiveGameRunning] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState(1);
   const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(null);
 
   // Background Music & Mute States using expo-audio
   const musicPlayer = useAudioPlayer(gameThemeMusic);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   // New State for custom Grade Locked Pop-up Screen
   const [lockedModalInfo, setLockedModalInfo] = useState<{ visible: boolean; gradeNum: number }>({
@@ -161,13 +158,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   // Parental Control States
   const [studyFirstEnabled, setStudyFirstEnabled] = useState(false);
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
-
-  // Compact 3-column portrait card dimensions
-  const screenWidth = Dimensions.get('window').width;
-  const horizontalPadding = 12 * 2;
-  const gap = 8;
-  const cardWidth = Math.floor((screenWidth - horizontalPadding - (gap * 2)) / 3);
-  const cardHeight = Math.floor(cardWidth * 1.25);
 
   const filterAnims = useRef({
     All: new Animated.Value(1),
@@ -188,15 +178,14 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   }).current;
 
   const tutorialAnim = useRef(new Animated.Value(0)).current;
-  const gradeModalAnim = useRef(new Animated.Value(0)).current;
   const lockedModalAnim = useRef(new Animated.Value(0)).current;
   const gridAnim = useRef(new Animated.Value(1)).current;
   const entrance = useRef(new Animated.Value(0)).current;
   const leaderboardPulse = useRef(new Animated.Value(1)).current;
 
-  // Load parent controls rules
+  // Load parent controls rules AND the user's saved grade
   useEffect(() => {
-    fetchParentControls();
+    fetchInitialData();
   }, []);
 
   // Handle music playback using regular useEffect with unmount cleanup
@@ -238,8 +227,16 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   };
 
-  const fetchParentControls = async () => {
+  const fetchInitialData = async () => {
     try {
+      // Fetch the globally saved user grade
+      const gradeData = await AsyncStorage.getItem('explorerGrade');
+      if (gradeData) {
+        const numericGrade = parseInt(gradeData.replace(/[^0-9]/g, ''), 10) || 1;
+        setSelectedGrade(numericGrade as GradeLevel);
+      }
+
+      // Fetch parental controls
       const data = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       if (data) {
         const controls = JSON.parse(data);
@@ -251,7 +248,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         }
       }
     } catch (e) {
-      console.error("Error reading parent controls in games", e);
+      console.error("Error reading initial data in games", e);
     }
   };
 
@@ -270,6 +267,12 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   };
 
   const visibleGames = getOrderedGames();
+  
+  // This chunks the games into explicit rows of 3 to absolutely force the 3-column layout
+  const chunkedGames = [];
+  for (let i = 0; i < visibleGames.length; i += 3) {
+    chunkedGames.push(visibleGames.slice(i, i + 3));
+  }
 
   useEffect(() => {
     Animated.spring(entrance, {
@@ -298,18 +301,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       }).start();
     }
   }, [selectedTutorialGame, tutorialAnim]);
-
-  useEffect(() => {
-    if (showGradeModal) {
-      gradeModalAnim.setValue(0);
-      Animated.spring(gradeModalAnim, {
-        toValue: 1,
-        tension: 65,
-        friction: 6,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [showGradeModal, gradeModalAnim]);
 
   useEffect(() => {
     if (lockedModalInfo.visible) {
@@ -378,35 +369,17 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
 
   const handleTutorialContinue = () => {
     closeTutorialWithAnimation(() => {
-      setShowGradeModal(true);
+      const gradeKey = `Grade ${selectedGrade}`;
+      if (gradeLocks[gradeKey]) {
+        setLockedModalInfo({ visible: true, gradeNum: selectedGrade });
+      } else {
+        setActiveGameRunning(true);
+      }
     });
   };
 
   const handleTutorialClose = () => {
     closeTutorialWithAnimation();
-  };
-
-  const handleSelectGrade = (grade: GradeLevel | string | number) => {
-    const numericGrade = typeof grade === 'string' 
-      ? parseInt(grade.replace(/[^0-9]/g, ''), 10) || 1 
-      : Number(grade);
-
-    const gradeKey = `Grade ${numericGrade}`;
-    if (gradeLocks[gradeKey]) {
-      setShowGradeModal(false);
-      setLockedModalInfo({ visible: true, gradeNum: numericGrade });
-      return;
-    }
-
-    Animated.timing(gradeModalAnim, {
-      toValue: 0,
-      duration: 120,
-      useNativeDriver: true,
-    }).start(() => {
-      setSelectedGrade(numericGrade as GradeLevel);
-      setShowGradeModal(false);
-      setActiveGameRunning(true);
-    });
   };
 
   const handleFinishGame = (earnedXp: number = 50) => {
@@ -501,8 +474,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
 
           {/* Featured Card */}
           <Animated.View style={{ transform: [{ scale: cardAnims.quiz }] }}>
-            <Pressable 
-              style={styles.featured} 
+            <Pressable
+              style={styles.featured}
               onPress={() => {
                 handleGamePress({
                   key: 'quiz',
@@ -559,44 +532,48 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             })}
           </View>
 
-          {/* Game Grid */}
+          {/* Fully fluid 2x3 Game Grid rendering that automatically fills whitespace */}
           <Animated.View style={[styles.grid, { transform: [{ scale: gridAnim }] }]}>
-            {visibleGames.map((item) => {
-              const themeColor = getDifficultyColor(item.difficulty);
-              const anim = cardAnims[item.key as keyof typeof cardAnims] || new Animated.Value(1);
-              return (
-                <Animated.View key={item.key} style={{ transform: [{ scale: anim }] }}>
-                  <Pressable
-                    style={[styles.gameCard, { width: cardWidth, height: cardHeight }]}
-                    onPress={() => handleGamePress(item)}
-                  >
-                    <View style={styles.cardBadgeContainer}>
-                      <Text style={styles.cardBadgeText}>{item.badge}</Text>
-                    </View>
-                    <View style={styles.cardTopArea}>
-                      <Image source={item.icon} style={styles.gameIcon} resizeMode="contain" />
-                    </View>
-                    <View style={styles.cardTextContainer}>
-                      <Text 
-                        style={[styles.cardTitle, { color: themeColor }]} 
-                        numberOfLines={1} 
-                        adjustsFontSizeToFit 
-                        minimumFontScale={0.8}
+            {chunkedGames.map((row, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={styles.gridRow}>
+                {row.map((item) => {
+                  const themeColor = getDifficultyColor(item.difficulty);
+                  const anim = cardAnims[item.key as keyof typeof cardAnims] || new Animated.Value(1);
+                  return (
+                    <Animated.View key={item.key} style={{ flex: 1, transform: [{ scale: anim }] }}>
+                      <Pressable
+                        style={styles.gameCard}
+                        onPress={() => handleGamePress(item)}
                       >
-                        {item.title}
-                      </Text>
-                      <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                    </View>
-                    <View style={styles.cardFooter}>
-                      <Text style={styles.lightningIcon}>⚡</Text>
-                      <Text style={[styles.cardXp, { color: themeColor }]} numberOfLines={1}>
-                        {item.xpText}
-                      </Text>
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
+                        <View style={styles.cardBadgeContainer}>
+                          <Text style={styles.cardBadgeText}>{item.badge}</Text>
+                        </View>
+                        <View style={styles.cardTopArea}>
+                          <Image source={item.icon} style={styles.gameIcon} resizeMode="contain" />
+                        </View>
+                        <View style={styles.cardTextContainer}>
+                          <Text
+                            style={[styles.cardTitle, { color: themeColor }]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                        </View>
+                        <View style={styles.cardFooter}>
+                          <Text style={styles.lightningIcon}>⚡</Text>
+                          <Text style={[styles.cardXp, { color: themeColor }]} numberOfLines={1}>
+                            {item.xpText}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            ))}
           </Animated.View>
 
           {/* Leaderboard Section */}
@@ -643,40 +620,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         </Animated.View>
       )}
 
-      {/* Grade Select Modal Popup with Animation */}
-      {showGradeModal && (
-        <Animated.View
-          style={[
-            styles.absoluteOverlay,
-            {
-              opacity: gradeModalAnim,
-              transform: [
-                {
-                  scale: gradeModalAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.85, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-          pointerEvents={showGradeModal ? 'auto' : 'none'}
-        >
-          <GradeSelectModal
-            visible={showGradeModal}
-            gameTitle={selectedTutorialGame?.title || 'Game'}
-            onSelectGrade={handleSelectGrade}
-            onClose={() => {
-              Animated.timing(gradeModalAnim, {
-                toValue: 0,
-                duration: 120,
-                useNativeDriver: true,
-              }).start(() => setShowGradeModal(false));
-            }}
-          />
-        </Animated.View>
-      )}
-
       {/* Custom Grade Locked Pop-up Screen Modal */}
       {lockedModalInfo.visible && (
         <Animated.View
@@ -714,11 +657,10 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
                     useNativeDriver: true,
                   }).start(() => {
                     setLockedModalInfo({ visible: false, gradeNum: 1 });
-                    setShowGradeModal(true);
                   });
                 }}
               >
-                <Text style={styles.lockedButtonText}>Choose Another Grade</Text>
+                <Text style={styles.lockedButtonText}>Go Back</Text>
               </Pressable>
             </View>
           </View>
@@ -820,7 +762,15 @@ const styles = StyleSheet.create({
   },
   levelIndicatorText: { color: '#f1c65b', fontSize: 11, fontWeight: '900' },
   mascotImage: { width: 44, height: 44 },
-  content: { padding: 12, paddingBottom: 40 },
+  
+  content: { 
+    padding: 12, 
+    paddingBottom: 40,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   title: { color: '#fff', fontSize: 21, fontWeight: '900' },
   subtitle: { color: '#94a3b8', fontSize: 11, fontWeight: '700', marginTop: 1 },
@@ -859,14 +809,23 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: '#4f46e5', borderColor: '#818cf8' },
   filterText: { color: '#94a3b8', fontSize: 10.5, fontWeight: '800' },
   filterTextActive: { color: '#ffffff' },
+  
+  // Grid container: simply stacks the rows
   grid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'flex-start', 
+    flexDirection: 'column', 
     gap: 8, 
     marginTop: 10, 
   },
+  // Grid row: Flexes to 100% width and spaces children evenly
+  gridRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  // Game Card: Auto-scales height based on flexible width using aspectRatio
   gameCard: {
+    width: '100%',
+    aspectRatio: 0.8,
     backgroundColor: '#131d3b',
     borderColor: '#30478a',
     borderWidth: 1.2,

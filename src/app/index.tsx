@@ -1,6 +1,8 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
@@ -8,6 +10,34 @@ const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest 
 const stella = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
 export default function WelcomeScreen() {
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const hasName = await AsyncStorage.getItem("explorerName");
+        const hasProfile = await AsyncStorage.getItem(
+          "@biosphere_profile_data_v1",
+        );
+
+        if (hasName || hasProfile) {
+          router.replace("/home");
+        } else {
+          setIsChecking(false);
+        }
+      } catch (e) {
+        console.error("Failed to check status", e);
+        setIsChecking(false);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, []);
+
+  if (isChecking) {
+    return <SafeAreaView style={styles.safeArea} />;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
@@ -45,6 +75,7 @@ export default function WelcomeScreen() {
           title="Quiz & Flashcards"
           subtitle="Test yourself and master every concept"
         />
+
         <Link href="/welcome" asChild>
           <Pressable style={styles.primary}>
             <Text style={styles.primaryText}>Getting Started</Text>

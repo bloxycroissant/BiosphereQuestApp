@@ -1,20 +1,20 @@
+import { GradientSafeAreaView } from '@/components/gradient-safe-area';
+import { useProgress } from '@/hooks/use-progress';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   ImageSourcePropType,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Modal,
-  Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GradientSafeAreaView } from '@/components/gradient-safe-area';
-import { useProgress } from '@/hooks/use-progress';
 
 const logo = require('../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png');
 const target = require('../../assets/BiosphereQuestAssets/target.png');
@@ -28,16 +28,19 @@ export default function HomeScreen() {
   const appear = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(-100)).current;
 
-  const [streak, setStreak] = useState(progress.streak);
-  const [level, setLevel] = useState(progress.level);
-  const [lessons, setLessons] = useState(progress.lessons);
-  const [xp, setXp] = useState(progress.xp);
-  const [studyMinutes, setStudyMinutes] = useState(progress.studyMinutes || 0);
-  const [prevLevel, setPrevLevel] = useState<number | null>(null);
+  const [userName, setUserName] = useState('Explorer');
+  const [userGrade, setUserGrade] = useState('');
+
+  const [streak, setStreak] = useState(0);
+  const [level, setLevel] = useState(0);
+  const [lessons, setLessons] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [studyMinutes, setStudyMinutes] = useState(0);
+
+  const prevLevelRef = useRef<number | null>(null);
   const [levelUpText, setLevelUpText] = useState('');
   const [greeting, setGreeting] = useState('Good morning');
 
-  // Parent Controls State
   const [isLocked, setIsLocked] = useState(false);
   const [lockMessage, setLockMessage] = useState('');
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
@@ -45,7 +48,6 @@ export default function HomeScreen() {
   const nextLevelXp = progress.nextLevelXp || 100;
   const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
 
-  // Check Parent Controls on Mount
   useEffect(() => {
     checkParentRules();
     const interval = setInterval(checkParentRules, 20000);
@@ -65,25 +67,27 @@ export default function HomeScreen() {
       if (controls.bedtimeLockEnabled && controls.bedtimeHour) {
         if (checkIsBedtime(controls.bedtimeHour)) {
           setIsLocked(true);
-          setLockMessage(`🌙 Bedtime Lock Active!\nYour parent set bedtime for ${controls.bedtimeHour}. Time to rest!`);
+          setLockMessage(
+            `🌙 Bedtime Lock Active!\nYour parent set bedtime for ${controls.bedtimeHour}. Time to rest!`
+          );
           return;
         }
       }
       setIsLocked(false);
     } catch (e) {
-      console.error("Error reading parent controls", e);
+      console.error('Error reading parent controls', e);
     }
   };
 
   const checkIsBedtime = (bedtimeStr: string) => {
     try {
-      const [timePart, period] = bedtimeStr.split(" ");
-      let [hourStr, minStr] = timePart.split(":");
+      const [timePart, period] = bedtimeStr.split(' ');
+      let [hourStr, minStr] = timePart.split(':');
       let targetHour = parseInt(hourStr, 10);
       const targetMin = parseInt(minStr, 10);
 
-      if (period === "PM" && targetHour < 12) targetHour += 12;
-      if (period === "AM" && targetHour === 12) targetHour = 0;
+      if (period === 'PM' && targetHour < 12) targetHour += 12;
+      if (period === 'AM' && targetHour === 12) targetHour = 0;
 
       const now = new Date();
       const currentTotalMins = now.getHours() * 60 + now.getMinutes();
@@ -95,16 +99,18 @@ export default function HomeScreen() {
     }
   };
 
-  // Foolproof navigation wrapper to prevent "Unmatched Route" crashes completely
   const navigateToRoute = (path: string) => {
     try {
       router.push(path as any);
     } catch (err) {
-      console.warn("Standard router push failed, trying absolute path...", err);
+      console.warn('Standard router push failed, trying absolute path...', err);
       try {
         router.replace(path as any);
       } catch (innerErr) {
-        Alert.alert("Route Notice", `Could not find route path: ${path}. Please ensure the file exists in src/app/`);
+        Alert.alert(
+          'Route Notice',
+          `Could not find route path: ${path}. Please ensure the file exists in src/app/`
+        );
       }
     }
   };
@@ -112,9 +118,9 @@ export default function HomeScreen() {
   const handleGradePress = (gradeCategory: string) => {
     if (gradeLocks[gradeCategory]) {
       Alert.alert(
-        "Content Locked", 
+        'Content Locked',
         `Your parent has locked access for ${gradeCategory}. Returning to login.`,
-        [{ text: "OK", onPress: () => router.replace('/') }]
+        [{ text: 'OK', onPress: () => router.replace('/') }]
       );
       return;
     }
@@ -155,39 +161,36 @@ export default function HomeScreen() {
 
   const loadSharedProgress = async () => {
     try {
+      const savedName = await AsyncStorage.getItem('explorerName');
+      const savedGrade = await AsyncStorage.getItem('explorerGrade');
+      if (savedName) setUserName(savedName);
+      if (savedGrade) setUserGrade(savedGrade);
+
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       if (savedData) {
         const parsed = JSON.parse(savedData);
-        const newLvl = parsed.level !== undefined ? parsed.level : progress.level;
+        const newLvl = parsed.level !== undefined ? parsed.level : 0;
+        const previousLevel = prevLevelRef.current;
 
         setLevel((currentLvl) => {
-          if (prevLevel !== null && newLvl > currentLvl) {
-            triggerLevelUpAnimation(currentLvl, newLvl);
+          if (previousLevel !== null && newLvl > previousLevel) {
+            triggerLevelUpAnimation(previousLevel, newLvl);
           }
-          setPrevLevel(newLvl);
+          prevLevelRef.current = newLvl;
           return newLvl;
         });
 
-        if (parsed.streak !== undefined) setStreak(parsed.streak);
-        if (parsed.lessons !== undefined) setLessons(parsed.lessons);
-        if (parsed.xp !== undefined) setXp(parsed.xp);
-        if (parsed.studyMinutes !== undefined) {
-          setStudyMinutes(parsed.studyMinutes);
-        } else {
-          setStudyMinutes(0);
-        }
+        setStreak(parsed.streak !== undefined ? parsed.streak : 0);
+        setLessons(parsed.lessons !== undefined ? parsed.lessons : 0);
+        setXp(parsed.xp !== undefined ? parsed.xp : 0);
+        setStudyMinutes(parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0);
       } else {
-        setLevel((currentLvl) => {
-          if (prevLevel !== null && progress.level > currentLvl) {
-            triggerLevelUpAnimation(currentLvl, progress.level);
-          }
-          setPrevLevel(progress.level);
-          return progress.level;
-        });
-        setStreak(progress.streak);
-        setLessons(progress.lessons);
-        setXp(progress.xp);
-        setStudyMinutes(progress.studyMinutes || 0);
+        setLevel(0);
+        prevLevelRef.current = 0;
+        setStreak(0);
+        setLessons(0);
+        setXp(0);
+        setStudyMinutes(0);
       }
     } catch (e) {
       console.error('Failed to load shared progress on home', e);
@@ -224,8 +227,10 @@ export default function HomeScreen() {
           <View style={styles.greeting}>
             <Image source={logo} style={styles.avatar} contentFit="contain" />
             <View>
-              <Text style={styles.small}>{greeting},</Text>
-              <Text style={styles.name}>BloxyCroissant</Text>
+              <Text style={styles.small}>
+                {greeting},{userGrade ? ` Grade ${userGrade}` : ''}
+              </Text>
+              <Text style={styles.name}>{userName}</Text>
             </View>
           </View>
           <Text style={styles.bell}>🔔</Text>
@@ -285,9 +290,7 @@ export default function HomeScreen() {
 
           <Text style={styles.section}>Study time</Text>
           <View style={styles.study}>
-            <Text style={styles.studyValue}>
-              {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m
-            </Text>
+            <Text style={styles.studyValue}>{Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m</Text>
             <Text style={styles.studyCopy}>Keep learning to grow your weekly progress.</Text>
           </View>
 
@@ -311,10 +314,9 @@ export default function HomeScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Bedtime Lock Overlay Modal -> Automatically redirects back to welcome/login page when clicked/tapped */}
       <Modal visible={isLocked} animationType="fade" transparent={true}>
-        <Pressable 
-          style={styles.lockOverlay} 
+        <Pressable
+          style={styles.lockOverlay}
           onPress={() => {
             setIsLocked(false);
             router.replace('/');
@@ -490,6 +492,19 @@ const styles = StyleSheet.create({
   },
   lockEmoji: { fontSize: 50, marginBottom: 12 },
   lockTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 8, textAlign: 'center' },
-  lockDesc: { color: '#94a3b8', fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  lockActionHint: { color: '#818cf8', fontSize: 12, fontWeight: '800', textAlign: 'center', textDecorationLine: 'underline' },
+  lockDesc: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  lockActionHint: {
+    color: '#818cf8',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
 });
