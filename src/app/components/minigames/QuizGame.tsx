@@ -196,16 +196,6 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
           )}
         </View>
       </ScrollView>
-
-      <GradeSelectModal
-        visible={isGradeModalVisible}
-        gameName="Math & Science Quiz"
-        onClose={() => setIsGradeModalVisible(false)}
-        onSelectGrade={(selectedGrade: number) => {
-          setIsGradeModalVisible(false);
-          setCurrentGrade(selectedGrade as GradeLevel);
-        }}
-      />
     </Animated.View>
   );
 };

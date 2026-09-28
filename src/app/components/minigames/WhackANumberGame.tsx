@@ -106,16 +106,6 @@ export const WhackANumberGame: React.FC<Props> = ({ grade, onSuccess, onClose })
           </TouchableOpacity>
         </Animated.View>
       </View>
-
-      <GradeSelectModal
-        visible={isGradeModalVisible}
-        gameName="Whack-a-Number"
-        onClose={() => setIsGradeModalVisible(false)}
-        onSelectGrade={(selectedGrade: number) => {
-          setIsGradeModalVisible(false);
-          setCurrentGrade(selectedGrade as GradeLevel);
-        }}
-      />
     </Animated.View>
   );
 };

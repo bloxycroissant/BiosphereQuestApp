@@ -106,16 +106,6 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
           </TouchableOpacity>
         </Animated.View>
       </View>
-
-      <GradeSelectModal
-        visible={isGradeModalVisible}
-        gameName="Memory Match"
-        onClose={() => setIsGradeModalVisible(false)}
-        onSelectGrade={(selectedGrade: number) => {
-          setIsGradeModalVisible(false);
-          setCurrentGrade(selectedGrade as GradeLevel);
-        }}
-      />
     </Animated.View>
   );
 };
