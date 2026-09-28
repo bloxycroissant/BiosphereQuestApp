@@ -45,7 +45,7 @@ export default function WelcomeScreen() {
           title="Quiz & Flashcards"
           subtitle="Test yourself and master every concept"
         />
-        <Link href="/welcome" asChild>
+        <Link href={"/welcome" as any} asChild>
           <Pressable style={styles.primary}>
             <Text style={styles.primaryText}>Getting Started</Text>
           </Pressable>
