@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Animated, ViewStyle, TextStyle, ScrollView } from 'react-native';
 import { generateQuizQuestion, QuizQuestion, GradeLevel } from '../../data/questionGenerators';
-import GradeSelectModal from '../GradeSelectModal';
 
 interface Props {
   grade: GradeLevel;
