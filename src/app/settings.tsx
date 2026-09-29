@@ -1,9 +1,10 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -15,58 +16,101 @@ import {
 import { supabase } from "../lib/supabase";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
+const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 
-const parseStoredProfile = (value: string | null) => {
-  if (!value) return null;
+const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
+const googleLogo = require("../../assets/BiosphereQuestAssets/Google Logo.png");
 
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-};
+const gradeLevels = [
+  { level: 1, label: "Explorer" },
+  { level: 2, label: "Adventurer" },
+  { level: 3, label: "Navigator" },
+  { level: 4, label: "Pioneer" },
+  { level: 5, label: "Expert" },
+  { level: 6, label: "Master" },
+];
 
-export default function SettingsScreen() {
+export default function SettingsScreen(): React.JSX.Element {
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [parentGateVisible, setParentGateVisible] = useState(false);
+  const [gradeModalVisible, setGradeModalVisible] = useState(false);
   const [securityAnswer, setSecurityAnswer] = useState("");
+  const [savedKeyword, setSavedKeyword] = useState("");
   const [hasAccount, setHasAccount] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [isGoogleAuth, setIsGoogleAuth] = useState(false);
+  const [currentGrade, setCurrentGrade] = useState(1);
 
-  const syncAuth = async () => {
+  const handleBack = (): void => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/home" as any);
+    }
+  };
+
+  const syncAuth = async (): Promise<void> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Load current grade
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const parsed = savedData ? JSON.parse(savedData) : null;
+      if (parsed?.gradeYear) {
+        const match = parsed.gradeYear.match(/\d+/);
+        if (match) setCurrentGrade(parseInt(match[0], 10));
+      } else {
+        const guestGrade = await AsyncStorage.getItem("explorerGrade");
+        if (guestGrade) setCurrentGrade(parseInt(guestGrade, 10));
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setHasAccount(true);
         setUserEmail(user.email || "Active User");
+
+        const isGoogle =
+          user.app_metadata?.provider === "google" ||
+          user.identities?.some((id: any) => id.provider === "google");
+        setIsGoogleAuth(Boolean(isGoogle));
         return;
       }
 
-      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-      const parsed = savedData ? JSON.parse(savedData) : null;
       if (parsed?.email?.trim()) {
         setHasAccount(true);
         setUserEmail(parsed.email);
+        setIsGoogleAuth(parsed.authProvider === "google");
         return;
       }
 
       setHasAccount(false);
       setUserEmail("");
+      setIsGoogleAuth(false);
     } catch (e) {
       console.error("Auth sync error:", e);
+      setHasAccount(false);
+      setUserEmail("");
+      setIsGoogleAuth(false);
     }
   };
 
   useEffect(() => {
     syncAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setHasAccount(true);
         setUserEmail(session.user.email || "Active User");
+        const isGoogle =
+          session.user.app_metadata?.provider === "google" ||
+          session.user.identities?.some((id: any) => id.provider === "google");
+        setIsGoogleAuth(Boolean(isGoogle));
       } else {
         setHasAccount(false);
         setUserEmail("");
+        setIsGoogleAuth(false);
       }
     });
 
@@ -76,20 +120,99 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       syncAuth();
-    }, [])
+    }, []),
   );
 
-  const handleDevReset = async () => {
+  const handleUpdateGrade = async (newGrade: number): Promise<void> => {
+    try {
+      setCurrentGrade(newGrade);
+      await AsyncStorage.setItem("explorerGrade", newGrade.toString());
+
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const parsed = savedData ? JSON.parse(savedData) : {};
+      parsed.gradeYear = `Grade ${newGrade}`;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+
+      // Sync metadata to Supabase if authenticated
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.auth.updateUser({
+          data: { grade_level: newGrade.toString() },
+        });
+      }
+
+      setGradeModalVisible(false);
+      Alert.alert(
+        "Grade Level Updated",
+        `Your curriculum is now set to Grade ${newGrade}.`,
+      );
+    } catch (error) {
+      console.error("Failed to update grade", error);
+      Alert.alert("Error", "Could not update grade level.");
+    }
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        parsed.email = "";
+        parsed.authProvider = "";
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
+
+      setHasAccount(false);
+      setUserEmail("");
+      setIsGoogleAuth(false);
+      Alert.alert("Logged Out", "You have been logged out of your account.");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleParentControlsPress = async (): Promise<void> => {
+    try {
+      const controlsData = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
+      const controls = controlsData ? JSON.parse(controlsData) : null;
+      const keyword = controls?.parentKeyword?.trim();
+
+      if (!keyword) {
+        router.push("/parent-dashboard" as any);
+      } else {
+        setSavedKeyword(keyword);
+        setParentGateVisible(true);
+      }
+    } catch (e) {
+      router.push("/parent-dashboard" as any);
+    }
+  };
+
+  const handleParentGateSubmit = (): void => {
+    if (securityAnswer.trim().toLowerCase() === savedKeyword.toLowerCase()) {
+      setParentGateVisible(false);
+      setSecurityAnswer("");
+      router.push("/parent-dashboard" as any);
+    } else {
+      Alert.alert("Access Denied", "Incorrect keyword. Please try again.");
+    }
+  };
+
+  const handleDevReset = async (): Promise<void> => {
     try {
       await supabase.auth.signOut();
       await AsyncStorage.clear();
-      router.replace("/");
+      router.replace("/" as any);
     } catch (error) {
       console.error("Dev reset error:", error);
     }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = (): void => {
     Alert.alert(
       "Delete Account",
       "Are you sure you want to permanently delete your account and wipe all data? This cannot be undone.",
@@ -102,17 +225,17 @@ export default function SettingsScreen() {
             try {
               await supabase.auth.signOut();
               await AsyncStorage.clear();
-              router.replace("/");
+              router.replace("/" as any);
             } catch (error) {
               console.error("Delete account error:", error);
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const executeResetProgress = async () => {
+  const executeResetProgress = async (): Promise<void> => {
     try {
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       const parsed = savedData ? JSON.parse(savedData) : {};
@@ -130,24 +253,77 @@ export default function SettingsScreen() {
 
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(resetData));
       setResetModalVisible(false);
-      router.back();
+      handleBack();
     } catch (e) {
       console.error("Failed to reset progress", e);
     }
   };
 
-  const handleParentGateSubmit = () => {
-    if (securityAnswer.trim().toLowerCase() === "fluffy") {
-      setParentGateVisible(false);
-      setSecurityAnswer("");
-      router.push("/parent-dashboard" as any);
-    } else {
-      Alert.alert("Access Denied", "Incorrect answer. Please try again.");
-    }
-  };
-
   return (
-    <GradientSafeAreaView style={styles.safeArea} edges={['top']}>
+    <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
+      {/* Change Grade Modal */}
+      <Modal
+        visible={gradeModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setGradeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Select Grade Level </Text>
+            <Text style={styles.modalMessage}>
+              Update your rank to receive grade-specific Math and Science
+              missions:
+            </Text>
+
+            <View style={styles.gradeGrid}>
+              {gradeLevels.map((g) => {
+                const isSelected = currentGrade === g.level;
+                return (
+                  <Pressable
+                    key={g.level}
+                    style={[
+                      styles.gradeBox,
+                      isSelected && styles.gradeBoxActive,
+                    ]}
+                    onPress={() => handleUpdateGrade(g.level)}
+                  >
+                    <Text
+                      style={[
+                        styles.gradeNumber,
+                        isSelected && styles.gradeTextActive,
+                      ]}
+                    >
+                      {g.level}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.gradeLabel,
+                        isSelected && styles.gradeTextActive,
+                      ]}
+                    >
+                      Grade {g.level}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              style={[
+                styles.modalBtn,
+                styles.modalCancelBtn,
+                { width: "100%", marginTop: 10 },
+              ]}
+              onPress={() => setGradeModalVisible(false)}
+            >
+              <Text style={styles.modalCancelText}>Close </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reset Progress Modal */}
       <Modal
         visible={resetModalVisible}
         transparent={true}
@@ -156,7 +332,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Reset Progress</Text>
+            <Text style={styles.modalTitle}>Reset Progress </Text>
             <Text style={styles.modalMessage}>
               Are you sure you want to reset your stats, study time, and streak?
               Progress also automatically resets every 30 days.
@@ -166,19 +342,20 @@ export default function SettingsScreen() {
                 style={[styles.modalBtn, styles.modalCancelBtn]}
                 onPress={() => setResetModalVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel </Text>
               </Pressable>
               <Pressable
                 style={[styles.modalBtn, styles.modalConfirmBtn]}
                 onPress={executeResetProgress}
               >
-                <Text style={styles.modalConfirmText}>Reset</Text>
+                <Text style={styles.modalConfirmText}>Reset </Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
+      {/* Parental Gate Modal */}
       <Modal
         visible={parentGateVisible}
         transparent={true}
@@ -187,24 +364,21 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Parental Gate</Text>
+            <Text style={styles.modalTitle}>Parental Gate </Text>
             <Text style={styles.modalMessage}>
-              For parents only! To access settings and limits, answer your
-              security question:
-            </Text>
-
-            <Text style={styles.securityQuestion}>
-              What is the name of your first pet?
+              Enter the parental keyword to access dashboard settings and
+              limits:
             </Text>
 
             <TextInput
               style={styles.securityInput}
               value={securityAnswer}
               onChangeText={setSecurityAnswer}
-              placeholder="Enter your answer"
+              placeholder="Enter security keyword"
               placeholderTextColor="#68779a"
               autoCapitalize="none"
               autoCorrect={false}
+              secureTextEntry={true}
             />
 
             <View style={styles.modalButtonRow}>
@@ -215,13 +389,13 @@ export default function SettingsScreen() {
                   setSecurityAnswer("");
                 }}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel </Text>
               </Pressable>
               <Pressable
                 style={[styles.modalBtn, styles.modalSubmitBtn]}
                 onPress={handleParentGateSubmit}
               >
-                <Text style={styles.modalSubmitText}>Unlock</Text>
+                <Text style={styles.modalSubmitText}>Unlock </Text>
               </Pressable>
             </View>
           </View>
@@ -233,36 +407,89 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={styles.backText}>← Back</Text>
+          <Pressable onPress={handleBack}>
+            <Text style={styles.backText}>  Back </Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerTitle}>Settings </Text>
           <View style={{ width: 45 }} />
         </View>
 
-        <Text style={styles.groupLabel}>ACCOUNT</Text>
+        <Text style={styles.groupLabel}>ACCOUNT </Text>
         <View style={styles.cardGroup}>
           {!hasAccount ? (
             <Pressable
               style={styles.rowItem}
               onPress={() => router.push("/login" as any)}
             >
-              <Text style={styles.rowItemText}>Login or Create Account</Text>
-              <Text style={styles.rowArrow}>→</Text>
+              <Text style={styles.rowItemText}>Login or Create Account </Text>
+              <Text style={styles.rowArrow}> </Text>
             </Pressable>
           ) : (
-            <View style={styles.rowItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowItemText}>{userEmail}</Text>
-                <Text style={[styles.rowItemSub, { color: "#4ade80" }]}>
-                  Logged In (Verified)
-                </Text>
+            <View>
+              <View style={styles.rowItem}>
+                <Image
+                  source={isGoogleAuth ? googleLogo : logo}
+                  style={styles.providerLogo}
+                  resizeMode="contain"
+                />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.rowItemText}>{userEmail} </Text>
+                  <Text style={[styles.rowItemSub, { color: "#4ade80" }]}>
+                    {isGoogleAuth ? "Google Logged In" : "Logged In (Verified)"}
+                  </Text>
+                </View>
+                <Text style={styles.rowArrow}>✓ </Text>
               </View>
-              <Text style={styles.rowArrow}>✓</Text>
+
+              {!isGoogleAuth && (
+                <Pressable
+                  style={[
+                    styles.rowItem,
+                    { borderTopWidth: 1, borderTopColor: "# <0> <5c" },
+                  ]}
+                  onPress={() => router.push("/change-password" as any)}
+                >
+                  <Text style={styles.rowItemText}>Change Password </Text>
+                  <Text style={styles.rowArrow}> </Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                style={[
+                  styles.rowItem,
+                  { borderTopWidth: 1, borderTopColor: "# <0> <5c" },
+                ]}
+                onPress={handleLogout}
+              >
+                <Text style={[styles.rowItemText, { color: "#f87171" }]}>
+                  Log Out{" "}
+                </Text>
+                <Text style={[styles.rowArrow, { color: "#f87171" }]}> </Text>
+              </Pressable>
             </View>
           )}
         </View>
 
+        {/* ACADEMIC PREFERENCES (Change Grade) */}
+        <Text style={[styles.groupLabel, { marginTop: 20 }]}>
+          ACADEMIC PREFERENCES
+        </Text>
+        <View style={styles.cardGroup}>
+          <Pressable
+            style={styles.rowItem}
+            onPress={() => setGradeModalVisible(true)}
+          >
+            <View>
+              <Text style={styles.rowItemText}>Change Grade Level </Text>
+              <Text style={styles.rowItemSub}>
+                Currently Grade {currentGrade}{" "}
+              </Text>
+            </View>
+            <Text style={styles.rowArrow}> </Text>
+          </Pressable>
+        </View>
+
+        {/* FAMILY MANAGEMENT (Logged In Only) */}
         {hasAccount && (
           <View>
             <Text style={[styles.groupLabel, { marginTop: 20 }]}>
@@ -271,69 +498,90 @@ export default function SettingsScreen() {
             <View style={styles.cardGroup}>
               <Pressable
                 style={styles.rowItem}
-                onPress={() => setParentGateVisible(true)}
+                onPress={handleParentControlsPress}
               >
                 <View>
-                  <Text style={styles.rowItemText}>Parental Controls</Text>
+                  <Text style={styles.rowItemText}>Parental Controls </Text>
                   <Text style={styles.rowItemSub}>
                     Manage limits and screentime
                   </Text>
                 </View>
-                <Text style={styles.rowArrow}>🔒</Text>
+                <Text style={styles.rowArrow}>🔒 </Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        <Text style={[styles.groupLabel, { color: "#ff3e58", marginTop: 20 }]}>
-          DANGER ZONE
-        </Text>
-        <Pressable
-          style={[
-            styles.dangerZoneCard,
-            { borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-          ]}
-          onPress={() => setResetModalVisible(true)}
-        >
+        {/* DANGER ZONE (Logged In Only) */}
+        {hasAccount && (
           <View>
-            <Text style={styles.dangerZoneText}>Reset Progress Data</Text>
-            <Text style={styles.dangerZoneSub}>
-              Wipe streak, XP, and levels
+            <Text
+              style={[styles.groupLabel, { color: "#ff3e58", marginTop: 20 }]}
+            >
+              DANGER ZONE
             </Text>
-          </View>
-          <Text style={styles.dangerZoneArrow}>→</Text>
-        </Pressable>
+            <Pressable
+              style={[
+                styles.dangerZoneCard,
+                {
+                  borderBottomWidth: 0,
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                },
+              ]}
+              onPress={() => setResetModalVisible(true)}
+            >
+              <View>
+                <Text style={styles.dangerZoneText}>Reset Progress Data </Text>
+                <Text style={styles.dangerZoneSub}>
+                  Wipe streak, XP, and levels
+                </Text>
+              </View>
+              <Text style={styles.dangerZoneArrow}> </Text>
+            </Pressable>
 
-        <Pressable
-          style={[styles.dangerZoneCard, { borderTopLeftRadius: 0, borderTopRightRadius: 0 }]}
-          onPress={handleDeleteAccount}
-        >
-          <View>
-            <Text style={styles.dangerZoneText}>Delete Account</Text>
-            <Text style={styles.dangerZoneSub}>
-              Permanently remove your profile
-            </Text>
+            <Pressable
+              style={[
+                styles.dangerZoneCard,
+                { borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+              ]}
+              onPress={handleDeleteAccount}
+            >
+              <View>
+                <Text style={styles.dangerZoneText}>Delete Account </Text>
+                <Text style={styles.dangerZoneSub}>
+                  Permanently remove your profile
+                </Text>
+              </View>
+              <Text style={styles.dangerZoneArrow}> </Text>
+            </Pressable>
           </View>
-          <Text style={styles.dangerZoneArrow}>→</Text>
-        </Pressable>
+        )}
 
+        {/* DEVELOPER TOOLS */}
         <Text style={[styles.groupLabel, { color: "#ffaa00", marginTop: 20 }]}>
           DEVELOPER TOOLS
         </Text>
         <Pressable
           style={[
             styles.dangerZoneCard,
-            { borderColor: "#a36c00", backgroundColor: "#2b1e05", borderRadius: 16 },
+            {
+              borderColor: "#a>6c00",
+              backgroundColor: "# <b1e05",
+              borderRadius: 16,
+            },
           ]}
           onPress={handleDevReset}
         >
           <View>
-            <Text style={[styles.dangerZoneText, { color: "#ffaa00" }]}>Dev Factory Reset</Text>
+            <Text style={[styles.dangerZoneText, { color: "#ffaa00" }]}>
+              Dev Factory Reset{" "}
+            </Text>
             <Text style={[styles.dangerZoneSub, { color: "#cc8800" }]}>
               Wipe Supabase auth & all local data
             </Text>
           </View>
-          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}>→</Text>
+          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}> </Text>
         </Pressable>
       </ScrollView>
     </GradientSafeAreaView>
@@ -372,6 +620,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 18,
+  },
+  providerLogo: {
+    width: 28,
+    height: 28,
   },
   rowItemText: { color: "#ffffff", fontSize: 14, fontWeight: "800" },
   rowItemSub: {
@@ -431,13 +683,35 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20,
   },
-  securityQuestion: {
-    color: "#9af2bc",
-    fontSize: 12,
-    fontWeight: "800",
+  gradeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
     marginBottom: 12,
-    textAlign: "center",
   },
+  gradeBox: {
+    backgroundColor: "#091426",
+    borderColor: "#374b7c",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    width: "30%",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  gradeBoxActive: {
+    backgroundColor: "#625cff",
+    borderColor: "#8d89ff",
+  },
+  gradeNumber: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  gradeLabel: {
+    color: "#8a9bbd",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  gradeTextActive: { color: "#ffffff" },
   securityInput: {
     backgroundColor: "#091426",
     borderColor: "#374b7c",

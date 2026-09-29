@@ -17,8 +17,20 @@ import {
   View,
 } from "react-native";
 
-const subjectsList = ["Math", "Patterns", "Matter", "Force", "Geometry"];
-const gradeLevels = [
+interface GradeLevel {
+  level: number;
+  label: string;
+}
+
+const subjectsList: string[] = [
+  "Math",
+  "Patterns",
+  "Matter",
+  "Force",
+  "Geometry",
+];
+
+const gradeLevels: GradeLevel[] = [
   { level: 1, label: "Explorer" },
   { level: 2, label: "Adventurer" },
   { level: 3, label: "Navigator" },
@@ -28,10 +40,12 @@ const gradeLevels = [
 ];
 
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
+const STORAGE_KEY = "@biosphere_profile_data_v1";
 
-export default function WelcomeWizardScreen() {
+export default function WelcomeWizardScreen(): React.JSX.Element {
   const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [selectedGrade, setSelectedGrade] = useState(3);
   const [selectedSubjects, setSelectedSubjects] = useState(["Math"]);
 
@@ -40,7 +54,7 @@ export default function WelcomeWizardScreen() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
   const scaleButtonAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Track press scales dynamically for grid items
   const boxScales = useRef<{ [key: string]: Animated.Value }>({}).current;
 
@@ -83,7 +97,7 @@ export default function WelcomeWizardScreen() {
           duration: 1500,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [floatAnim]);
 
@@ -121,7 +135,7 @@ export default function WelcomeWizardScreen() {
     ]).start(() => callback());
   };
 
-  const toggleSubject = (subject: string) => {
+  const toggleSubject = (subject: string): void => {
     animateItemPress(subject, () => {
       setSelectedSubjects((current) =>
         current.includes(subject)
@@ -137,15 +151,19 @@ export default function WelcomeWizardScreen() {
     });
   };
 
-  const handleNextStep = () => {
-    if (step === 1 && !name.trim()) {
-      Alert.alert("Hold on!", "We need your Explorer Name to continue.");
+  const handleNextStep = (): void => {
+    if (step === 1 && !fullName.trim()) {
+      Alert.alert("Hold on!", "Please enter your full name to continue.");
+      return;
+    }
+    if (step === 2 && !username.trim()) {
+      Alert.alert("Hold on!", "We need your Explorer Username to continue.");
       return;
     }
     animateButtonPress(() => setStep(step + 1));
   };
 
-  const handleLaunch = async () => {
+  const handleLaunch = async (): Promise<void> => {
     if (selectedSubjects.length === 0) {
       Alert.alert("Hold on!", "Please pick at least one mission topic.");
       return;
@@ -155,14 +173,34 @@ export default function WelcomeWizardScreen() {
       try {
         await AsyncStorage.removeItem("@biosphere_profile_data_v1");
 
-        await AsyncStorage.setItem("explorerName", name);
+        // Clear out stale cache
+        await AsyncStorage.removeItem(STORAGE_KEY);
+
+        // Save standalone keys for fallback access
+        await AsyncStorage.setItem("explorerName", fullName.trim());
+        await AsyncStorage.setItem("explorerUsername", username.trim());
         await AsyncStorage.setItem("explorerGrade", selectedGrade.toString());
         await AsyncStorage.setItem(
           "explorerSubjects",
           JSON.stringify(selectedSubjects),
         );
 
-        router.replace("/home");
+        // Seed the full profile cache
+        const initialProfile = {
+          name: fullName.trim(),
+          username: username.trim(),
+          gradeYear: `Grade ${selectedGrade}`,
+          xp: 0,
+          level: 0,
+          nextLevelXp: 100,
+          streak: 0,
+          lessons: 0,
+          lastResetDate: Date.now(),
+          lastActiveDate: new Date().toDateString(),
+        };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initialProfile));
+
+        router.replace("/home" as any);
       } catch (e) {
         console.error("Failed to save local data", e);
       }
@@ -183,7 +221,7 @@ export default function WelcomeWizardScreen() {
           >
             <Text style={styles.back}>‹ Back</Text>
           </Pressable>
-          <Text style={styles.stepIndicator}>Step {step} of 3</Text>
+          <Text style={styles.stepIndicator}>Step {step} of 4</Text>
         </View>
 
         <ScrollView
@@ -213,34 +251,64 @@ export default function WelcomeWizardScreen() {
               },
             ]}
           >
-            {/* STEP 1: NAME */}
+            {/* STEP 1: FULL NAME */}
             {step === 1 && (
               <View style={styles.innerContainer}>
-                <Text style={styles.title}>What should we call you?</Text>
+                <Text style={styles.title}>What is your name?</Text>
                 <Text style={styles.subtitle}>
-                  Enter your official Explorer Name.
+                  Enter your full name for your official profile.
                 </Text>
 
                 <TextInput
                   style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. Captain Alex"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="e.g. Alex Johnson"
                   placeholderTextColor="#aebee0"
                   autoFocus
                 />
 
-                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
+                <Animated.View
+                  style={{
+                    transform: [{ scale: scaleButtonAnim }],
+                    width: "100%",
+                  }}
+                >
                   <Pressable onPress={handleNextStep} style={styles.primary}>
-                    <Text style={styles.primaryText}>Next Step →</Text>
+                    <Text style={styles.primaryText}>Next Step </Text>
                   </Pressable>
                 </Animated.View>
               </View>
             )}
 
-            {/* STEP 2: GRADE */}
+            {/* STEP 2: EXPLORER USERNAME */}
             {step === 2 && (
-              <View style={styles.innerContainer}>
+              <View style={styles.stepContainer}>
+                <Text style={styles.title}>What should we call you?</Text>
+                <Text style={styles.subtitle}>
+                  Choose an Explorer username for your quests and rankings.
+                </Text>
+
+                <TextInput
+                  style={styles.input}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="e.g. CaptainAlex"
+                  placeholderTextColor="#aebee0"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+
+                <Pressable onPress={handleNextStep} style={styles.primary}>
+                  <Text style={styles.primaryText}>Next Step </Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* STEP 3: GRADE LEVEL */}
+            {step === 3 && (
+              <View style={styles.stepContainer}>
                 <Text style={styles.title}>Select your rank</Text>
                 <Text style={styles.subtitle}>
                   What grade level are you currently in?
@@ -286,17 +354,22 @@ export default function WelcomeWizardScreen() {
                   })}
                 </View>
 
-                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
+                <Animated.View
+                  style={{
+                    transform: [{ scale: scaleButtonAnim }],
+                    width: "100%",
+                  }}
+                >
                   <Pressable onPress={handleNextStep} style={styles.primary}>
-                    <Text style={styles.primaryText}>Next Step →</Text>
+                    <Text style={styles.primaryText}>Next Step </Text>
                   </Pressable>
                 </Animated.View>
               </View>
             )}
 
-            {/* STEP 3: TOPICS */}
-            {step === 3 && (
-              <View style={styles.innerContainer}>
+            {/* STEP 4: MISSION TOPICS & LAUNCH */}
+            {step === 4 && (
+              <View style={styles.stepContainer}>
                 <Text style={styles.title}>Pick your missions</Text>
                 <Text style={styles.subtitle}>
                   What topics do you want to master first?
@@ -334,8 +407,16 @@ export default function WelcomeWizardScreen() {
                   })}
                 </View>
 
-                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
-                  <Pressable onPress={handleLaunch} style={styles.primaryLaunch}>
+                <Animated.View
+                  style={{
+                    transform: [{ scale: scaleButtonAnim }],
+                    width: "100%",
+                  }}
+                >
+                  <Pressable
+                    onPress={handleLaunch}
+                    style={styles.primaryLaunch}
+                  >
                     <Text style={styles.primaryText}>🚀 Launch App</Text>
                   </Pressable>
                 </Animated.View>

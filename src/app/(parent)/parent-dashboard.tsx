@@ -11,26 +11,13 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 const logo = require("../../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
-
-const DEFAULT_GRADE_LOCKS: { [key: string]: boolean } = {
-  "Grade 1": false,
-  "Grade 2": false,
-  "Grade 3": false,
-  "Grade 4": false,
-  "Grade 5": false,
-  "Grade 6": false,
-};
-
-const normalizeGradeLocks = (locks?: Partial<Record<string, boolean>>) => ({
-  ...DEFAULT_GRADE_LOCKS,
-  ...(locks || {}),
-});
 
 export default function ParentDashboardScreen() {
   const [studentName, setStudentName] = useState("Explorer");
@@ -41,19 +28,17 @@ export default function ParentDashboardScreen() {
   const [quizAccuracy, setQuizAccuracy] = useState("0%");
   const [greeting, setGreeting] = useState("Good Morning");
 
+  const [timeCapEnabled, setTimeCapEnabled] = useState(true);
   const [timeCapMinutes, setTimeCapMinutes] = useState(90);
-  const [bedtimeLockEnabled, setBedtimeLockEnabled] = useState(true);
 
+  const [bedtimeLockEnabled, setBedtimeLockEnabled] = useState(true);
   const [bedtimeHourNum, setBedtimeHourNum] = useState("9");
   const [bedtimeMinute, setBedtimeMinute] = useState("00");
   const [bedtimePeriod, setBedtimePeriod] = useState<"AM" | "PM">("PM");
   const bedtimeHour = `${bedtimeHourNum}:${bedtimeMinute} ${bedtimePeriod}`;
 
   const [studyFirstEnabled, setStudyFirstEnabled] = useState(true);
-
-  const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>(
-    DEFAULT_GRADE_LOCKS,
-  );
+  const [parentKeyword, setParentKeyword] = useState("");
 
   const entrance = useRef(new Animated.Value(0)).current;
   const scaleAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -128,6 +113,8 @@ export default function ParentDashboardScreen() {
       const controlsData = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       if (controlsData) {
         const controls = JSON.parse(controlsData);
+        if (controls.timeCapEnabled !== undefined)
+          setTimeCapEnabled(controls.timeCapEnabled);
         if (controls.timeCapMinutes !== undefined)
           setTimeCapMinutes(controls.timeCapMinutes);
         if (controls.bedtimeLockEnabled !== undefined)
@@ -135,7 +122,8 @@ export default function ParentDashboardScreen() {
         if (controls.bedtimeHour) parseAndSetBedtime(controls.bedtimeHour);
         if (controls.studyFirstEnabled !== undefined)
           setStudyFirstEnabled(controls.studyFirstEnabled);
-        if (controls.gradeLocks) setGradeLocks(controls.gradeLocks);
+        if (controls.parentKeyword !== undefined)
+          setParentKeyword(controls.parentKeyword);
       }
     } catch (e) {
       console.error("Failed to load controls", e);
@@ -163,11 +151,12 @@ export default function ParentDashboardScreen() {
   ) => {
     try {
       const currentControls = {
+        timeCapEnabled,
         timeCapMinutes,
         bedtimeLockEnabled,
         bedtimeHour: `${bedtimeHourNum}:${bedtimeMinute} ${bedtimePeriod}`,
         studyFirstEnabled,
-        gradeLocks,
+        parentKeyword,
         ...updatedSettings,
       };
       await AsyncStorage.setItem(
@@ -183,12 +172,6 @@ export default function ParentDashboardScreen() {
     const newCap = Math.max(30, timeCapMinutes + amountMinutes);
     setTimeCapMinutes(newCap);
     saveParentControls({ timeCapMinutes: newCap });
-  };
-
-  const toggleGradeLock = (grade: string) => {
-    const updated = { ...gradeLocks, [grade]: !gradeLocks[grade] };
-    setGradeLocks(updated);
-    saveParentControls({ gradeLocks: updated });
   };
 
   const formatTimeDisplay = (totalMinutes: number) => {
@@ -287,50 +270,58 @@ export default function ParentDashboardScreen() {
                 <View style={{ flex: 1, paddingRight: 8 }}>
                   <Text style={styles.controlTitle}>Daily Time Cap</Text>
                   <Text style={styles.controlDesc}>
-                    Restricts app access when daily limit is reached
+                    {timeCapEnabled
+                      ? `Active limit: ${formatTimeDisplay(timeCapMinutes)}`
+                      : "Daily time cap is currently disabled"}
                   </Text>
                 </View>
-                <Text
-                  style={[styles.timeValueText, { marginRight: 12 }]}
-                  numberOfLines={1}
-                >
-                  {formatTimeDisplay(timeCapMinutes)}
-                </Text>
+                <Switch
+                  value={timeCapEnabled}
+                  onValueChange={(val) => {
+                    setTimeCapEnabled(val);
+                    saveParentControls({ timeCapEnabled: val });
+                  }}
+                  trackColor={{ false: "#374151", true: "#5857e4" }}
+                  thumbColor="#ffffff"
+                />
               </View>
-              <View style={styles.buttonRow}>
-                {(["-15m", "+15m", "-1hr", "+1hr"] as const).map(
-                  (label, idx) => {
-                    const animKey = `timeBtn_${idx}`;
-                    const minutesValue =
-                      label === "-15m"
-                        ? -15
-                        : label === "+15m"
-                          ? 15
-                          : label === "-1hr"
-                            ? -60
-                            : 60;
 
-                    return (
-                      <Animated.View
-                        key={label}
-                        style={{
-                          flex: 1,
-                          transform: [{ scale: getScaleAnim(animKey) }],
-                        }}
-                      >
-                        <Pressable
-                          style={styles.adjButton}
-                          onPressIn={() => animatePressIn(animKey)}
-                          onPressOut={() => animatePressOut(animKey)}
-                          onPress={() => adjustTimeCap(minutesValue)}
+              {timeCapEnabled && (
+                <View style={styles.buttonRow}>
+                  {(["-15m", "+15m", "-1hr", "+1hr"] as const).map(
+                    (label, idx) => {
+                      const animKey = `timeBtn_${idx}`;
+                      const minutesValue =
+                        label === "-15m"
+                          ? -15
+                          : label === "+15m"
+                            ? 15
+                            : label === "-1hr"
+                              ? -60
+                              : 60;
+
+                      return (
+                        <Animated.View
+                          key={label}
+                          style={{
+                            flex: 1,
+                            transform: [{ scale: getScaleAnim(animKey) }],
+                          }}
                         >
-                          <Text style={styles.adjButtonText}>{label}</Text>
-                        </Pressable>
-                      </Animated.View>
-                    );
-                  },
-                )}
-              </View>
+                          <Pressable
+                            style={styles.adjButton}
+                            onPressIn={() => animatePressIn(animKey)}
+                            onPressOut={() => animatePressOut(animKey)}
+                            onPress={() => adjustTimeCap(minutesValue)}
+                          >
+                            <Text style={styles.adjButtonText}>{label}</Text>
+                          </Pressable>
+                        </Animated.View>
+                      );
+                    },
+                  )}
+                </View>
+              )}
             </View>
 
             <Text style={styles.sectionTitle}>
@@ -528,58 +519,28 @@ export default function ParentDashboardScreen() {
             </View>
 
             <Text style={styles.sectionTitle}>
-              Grade-Level Content Filter Locking
+              🔒 Security & Access Keyword
             </Text>
             <View style={styles.controlCard}>
-              <Text
-                style={[
-                  styles.controlDesc,
-                  { color: "#94a3b8", marginBottom: 8, fontSize: 11 },
-                ]}
-              >
-                Lock or unlock specific grade curriculum (Student is currently
-                in {gradeLevel}):
+              <Text style={styles.controlTitle}>Dashboard Access Keyword</Text>
+              <Text style={styles.controlDesc}>
+                Set a secret keyword to require a passcode before opening this
+                dashboard. Leave blank to keep access unlocked.
               </Text>
-              <View style={styles.gradesGrid}>
-                {[
-                  "Grade 1",
-                  "Grade 2",
-                  "Grade 3",
-                  "Grade 4",
-                  "Grade 5",
-                  "Grade 6",
-                ].map((grade) => {
-                  const isLocked = gradeLocks[grade];
-                  const animKey = `grade_${grade}`;
-
-                  return (
-                    <Animated.View
-                      key={grade}
-                      style={{
-                        width: "31%",
-                        transform: [{ scale: getScaleAnim(animKey) }],
-                      }}
-                    >
-                      <Pressable
-                        style={[
-                          styles.gradeToggleBtn,
-                          isLocked ? styles.gradeLocked : styles.gradeUnlocked,
-                        ]}
-                        onPressIn={() => animatePressIn(animKey)}
-                        onPressOut={() => animatePressOut(animKey)}
-                        onPress={() => toggleGradeLock(grade)}
-                      >
-                        <Text style={styles.gradeToggleText}>
-                          {grade} {isLocked ? "🔒" : "🔓"}
-                        </Text>
-                      </Pressable>
-                    </Animated.View>
-                  );
-                })}
-              </View>
+              <TextInput
+                style={styles.keywordInput}
+                value={parentKeyword}
+                onChangeText={(val) => {
+                  setParentKeyword(val);
+                  saveParentControls({ parentKeyword: val.trim() });
+                }}
+                placeholder="Enter custom keyword (e.g. secret123)"
+                placeholderTextColor="#68779a"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
 
-            <Text style={styles.sectionTitle}>🔒 Security</Text>
             <View style={styles.actionCard}>
               <Pressable
                 style={[styles.actionRow, { borderBottomWidth: 0 }]}
@@ -589,7 +550,7 @@ export default function ParentDashboardScreen() {
                   Lock Dashboard & Exit
                 </Text>
                 <Text style={[styles.actionArrow, { color: "#facc15" }]}>
-                  →
+                    
                 </Text>
               </Pressable>
             </View>
@@ -687,7 +648,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
-  timeValueText: { color: "#4ade80", fontSize: 16, fontWeight: "900" },
   buttonRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   horizontalScrollRow: { gap: 6, paddingVertical: 4 },
   pickerSubRow: {
@@ -728,23 +688,18 @@ const styles = StyleSheet.create({
   },
   timeBadgeText: { color: "#94a3b8", fontSize: 11, fontWeight: "800" },
   timeBadgeTextActive: { color: "#ffffff", fontWeight: "900" },
-  gradesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  gradeToggleBtn: {
-    width: "100%",
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
+  keywordInput: {
+    backgroundColor: "#091426",
+    borderColor: "#374b7c",
     borderWidth: 1,
+    borderRadius: 10,
+    color: "#ffffff",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 4,
   },
-  gradeLocked: {
-    backgroundColor: "rgba(127, 29, 29, 0.4)",
-    borderColor: "#f87171",
-  },
-  gradeUnlocked: {
-    backgroundColor: "rgba(20, 83, 45, 0.4)",
-    borderColor: "#4ade80",
-  },
-  gradeToggleText: { color: "#fff", fontSize: 11, fontWeight: "900" },
   actionCard: {
     backgroundColor: "rgba(31, 41, 66, 0.8)",
     borderColor: "#374151",
