@@ -48,7 +48,7 @@ export default function WelcomeScreen() {
         </View>
         <Text style={styles.brand}>Biosphere Quest</Text>
         <Text style={styles.tagline}>
-          Rocket your knowledge from Grade 1 to College
+          Rocket your knowledge from Grade 1 to Grade 6
         </Text>
         <View style={styles.stats}>
           <Stat value="1.5M+" label="Learners" />

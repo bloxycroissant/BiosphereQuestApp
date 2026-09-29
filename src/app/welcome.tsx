@@ -2,9 +2,10 @@ import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
@@ -34,19 +35,114 @@ export default function WelcomeWizardScreen() {
   const [selectedGrade, setSelectedGrade] = useState(3);
   const [selectedSubjects, setSelectedSubjects] = useState(["Math"]);
 
-  const toggleSubject = (subject: string) =>
-    setSelectedSubjects((current) =>
-      current.includes(subject)
-        ? current.filter((item) => item !== subject)
-        : [...current, subject],
-    );
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const scaleButtonAnim = useRef(new Animated.Value(1)).current;
+  
+  // Track press scales dynamically for grid items
+  const boxScales = useRef<{ [key: string]: Animated.Value }>({}).current;
+
+  // Helper to get or create a scale animation value for grid items
+  const getBoxScale = (key: string | number) => {
+    const stringKey = String(key);
+    if (!boxScales[stringKey]) {
+      boxScales[stringKey] = new Animated.Value(1);
+    }
+    return boxScales[stringKey];
+  };
+
+  const animateItemPress = (key: string | number, callback: () => void) => {
+    const animValue = getBoxScale(key);
+    Animated.sequence([
+      Animated.timing(animValue, {
+        toValue: 0.94,
+        duration: 70,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 70,
+        useNativeDriver: true,
+      }),
+    ]).start(() => callback());
+  };
+
+  // Mascot floating loop animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [floatAnim]);
+
+  // Trigger step transition animation whenever "step" changes
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [step, fadeAnim, slideAnim]);
+
+  const animateButtonPress = (callback: () => void) => {
+    Animated.sequence([
+      Animated.timing(scaleButtonAnim, {
+        toValue: 0.96,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleButtonAnim, {
+        toValue: 1,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+    ]).start(() => callback());
+  };
+
+  const toggleSubject = (subject: string) => {
+    animateItemPress(subject, () => {
+      setSelectedSubjects((current) =>
+        current.includes(subject)
+          ? current.filter((item) => item !== subject)
+          : [...current, subject],
+      );
+    });
+  };
+
+  const handleSelectGrade = (level: number) => {
+    animateItemPress(level, () => {
+      setSelectedGrade(level);
+    });
+  };
 
   const handleNextStep = () => {
     if (step === 1 && !name.trim()) {
       Alert.alert("Hold on!", "We need your Explorer Name to continue.");
       return;
     }
-    setStep(step + 1);
+    animateButtonPress(() => setStep(step + 1));
   };
 
   const handleLaunch = async () => {
@@ -55,20 +151,22 @@ export default function WelcomeWizardScreen() {
       return;
     }
 
-    try {
-      await AsyncStorage.removeItem("@biosphere_profile_data_v1");
+    animateButtonPress(async () => {
+      try {
+        await AsyncStorage.removeItem("@biosphere_profile_data_v1");
 
-      await AsyncStorage.setItem("explorerName", name);
-      await AsyncStorage.setItem("explorerGrade", selectedGrade.toString());
-      await AsyncStorage.setItem(
-        "explorerSubjects",
-        JSON.stringify(selectedSubjects),
-      );
+        await AsyncStorage.setItem("explorerName", name);
+        await AsyncStorage.setItem("explorerGrade", selectedGrade.toString());
+        await AsyncStorage.setItem(
+          "explorerSubjects",
+          JSON.stringify(selectedSubjects),
+        );
 
-      router.replace("/home");
-    } catch (e) {
-      console.error("Failed to save local data", e);
-    }
+        router.replace("/home");
+      } catch (e) {
+        console.error("Failed to save local data", e);
+      }
+    });
   };
 
   return (
@@ -92,116 +190,158 @@ export default function WelcomeWizardScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Image source={astro} style={styles.mascot} contentFit="contain" />
+          {/* Animated Floating Mascot */}
+          <Animated.View
+            style={{
+              transform: [{ translateY: floatAnim }],
+              alignSelf: "center",
+              marginBottom: 20,
+              width: "40%",
+              maxHeight: 140,
+            }}
+          >
+            <Image source={astro} style={styles.mascot} contentFit="contain" />
+          </Animated.View>
 
-          {/* STEP 1: NAME */}
-          {step === 1 && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.title}>What should we call you?</Text>
-              <Text style={styles.subtitle}>
-                Enter your official Explorer Name.
-              </Text>
+          {/* Animated Content Step Container */}
+          <Animated.View
+            style={[
+              styles.stepContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {/* STEP 1: NAME */}
+            {step === 1 && (
+              <View style={styles.innerContainer}>
+                <Text style={styles.title}>What should we call you?</Text>
+                <Text style={styles.subtitle}>
+                  Enter your official Explorer Name.
+                </Text>
 
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. Captain Alex"
-                placeholderTextColor="#aebee0"
-                autoFocus
-              />
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. Captain Alex"
+                  placeholderTextColor="#aebee0"
+                  autoFocus
+                />
 
-              <Pressable onPress={handleNextStep} style={styles.primary}>
-                <Text style={styles.primaryText}>Next Step →</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* STEP 2: GRADE */}
-          {step === 2 && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.title}>Select your rank</Text>
-              <Text style={styles.subtitle}>
-                What grade level are you currently in?
-              </Text>
-
-              <View style={styles.grid}>
-                {gradeLevels.map((g) => {
-                  const isSelected = selectedGrade === g.level;
-                  return (
-                    <Pressable
-                      key={g.level}
-                      onPress={() => setSelectedGrade(g.level)}
-                      style={[
-                        styles.selectionBox,
-                        isSelected && styles.selectionBoxActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.boxNumber,
-                          isSelected && styles.boxTextActive,
-                        ]}
-                      >
-                        {g.level}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.boxLabel,
-                          isSelected && styles.boxTextActive,
-                        ]}
-                      >
-                        {g.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
+                  <Pressable onPress={handleNextStep} style={styles.primary}>
+                    <Text style={styles.primaryText}>Next Step →</Text>
+                  </Pressable>
+                </Animated.View>
               </View>
+            )}
 
-              <Pressable onPress={handleNextStep} style={styles.primary}>
-                <Text style={styles.primaryText}>Next Step →</Text>
-              </Pressable>
-            </View>
-          )}
+            {/* STEP 2: GRADE */}
+            {step === 2 && (
+              <View style={styles.innerContainer}>
+                <Text style={styles.title}>Select your rank</Text>
+                <Text style={styles.subtitle}>
+                  What grade level are you currently in?
+                </Text>
 
-          {/* STEP 3: TOPICS */}
-          {step === 3 && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.title}>Pick your missions</Text>
-              <Text style={styles.subtitle}>
-                What topics do you want to master first?
-              </Text>
-
-              <View style={styles.grid}>
-                {subjectsList.map((subject) => {
-                  const isSelected = selectedSubjects.includes(subject);
-                  return (
-                    <Pressable
-                      key={subject}
-                      onPress={() => toggleSubject(subject)}
-                      style={[
-                        styles.selectionBox,
-                        isSelected && styles.selectionBoxActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.boxSubjectText,
-                          isSelected && styles.boxTextActive,
-                        ]}
+                <View style={styles.grid}>
+                  {gradeLevels.map((g) => {
+                    const isSelected = selectedGrade === g.level;
+                    return (
+                      <Animated.View
+                        key={g.level}
+                        style={{
+                          width: "47%",
+                          transform: [{ scale: getBoxScale(g.level) }],
+                        }}
                       >
-                        {subject}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                        <Pressable
+                          onPress={() => handleSelectGrade(g.level)}
+                          style={[
+                            styles.selectionBox,
+                            isSelected && styles.selectionBoxActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.boxNumber,
+                              isSelected && styles.boxTextActive,
+                            ]}
+                          >
+                            {g.level}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.boxLabel,
+                              isSelected && styles.boxTextActive,
+                            ]}
+                          >
+                            {g.label}
+                          </Text>
+                        </Pressable>
+                      </Animated.View>
+                    );
+                  })}
+                </View>
 
-              <Pressable onPress={handleLaunch} style={styles.primaryLaunch}>
-                <Text style={styles.primaryText}>🚀 Launch App</Text>
-              </Pressable>
-            </View>
-          )}
+                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
+                  <Pressable onPress={handleNextStep} style={styles.primary}>
+                    <Text style={styles.primaryText}>Next Step →</Text>
+                  </Pressable>
+                </Animated.View>
+              </View>
+            )}
+
+            {/* STEP 3: TOPICS */}
+            {step === 3 && (
+              <View style={styles.innerContainer}>
+                <Text style={styles.title}>Pick your missions</Text>
+                <Text style={styles.subtitle}>
+                  What topics do you want to master first?
+                </Text>
+
+                <View style={styles.grid}>
+                  {subjectsList.map((subject) => {
+                    const isSelected = selectedSubjects.includes(subject);
+                    return (
+                      <Animated.View
+                        key={subject}
+                        style={{
+                          width: "47%",
+                          transform: [{ scale: getBoxScale(subject) }],
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => toggleSubject(subject)}
+                          style={[
+                            styles.selectionBox,
+                            isSelected && styles.selectionBoxActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.boxSubjectText,
+                              isSelected && styles.boxTextActive,
+                            ]}
+                          >
+                            {subject}
+                          </Text>
+                        </Pressable>
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+
+                <Animated.View style={{ transform: [{ scale: scaleButtonAnim }], width: "100%" }}>
+                  <Pressable onPress={handleLaunch} style={styles.primaryLaunch}>
+                    <Text style={styles.primaryText}>🚀 Launch App</Text>
+                  </Pressable>
+                </Animated.View>
+              </View>
+            )}
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -230,13 +370,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mascot: {
-    width: "40%",
+    width: "100%",
     aspectRatio: 0.8,
-    alignSelf: "center",
-    marginBottom: 20,
-    maxHeight: 140,
   },
   stepContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  innerContainer: {
     width: "100%",
     alignItems: "center",
   },
@@ -277,13 +418,13 @@ const styles = StyleSheet.create({
     borderColor: "#625cff",
     borderWidth: 1,
     borderRadius: 12,
-    width: "47%",
+    width: "100%",
     alignItems: "center",
     paddingVertical: 18,
     paddingHorizontal: 10,
   },
   selectionBoxActive: {
-    backgroundColor: "#f5cd47", // The bright yellow!
+    backgroundColor: "#f5cd47",
     borderColor: "#fff",
   },
   boxNumber: { color: "#fff", fontSize: 20, fontWeight: "900" },
@@ -300,7 +441,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
   },
-  boxTextActive: { color: "#1c2b59" }, // Dark text so it is readable on the yellow background
+  boxTextActive: { color: "#1c2b59" },
   primary: {
     backgroundColor: "#5857e4",
     borderRadius: 12,
@@ -315,7 +456,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryLaunch: {
-    backgroundColor: "#6258ff", // Slightly brighter purple for the final blast off!
+    backgroundColor: "#6258ff",
     borderRadius: 12,
     alignItems: "center",
     padding: 16,
