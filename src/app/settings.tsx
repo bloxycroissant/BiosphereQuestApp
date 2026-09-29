@@ -1,7 +1,7 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -16,44 +16,101 @@ import { supabase } from "../lib/supabase";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 
+const parseStoredProfile = (value: string | null) => {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
 export default function SettingsScreen() {
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [parentGateVisible, setParentGateVisible] = useState(false);
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [hasAccount, setHasAccount] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+
+  const syncAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setHasAccount(true);
+        setUserEmail(user.email || "Active User");
+        return;
+      }
+
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const parsed = savedData ? JSON.parse(savedData) : null;
+      if (parsed?.email?.trim()) {
+        setHasAccount(true);
+        setUserEmail(parsed.email);
+        return;
+      }
+
+      setHasAccount(false);
+      setUserEmail("");
+    } catch (e) {
+      console.error("Auth sync error:", e);
+    }
+  };
+
+  useEffect(() => {
+    syncAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setHasAccount(true);
+        setUserEmail(session.user.email || "Active User");
+      } else {
+        setHasAccount(false);
+        setUserEmail("");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      syncAuth();
+    }, [])
+  );
 
   const handleDevReset = async () => {
     try {
       await supabase.auth.signOut();
       await AsyncStorage.clear();
-      console.log("🧹 State wiped! Redirecting to the start screen...");
       router.replace("/");
     } catch (error) {
-      console.error("Error during dev reset:", error);
+      console.error("Dev reset error:", error);
     }
   };
 
-  useEffect(() => {
-    const checkLoginStatus = async () => {
-      try {
-        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-
-        if (!savedData) {
-          setHasAccount(false);
-          return;
-        }
-
-        const parsed = JSON.parse(savedData);
-        const hasValidEmail = !!parsed?.email && String(parsed.email).trim() !== "";
-        setHasAccount(hasValidEmail);
-      } catch (e) {
-        console.error("Failed to fetch login status", e);
-        setHasAccount(false);
-      }
-    };
-
-    checkLoginStatus();
-  }, []);
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to permanently delete your account and wipe all data? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await supabase.auth.signOut();
+              await AsyncStorage.clear();
+              router.replace("/");
+            } catch (error) {
+              console.error("Delete account error:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const executeResetProgress = async () => {
     try {
@@ -90,7 +147,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
+    <GradientSafeAreaView style={styles.safeArea} edges={['top']}>
       <Modal
         visible={resetModalVisible}
         transparent={true}
@@ -185,13 +242,25 @@ export default function SettingsScreen() {
 
         <Text style={styles.groupLabel}>ACCOUNT</Text>
         <View style={styles.cardGroup}>
-          <Pressable
-            style={styles.rowItem}
-            onPress={() => router.push("/login" as any)}
-          >
-            <Text style={styles.rowItemText}>Login or Create Account</Text>
-            <Text style={styles.rowArrow}>→</Text>
-          </Pressable>
+          {!hasAccount ? (
+            <Pressable
+              style={styles.rowItem}
+              onPress={() => router.push("/login" as any)}
+            >
+              <Text style={styles.rowItemText}>Login or Create Account</Text>
+              <Text style={styles.rowArrow}>→</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.rowItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowItemText}>{userEmail}</Text>
+                <Text style={[styles.rowItemSub, { color: "#4ade80" }]}>
+                  Logged In (Verified)
+                </Text>
+              </View>
+              <Text style={styles.rowArrow}>✓</Text>
+            </View>
+          )}
         </View>
 
         {hasAccount && (
@@ -220,7 +289,10 @@ export default function SettingsScreen() {
           DANGER ZONE
         </Text>
         <Pressable
-          style={styles.dangerZoneCard}
+          style={[
+            styles.dangerZoneCard,
+            { borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+          ]}
           onPress={() => setResetModalVisible(true)}
         >
           <View>
@@ -232,20 +304,31 @@ export default function SettingsScreen() {
           <Text style={styles.dangerZoneArrow}>→</Text>
         </Pressable>
 
+        <Pressable
+          style={[styles.dangerZoneCard, { borderTopLeftRadius: 0, borderTopRightRadius: 0 }]}
+          onPress={handleDeleteAccount}
+        >
+          <View>
+            <Text style={styles.dangerZoneText}>Delete Account</Text>
+            <Text style={styles.dangerZoneSub}>
+              Permanently remove your profile
+            </Text>
+          </View>
+          <Text style={styles.dangerZoneArrow}>→</Text>
+        </Pressable>
+
         <Text style={[styles.groupLabel, { color: "#ffaa00", marginTop: 20 }]}>
           DEVELOPER TOOLS
         </Text>
         <Pressable
           style={[
             styles.dangerZoneCard,
-            { borderColor: "#a36c00", backgroundColor: "#2b1e05" },
+            { borderColor: "#a36c00", backgroundColor: "#2b1e05", borderRadius: 16 },
           ]}
           onPress={handleDevReset}
         >
           <View>
-            <Text style={[styles.dangerZoneText, { color: "#ffaa00" }]}>
-              Dev Factory Reset
-            </Text>
+            <Text style={[styles.dangerZoneText, { color: "#ffaa00" }]}>Dev Factory Reset</Text>
             <Text style={[styles.dangerZoneSub, { color: "#cc8800" }]}>
               Wipe Supabase auth & all local data
             </Text>
@@ -317,7 +400,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   dangerZoneArrow: { color: "#ff3e58", fontSize: 16, fontWeight: "900" },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(9, 20, 38, 0.85)",

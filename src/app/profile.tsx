@@ -19,16 +19,7 @@ import {
   UIManager,
   View,
 } from "react-native";
-
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
-const astro = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
+import { supabase } from "../lib/supabase";
 
 type Section = "badges" | "schedule";
 type ViewMode = "profile" | "editProfile" | "addSchedule";
@@ -39,9 +30,9 @@ interface LocalSession {
   title: string;
   time: string;
   duration: string;
-  category?: string;
-  description?: string;
-  reminder?: string;
+  category: string;
+  description: string;
+  reminder: string;
   done: boolean;
 }
 
@@ -54,10 +45,34 @@ interface AchievementType {
   xp: number;
 }
 
+interface RawSession {
+  id: string | number;
+  day?: string;
+  title?: string;
+  time?: string;
+  duration?: string;
+  category?: string;
+  description?: string;
+  reminder?: string;
+  done?: boolean;
+}
+
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export default function ProfileScreen() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  if (
+    Platform.OS === "android" &&
+    UIManager.setLayoutAnimationEnabledExperimental
+  ) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+
+  const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
+  const astro = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
+
   const progress = useProgress();
   const [currentView, setCurrentView] = useState("profile");
   const [section, setSection] = useState("badges");
@@ -74,7 +89,7 @@ export default function ProfileScreen() {
   const addFormAnim = useRef(new Animated.Value(40)).current;
   const addFormOpacity = useRef(new Animated.Value(0)).current;
 
-  const [prevLevel, setPrevLevel] = useState<number | null>(null);
+  const [prevLevel, setPrevLevel] = useState(null);
   const [levelUpText, setLevelUpText] = useState("");
 
   const [streak, setStreak] = useState(0);
@@ -107,9 +122,58 @@ export default function ProfileScreen() {
     profileImage,
   );
 
-  const rawSessions: Array<Partial<LocalSession> & { id: string | number }> = (
+  const checkAuthStatus = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setIsLoggedIn(true);
+        if (user.email && !email) {
+          setEmail(user.email);
+        }
+        return;
+      }
+
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const parsed = savedData ? JSON.parse(savedData) : null;
+      if (parsed?.email?.trim()) {
+        setIsLoggedIn(true);
+        return;
+      }
+
+      setIsLoggedIn(false);
+    } catch (e) {
+      console.error("Auth check error in profile", e);
+    }
+  };
+
+  useEffect(() => {
+    checkAuthStatus();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        if (session.user.email) setEmail(session.user.email);
+      } else {
+        setIsLoggedIn(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkAuthStatus();
+    }, []),
+  );
+
+  const rawSessions: Array<{ id: string | number; [key: string]: any }> = ((
     progress as any
-  ).sessions || [
+  )?.sessions ?? [
     {
       id: "1",
       day: "Mon",
@@ -126,9 +190,9 @@ export default function ProfileScreen() {
       duration: "1 hr",
       done: false,
     },
-  ];
+  ]) as Array<{ id: string | number; [key: string]: any }>;
 
-  const [sessions, setSessions] = useState<LocalSession[]>(
+  const [sessions, setSessions] = useState(
     rawSessions.map((s) => ({
       id: String(s.id),
       day: String(s.day || "Mon"),
@@ -213,7 +277,7 @@ export default function ProfileScreen() {
     const formattedOld = String(oldLvl).padStart(2, "0");
     const formattedNew = String(newLvl).padStart(2, "0");
     setLevelUpText(
-      `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
+      `Congratulations! You leveled up from \({formattedOld} to\){formattedNew}!`,
     );
 
     Animated.spring(levelUpAnim, {
@@ -510,7 +574,7 @@ export default function ProfileScreen() {
       const hrs = parseInt(newHours, 10);
       const mins = parseInt(newMinutes, 10);
       if (!isNaN(hrs) && hrs > 0)
-        durationStr += `${hrs} hr${hrs > 1 ? "s" : ""} `;
+        durationStr += `\({hrs} hr\){hrs > 1 ? "s" : ""} `;
       if (!isNaN(mins) && mins > 0) durationStr += `${mins} mins`;
       if (!durationStr.trim()) durationStr = "30 mins";
 
@@ -789,7 +853,7 @@ export default function ProfileScreen() {
                     value={newMinutes}
                     onChangeText={setNewMinutes}
                     keyboardType="numeric"
-                    placeholder=">0"
+                    placeholder="30"
                     placeholderTextColor="#68779a"
                   />
                 </View>
@@ -819,7 +883,7 @@ export default function ProfileScreen() {
                     "None",
                     "5 mins before",
                     "10 mins before",
-                    ">0 mins before",
+                    "30 mins before",
                   ].map((rem) => (
                     <Pressable
                       key={rem}
@@ -872,12 +936,14 @@ export default function ProfileScreen() {
               <Text style={styles.title}>Profile</Text>
             </View>
             <View style={{ flexDirection: "row", gap: 6 }}>
-              <Pressable
-                onPress={() => router.push("/login" as any)}
-                style={styles.loginBtn}
-              >
-                <Text style={styles.loginBtnText}>Login</Text>
-              </Pressable>
+              {!isLoggedIn && (
+                <Pressable
+                  onPress={() => router.push("/login" as any)}
+                  style={styles.loginBtn}
+                >
+                  <Text style={styles.loginBtnText}>Login</Text>
+                </Pressable>
+              )}
               <Pressable
                 onPress={() => router.push("/settings" as any)}
                 style={styles.settingsBtn}
@@ -1045,7 +1111,7 @@ function Badges() {
               {
                 borderColor: achievement.unlocked
                   ? achievement.accent
-                  : "#>5466e",
+                  : "#35466e",
               },
             ]}
           >
@@ -1064,7 +1130,7 @@ function Badges() {
       >
         <View style={{ flex: 1 }}>
           <Text style={styles.aboutTitle}>About Us</Text>
-          <Text style={{ color: "#8ae<c5", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: "#8ae2c5", fontSize: 11, marginTop: 2 }}>
             Biosphere Quest
           </Text>
         </View>
