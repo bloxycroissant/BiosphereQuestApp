@@ -408,7 +408,7 @@ export default function SettingsScreen(): React.JSX.Element {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={handleBack}>
-            <Text style={styles.backText}>  Back </Text>
+            <Text style={styles.backText}> Back </Text>
           </Pressable>
           <Text style={styles.headerTitle}>Settings </Text>
           <View style={{ width: 45 }} />
@@ -421,8 +421,8 @@ export default function SettingsScreen(): React.JSX.Element {
               style={styles.rowItem}
               onPress={() => router.push("/login" as any)}
             >
-              <Text style={styles.rowItemText}>Login or Create Account </Text>
-              <Text style={styles.rowArrow}> </Text>
+              <Text style={styles.rowItemText}>Login or Create Account</Text>
+              <Text style={styles.rowArrow}>→</Text>
             </Pressable>
           ) : (
             <View>
@@ -470,7 +470,6 @@ export default function SettingsScreen(): React.JSX.Element {
           )}
         </View>
 
-        {/* ACADEMIC PREFERENCES (Change Grade) */}
         <Text style={[styles.groupLabel, { marginTop: 20 }]}>
           ACADEMIC PREFERENCES
         </Text>
@@ -489,7 +488,6 @@ export default function SettingsScreen(): React.JSX.Element {
           </Pressable>
         </View>
 
-        {/* FAMILY MANAGEMENT (Logged In Only) */}
         {hasAccount && (
           <View>
             <Text style={[styles.groupLabel, { marginTop: 20 }]}>
@@ -512,7 +510,6 @@ export default function SettingsScreen(): React.JSX.Element {
           </View>
         )}
 
-        {/* DANGER ZONE (Logged In Only) */}
         {hasAccount && (
           <View>
             <Text
@@ -581,7 +578,7 @@ export default function SettingsScreen(): React.JSX.Element {
               Wipe Supabase auth & all local data
             </Text>
           </View>
-          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}> </Text>
+          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}>→</Text>
         </Pressable>
       </ScrollView>
     </GradientSafeAreaView>
