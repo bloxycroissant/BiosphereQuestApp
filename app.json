@@ -1,17 +1,12 @@
 {
   "expo": {
-    "name": "50% Biosphere Quest",
-    "slug": "50% biosphere-quest",
+    "name": "Biosphere Quest",
+    "slug": "biosphere-quest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
     "scheme": "biospherequest",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#091426"
-    },
     "ios": {
       "supportsTablet": true,
       "userInterfaceStyle": "dark",
@@ -23,7 +18,8 @@
         "backgroundColor": "#091426",
         "foregroundImage": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.biosphere.quest"
     },
     "web": {
       "output": "static",
@@ -47,6 +43,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bd78f9f0-6edc-4cef-a1d4-41677424ddf7"
+      }
     }
   }
 }
