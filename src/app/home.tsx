@@ -1,9 +1,9 @@
-import { GradientSafeAreaView } from '@/components/gradient-safe-area';
-import { useProgress } from '@/hooks/use-progress';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Image } from 'expo-image';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { GradientSafeAreaView } from "@/components/gradient-safe-area";
+import { useProgress } from "@/hooks/use-progress";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -14,22 +14,22 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
+} from "react-native";
 
-const logo = require('../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png');
-const target = require('../../assets/BiosphereQuestAssets/target.png');
-const astro = require('../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png');
+const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
+const target = require("../../assets/BiosphereQuestAssets/target.png");
+const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 
-const STORAGE_KEY = '@biosphere_profile_data_v1';
-const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
+const STORAGE_KEY = "@biosphere_profile_data_v1";
+const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 
 export default function HomeScreen() {
   const progress = useProgress();
   const appear = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(-100)).current;
 
-  const [userName, setUserName] = useState('Explorer');
-  const [userGrade, setUserGrade] = useState('');
+  const [userName, setUserName] = useState("Explorer");
+  const [userGrade, setUserGrade] = useState("");
 
   const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(0);
@@ -38,15 +38,16 @@ export default function HomeScreen() {
   const [studyMinutes, setStudyMinutes] = useState(0);
 
   const prevLevelRef = useRef<number | null>(null);
-  const [levelUpText, setLevelUpText] = useState('');
-  const [greeting, setGreeting] = useState('Good morning');
+  const [levelUpText, setLevelUpText] = useState("");
+  const [greeting, setGreeting] = useState("Good morning");
 
   const [isLocked, setIsLocked] = useState(false);
-  const [lockMessage, setLockMessage] = useState('');
+  const [lockMessage, setLockMessage] = useState("");
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
   const nextLevelXp = progress.nextLevelXp || 100;
-  const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+  const width =
+    `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
 
   useEffect(() => {
     checkParentRules();
@@ -68,26 +69,26 @@ export default function HomeScreen() {
         if (checkIsBedtime(controls.bedtimeHour)) {
           setIsLocked(true);
           setLockMessage(
-            `🌙 Bedtime Lock Active!\nYour parent set bedtime for ${controls.bedtimeHour}. Time to rest!`
+            `🌙 Bedtime Lock Active!\nYour parent set bedtime for ${controls.bedtimeHour}. Time to rest!`,
           );
           return;
         }
       }
       setIsLocked(false);
     } catch (e) {
-      console.error('Error reading parent controls', e);
+      console.error("Error reading parent controls", e);
     }
   };
 
   const checkIsBedtime = (bedtimeStr: string) => {
     try {
-      const [timePart, period] = bedtimeStr.split(' ');
-      let [hourStr, minStr] = timePart.split(':');
+      const [timePart, period] = bedtimeStr.split(" ");
+      let [hourStr, minStr] = timePart.split(":");
       let targetHour = parseInt(hourStr, 10);
       const targetMin = parseInt(minStr, 10);
 
-      if (period === 'PM' && targetHour < 12) targetHour += 12;
-      if (period === 'AM' && targetHour === 12) targetHour = 0;
+      if (period === "PM" && targetHour < 12) targetHour += 12;
+      if (period === "AM" && targetHour === 12) targetHour = 0;
 
       const now = new Date();
       const currentTotalMins = now.getHours() * 60 + now.getMinutes();
@@ -103,13 +104,13 @@ export default function HomeScreen() {
     try {
       router.push(path as any);
     } catch (err) {
-      console.warn('Standard router push failed, trying absolute path...', err);
+      console.warn("Standard router push failed, trying absolute path...", err);
       try {
         router.replace(path as any);
       } catch (innerErr) {
         Alert.alert(
-          'Route Notice',
-          `Could not find route path: ${path}. Please ensure the file exists in src/app/`
+          "Route Notice",
+          `Could not find route path: ${path}. Please ensure the file exists in src/app/`,
         );
       }
     }
@@ -118,30 +119,32 @@ export default function HomeScreen() {
   const handleGradePress = (gradeCategory: string) => {
     if (gradeLocks[gradeCategory]) {
       Alert.alert(
-        'Content Locked',
+        "Content Locked",
         `Your parent has locked access for ${gradeCategory}. Returning to login.`,
-        [{ text: 'OK', onPress: () => router.replace('/') }]
+        [{ text: "OK", onPress: () => router.replace("/") }],
       );
       return;
     }
-    navigateToRoute('/explore');
+    navigateToRoute("/explore");
   };
 
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) {
-      setGreeting('Good morning');
+      setGreeting("Good morning");
     } else if (hour >= 12 && hour < 17) {
-      setGreeting('Good afternoon');
+      setGreeting("Good afternoon");
     } else {
-      setGreeting('Good evening');
+      setGreeting("Good evening");
     }
   }, []);
 
   const triggerLevelUpAnimation = (oldLvl: number, newLvl: number) => {
-    const formattedOld = String(oldLvl).padStart(2, '0');
-    const formattedNew = String(newLvl).padStart(2, '0');
-    setLevelUpText(`Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`);
+    const formattedOld = String(oldLvl).padStart(2, "0");
+    const formattedNew = String(newLvl).padStart(2, "0");
+    setLevelUpText(
+      `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
+    );
 
     Animated.spring(levelUpAnim, {
       toValue: 0,
@@ -161,8 +164,8 @@ export default function HomeScreen() {
 
   const loadSharedProgress = async () => {
     try {
-      const savedName = await AsyncStorage.getItem('explorerName');
-      const savedGrade = await AsyncStorage.getItem('explorerGrade');
+      const savedName = await AsyncStorage.getItem("explorerName");
+      const savedGrade = await AsyncStorage.getItem("explorerGrade");
       if (savedName) setUserName(savedName);
       if (savedGrade) setUserGrade(savedGrade);
 
@@ -183,7 +186,9 @@ export default function HomeScreen() {
         setStreak(parsed.streak !== undefined ? parsed.streak : 0);
         setLessons(parsed.lessons !== undefined ? parsed.lessons : 0);
         setXp(parsed.xp !== undefined ? parsed.xp : 0);
-        setStudyMinutes(parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0);
+        setStudyMinutes(
+          parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
+        );
       } else {
         setLevel(0);
         prevLevelRef.current = 0;
@@ -193,7 +198,7 @@ export default function HomeScreen() {
         setStudyMinutes(0);
       }
     } catch (e) {
-      console.error('Failed to load shared progress on home', e);
+      console.error("Failed to load shared progress on home", e);
     }
   };
 
@@ -204,7 +209,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSharedProgress();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -217,18 +222,27 @@ export default function HomeScreen() {
   }, [appear]);
 
   return (
-    <GradientSafeAreaView style={styles.safeArea} edges={['top']}>
-      <Animated.View style={[styles.levelUpBanner, { transform: [{ translateY: levelUpAnim }] }]}>
+    <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
+      <Animated.View
+        style={[
+          styles.levelUpBanner,
+          { transform: [{ translateY: levelUpAnim }] },
+        ]}
+      >
         <Text style={styles.levelUpText}>{levelUpText}</Text>
       </Animated.View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <View style={styles.greeting}>
             <Image source={logo} style={styles.avatar} contentFit="contain" />
             <View>
               <Text style={styles.small}>
-                {greeting},{userGrade ? ` Grade ${userGrade}` : ''}
+                {greeting},{userGrade ? ` Grade ${userGrade}` : ""}
               </Text>
               <Text style={styles.name}>{userName}</Text>
             </View>
@@ -266,13 +280,19 @@ export default function HomeScreen() {
 
           <Text style={styles.section}>Continue Learning</Text>
           <View style={styles.cards}>
-            <Pressable onPress={() => handleGradePress('Grade 3')} style={styles.course}>
+            <Pressable
+              onPress={() => handleGradePress("Grade 3")}
+              style={styles.course}
+            >
               <Text style={styles.courseIcon}>📚</Text>
               <Text style={styles.courseTitle}>Fractions</Text>
               <Text style={styles.courseSub}>Grade 3</Text>
             </Pressable>
 
-            <Pressable onPress={() => handleGradePress('Grade 1')} style={styles.course}>
+            <Pressable
+              onPress={() => handleGradePress("Grade 1")}
+              style={styles.course}
+            >
               <Text style={styles.courseIcon}>🔢</Text>
               <Text style={styles.courseTitle}>Counting Numbers</Text>
               <Text style={styles.courseSub}>Grade 1</Text>
@@ -283,15 +303,21 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.challengeTag}>DAILY CHALLENGE</Text>
               <Text style={styles.challengeTitle}>Science & Math Quiz</Text>
-              <Text style={styles.challengeSub}>5 questions • +150 XP • ~3 min</Text>
+              <Text style={styles.challengeSub}>
+                5 questions • +150 XP • ~3 min
+              </Text>
             </View>
             <Image source={target} style={styles.target} contentFit="contain" />
           </View>
 
           <Text style={styles.section}>Study time</Text>
           <View style={styles.study}>
-            <Text style={styles.studyValue}>{Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m</Text>
-            <Text style={styles.studyCopy}>Keep learning to grow your weekly progress.</Text>
+            <Text style={styles.studyValue}>
+              {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m
+            </Text>
+            <Text style={styles.studyCopy}>
+              Keep learning to grow your weekly progress.
+            </Text>
           </View>
 
           <Text style={styles.section}>Browse by Grade</Text>
@@ -299,17 +325,17 @@ export default function HomeScreen() {
             title="Elementary"
             grades="Grade 1-3"
             icon={astro}
-            colors={['#875b20', '#172849']}
-            tags={['1 + 1 Basic Math', 'Science']}
-            onPress={() => handleGradePress('Elementary')}
+            colors={["#875b20", "#172849"]}
+            tags={["1 + 1 Basic Math", "Science"]}
+            onPress={() => handleGradePress("Elementary")}
           />
           <GradeCard
             title="Intermediate"
             grades="Grade 4-6"
             icon={astro}
-            colors={['#27749b', '#172849']}
-            tags={['Earth Science', 'Pre-Algebra']}
-            onPress={() => handleGradePress('Intermediate')}
+            colors={["#27749b", "#172849"]}
+            tags={["Earth Science", "Pre-Algebra"]}
+            onPress={() => handleGradePress("Intermediate")}
           />
         </Animated.View>
       </ScrollView>
@@ -319,14 +345,16 @@ export default function HomeScreen() {
           style={styles.lockOverlay}
           onPress={() => {
             setIsLocked(false);
-            router.replace('/');
+            router.replace("/");
           }}
         >
           <View style={styles.lockContentContainer}>
             <Text style={styles.lockEmoji}>🛡️</Text>
             <Text style={styles.lockTitle}>Locked by Parent</Text>
             <Text style={styles.lockDesc}>{lockMessage}</Text>
-            <Text style={styles.lockActionHint}>Tap anywhere to return to the welcome screen</Text>
+            <Text style={styles.lockActionHint}>
+              Tap anywhere to return to the welcome screen
+            </Text>
           </View>
         </Pressable>
       </Modal>
@@ -350,14 +378,22 @@ function GradeCard({
   onPress: () => void;
 }) {
   return (
-    <View style={[styles.gradeCard, { borderColor: colors[0], backgroundColor: colors[1] }]}>
+    <View
+      style={[
+        styles.gradeCard,
+        { borderColor: colors[0], backgroundColor: colors[1] },
+      ]}
+    >
       <View style={styles.gradeHeader}>
         <Image source={icon} style={styles.gradeIcon} contentFit="contain" />
         <View style={styles.gradeCopy}>
           <Text style={styles.gradeTitle}>{title}</Text>
           <Text style={styles.gradeLabel}>{grades}</Text>
         </View>
-        <Pressable onPress={onPress} style={[styles.viewButton, { borderColor: colors[0] }]}>
+        <Pressable
+          onPress={onPress}
+          style={[styles.viewButton, { borderColor: colors[0] }]}
+        >
           <Text style={styles.viewText}>View</Text>
         </Pressable>
       </View>
@@ -373,138 +409,168 @@ function GradeCard({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#091426' },
+  safeArea: { flex: 1, backgroundColor: "#091426" },
   levelUpBanner: {
-    position: 'absolute',
+    position: "absolute",
     top: 15,
     left: 18,
     right: 18,
     zIndex: 999,
-    backgroundColor: '#4642ae',
-    borderColor: '#ffdf4e',
+    backgroundColor: "#4642ae",
+    borderColor: "#ffdf4e",
     borderWidth: 2,
     borderRadius: 16,
     padding: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 8,
   },
-  levelUpText: { color: '#fff', fontWeight: '900', fontSize: 13, textAlign: 'center' },
+  levelUpText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 13,
+    textAlign: "center",
+  },
   content: { padding: 18, paddingBottom: 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greeting: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  greeting: { flexDirection: "row", alignItems: "center", gap: 8 },
   avatar: { width: 44, height: 44 },
-  small: { color: '#d6dced', fontSize: 12 },
-  name: { color: '#fff', fontWeight: '900', fontSize: 18 },
+  small: { color: "#d6dced", fontSize: 12 },
+  name: { color: "#fff", fontWeight: "900", fontSize: 18 },
   bell: {
-    color: '#d0c6ff',
+    color: "#d0c6ff",
     fontSize: 20,
-    borderColor: '#725df2',
+    borderColor: "#725df2",
     borderWidth: 1,
     borderRadius: 20,
     padding: 7,
   },
   progress: {
-    backgroundColor: '#202866',
-    borderColor: '#625cff',
+    backgroundColor: "#202866",
+    borderColor: "#625cff",
     borderWidth: 1,
     borderRadius: 13,
     padding: 10,
     marginTop: 18,
   },
-  labels: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  levelRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
-  xp: { color: '#edaa39', fontWeight: '900' },
-  track: { backgroundColor: '#000', height: 7, borderRadius: 5, marginTop: 5 },
-  fill: { height: '100%', backgroundColor: '#df6ce8', borderRadius: 5 },
-  section: { color: '#fff', fontSize: 17, fontWeight: '900', marginTop: 20, marginBottom: 9 },
-  cards: { flexDirection: 'row', gap: 10 },
+  labels: { flexDirection: "row", justifyContent: "space-between" },
+  label: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  levelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 14,
+  },
+  xp: { color: "#edaa39", fontWeight: "900" },
+  track: { backgroundColor: "#000", height: 7, borderRadius: 5, marginTop: 5 },
+  fill: { height: "100%", backgroundColor: "#df6ce8", borderRadius: 5 },
+  section: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 20,
+    marginBottom: 9,
+  },
+  cards: { flexDirection: "row", gap: 10 },
   course: {
     flex: 1,
     minHeight: 102,
-    backgroundColor: '#172849',
-    borderColor: '#4568cf',
+    backgroundColor: "#172849",
+    borderColor: "#4568cf",
     borderWidth: 1,
     borderRadius: 15,
     padding: 11,
   },
-  courseIcon: { color: '#f1bd48', fontSize: 27, fontWeight: '900' },
-  courseTitle: { color: '#fff', fontWeight: '900', marginTop: 4 },
-  courseSub: { color: '#bac7e0', fontSize: 10 },
+  courseIcon: { color: "#f1bd48", fontSize: 27, fontWeight: "900" },
+  courseTitle: { color: "#fff", fontWeight: "900", marginTop: 4 },
+  courseSub: { color: "#bac7e0", fontSize: 10 },
   challenge: {
-    backgroundColor: '#4642ae',
-    borderColor: '#c2cf34',
+    backgroundColor: "#4642ae",
+    borderColor: "#c2cf34",
     borderWidth: 1,
     borderRadius: 17,
     padding: 12,
     marginTop: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  challengeTag: { color: '#ffdf4e', fontWeight: '900', fontSize: 10 },
-  challengeTitle: { color: '#fff', fontWeight: '900', fontSize: 17 },
-  challengeSub: { color: '#fff', fontSize: 10 },
+  challengeTag: { color: "#ffdf4e", fontWeight: "900", fontSize: 10 },
+  challengeTitle: { color: "#fff", fontWeight: "900", fontSize: 17 },
+  challengeSub: { color: "#fff", fontSize: 10 },
   target: { width: 55, height: 55 },
   study: {
-    backgroundColor: '#172849',
-    borderColor: '#4568cf',
+    backgroundColor: "#172849",
+    borderColor: "#4568cf",
     borderWidth: 1,
     borderRadius: 13,
     padding: 14,
   },
-  studyValue: { color: '#7ce1ff', fontWeight: '900', fontSize: 22 },
-  studyCopy: { color: '#c0cbe0', fontSize: 11, marginTop: 4 },
+  studyValue: { color: "#7ce1ff", fontWeight: "900", fontSize: 22 },
+  studyCopy: { color: "#c0cbe0", fontSize: 11, marginTop: 4 },
   gradeCard: { borderWidth: 1, borderRadius: 18, padding: 10, marginTop: 9 },
-  gradeHeader: { flexDirection: 'row', alignItems: 'center' },
+  gradeHeader: { flexDirection: "row", alignItems: "center" },
   gradeIcon: { width: 44, height: 44 },
   gradeCopy: { flex: 1, marginLeft: 7 },
-  gradeTitle: { color: '#fff', fontSize: 19, fontWeight: '900' },
-  gradeLabel: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  viewButton: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 5 },
-  viewText: { color: '#fff', fontWeight: '900', fontSize: 11 },
-  tags: { flexDirection: 'row', gap: 7, marginTop: 7 },
+  gradeTitle: { color: "#fff", fontSize: 19, fontWeight: "900" },
+  gradeLabel: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  viewButton: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+  },
+  viewText: { color: "#fff", fontWeight: "900", fontSize: 11 },
+  tags: { flexDirection: "row", gap: 7, marginTop: 7 },
   tag: {
-    color: '#fff',
+    color: "#fff",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   lockOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(9, 11, 32, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(9, 11, 32, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
   lockContentContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 20,
-    width: '100%',
+    width: "100%",
   },
   lockEmoji: { fontSize: 50, marginBottom: 12 },
-  lockTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 8, textAlign: 'center' },
+  lockTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 8,
+    textAlign: "center",
+  },
   lockDesc: {
-    color: '#94a3b8',
+    color: "#94a3b8",
     fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     lineHeight: 20,
     marginBottom: 16,
   },
   lockActionHint: {
-    color: '#818cf8',
+    color: "#818cf8",
     fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
+    fontWeight: "800",
+    textAlign: "center",
+    textDecorationLine: "underline",
   },
 });

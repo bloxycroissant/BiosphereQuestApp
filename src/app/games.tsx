@@ -432,7 +432,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     <GradientSafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.topBar}>
         <Pressable onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>← Back</Text>
+          <Text style={styles.cancelText}>  Back</Text>
         </Pressable>
         <View style={styles.topBarRightContainer}>
           {/* Mute / Unmute Button */}

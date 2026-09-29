@@ -4,7 +4,7 @@ import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -45,22 +45,10 @@ interface AchievementType {
   xp: number;
 }
 
-interface RawSession {
-  id: string | number;
-  day?: string;
-  title?: string;
-  time?: string;
-  duration?: string;
-  category?: string;
-  description?: string;
-  reminder?: string;
-  done?: boolean;
-}
-
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-export default function ProfileScreen() {
+export default function ProfileScreen(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   if (
@@ -118,33 +106,48 @@ export default function ProfileScreen() {
   const [tempSchool, setTempSchool] = useState(school);
   const [tempGradeYear, setTempGradeYear] = useState(gradeYear);
   const [tempWebsite, setTempWebsite] = useState(website);
-  const [tempProfileImage, setTempProfileImage] = useState<string | null>(
-    profileImage,
-  );
+  const [tempProfileImage, setTempProfileImage] = useState(profileImage);
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (): Promise<void> => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (user) {
         setIsLoggedIn(true);
-        if (user.email && !email) {
-          setEmail(user.email);
+        const activeEmail = user.email || "";
+        setEmail(activeEmail);
+        setTempEmail(activeEmail);
+
+        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+        const parsed = savedData ? JSON.parse(savedData) : {};
+
+        if (
+          user.user_metadata?.full_name &&
+          (!parsed.name || parsed.name === "Explorer")
+        ) {
+          parsed.name = user.user_metadata.full_name;
+          setName(user.user_metadata.full_name);
         }
-        return;
-      }
+        if (
+          user.user_metadata?.username &&
+          (!parsed.username || parsed.username === "Explorer")
+        ) {
+          parsed.username = user.user_metadata.username;
+          setUsername(user.user_metadata.username);
+        }
 
-      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-      const parsed = savedData ? JSON.parse(savedData) : null;
-      if (parsed?.email?.trim()) {
-        setIsLoggedIn(true);
-        return;
+        parsed.email = activeEmail;
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      } else {
+        setIsLoggedIn(false);
+        setEmail("");
+        setTempEmail("");
       }
-
-      setIsLoggedIn(false);
     } catch (e) {
       console.error("Auth check error in profile", e);
+      setIsLoggedIn(false);
     }
   };
 
@@ -156,9 +159,13 @@ export default function ProfileScreen() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setIsLoggedIn(true);
-        if (session.user.email) setEmail(session.user.email);
+        const sessionEmail = session.user.email || "";
+        setEmail(sessionEmail);
+        setTempEmail(sessionEmail);
       } else {
         setIsLoggedIn(false);
+        setEmail("");
+        setTempEmail("");
       }
     });
 
@@ -215,7 +222,7 @@ export default function ProfileScreen() {
   const [newDescription, setNewDescription] = useState("");
   const [newReminder, setNewReminder] = useState("10 mins before");
 
-  const animateViewChange = (nextView: ViewMode) => {
+  const animateViewChange = (nextView: ViewMode): void => {
     if (nextView === "addSchedule") {
       addFormAnim.setValue(40);
       addFormOpacity.setValue(0);
@@ -249,7 +256,7 @@ export default function ProfileScreen() {
     setCurrentView(nextView);
   };
 
-  const handleTabSwitch = (newSection: Section) => {
+  const handleTabSwitch = (newSection: Section): void => {
     if (newSection === section) return;
 
     const slideDirection = newSection === "schedule" ? 30 : -30;
@@ -273,11 +280,11 @@ export default function ProfileScreen() {
     ]).start();
   };
 
-  const triggerLevelUpAnimation = (oldLvl: number, newLvl: number) => {
+  const triggerLevelUpAnimation = (oldLvl: number, newLvl: number): void => {
     const formattedOld = String(oldLvl).padStart(2, "0");
     const formattedNew = String(newLvl).padStart(2, "0");
     setLevelUpText(
-      `Congratulations! You leveled up from \({formattedOld} to\){formattedNew}!`,
+      `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
     );
 
     Animated.spring(levelUpAnim, {
@@ -296,7 +303,7 @@ export default function ProfileScreen() {
     }, 3500);
   };
 
-  const addXpWithProgress = (amount: number) => {
+  const addXpWithProgress = (amount: number): void => {
     let currentXp = xp + amount;
     let currentLevel = level;
     let currentNextXp = nextLevelXp;
@@ -325,7 +332,7 @@ export default function ProfileScreen() {
     });
   };
 
-  const persistData = async (updatedFields: object) => {
+  const persistData = async (updatedFields: object): Promise<void> => {
     try {
       const currentData = {
         name,
@@ -353,12 +360,13 @@ export default function ProfileScreen() {
     }
   };
 
-  const loadSavedData = async () => {
+  const loadSavedData = async (): Promise<void> => {
     try {
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       let parsed = savedData ? JSON.parse(savedData) : {};
 
       const guestName = await AsyncStorage.getItem("explorerName");
+      const guestUsername = await AsyncStorage.getItem("explorerUsername");
       const guestGrade = await AsyncStorage.getItem("explorerGrade");
 
       if (parsed.name) {
@@ -367,6 +375,14 @@ export default function ProfileScreen() {
         setName(guestName);
       } else {
         setName("Explorer");
+      }
+
+      if (parsed.username) {
+        setUsername(parsed.username);
+      } else if (guestUsername) {
+        setUsername(guestUsername);
+      } else {
+        setUsername("Explorer");
       }
 
       if (parsed.gradeYear) {
@@ -404,7 +420,10 @@ export default function ProfileScreen() {
       }
 
       if (parsed.username) setUsername(parsed.username);
-      if (parsed.email) setEmail(parsed.email);
+      if (parsed.email) {
+        setEmail(parsed.email);
+        setTempEmail(parsed.email);
+      }
       if (parsed.phone) setPhone(parsed.phone);
       if (parsed.bio) setBio(parsed.bio);
       if (parsed.school) setSchool(parsed.school);
@@ -453,7 +472,12 @@ export default function ProfileScreen() {
     }, []),
   );
 
-  const handleEditProfilePress = () => {
+  const handleEditProfilePress = async (): Promise<void> => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const activeEmail = user?.email || email;
+
     Animated.sequence([
       Animated.spring(editProfileScale, {
         toValue: 0.9,
@@ -467,7 +491,7 @@ export default function ProfileScreen() {
     ]).start(() => {
       setTempName(name);
       setTempUsername(username);
-      setTempEmail(email);
+      setTempEmail(activeEmail);
       setTempPhone(phone);
       setTempBio(bio);
       setTempSchool(school);
@@ -478,7 +502,7 @@ export default function ProfileScreen() {
     });
   };
 
-  const saveProfile = () => {
+  const saveProfile = (): void => {
     Animated.sequence([
       Animated.spring(saveProfileScale, {
         toValue: 0.88,
@@ -522,7 +546,7 @@ export default function ProfileScreen() {
     });
   };
 
-  const pickImage = async () => {
+  const pickImage = async (): Promise<void> => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
@@ -542,7 +566,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const completeAndDeleteSession = (id: string) => {
+  const completeAndDeleteSession = (id: string): void => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const updatedSessions = sessions.filter((s) => s.id !== id);
     setSessions(updatedSessions);
@@ -553,7 +577,7 @@ export default function ProfileScreen() {
     persistData({ sessions: updatedSessions, lessons: newLessons });
   };
 
-  const addSession = () => {
+  const addSession = (): void => {
     Animated.sequence([
       Animated.spring(addScheduleScale, {
         toValue: 0.92,
@@ -574,7 +598,7 @@ export default function ProfileScreen() {
       const hrs = parseInt(newHours, 10);
       const mins = parseInt(newMinutes, 10);
       if (!isNaN(hrs) && hrs > 0)
-        durationStr += `\({hrs} hr\){hrs > 1 ? "s" : ""} `;
+        durationStr += `${hrs} hr${hrs > 1 ? "s" : ""} `;
       if (!isNaN(mins) && mins > 0) durationStr += `${mins} mins`;
       if (!durationStr.trim()) durationStr = "30 mins";
 
@@ -617,7 +641,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.editHeaderRow}>
               <Pressable onPress={() => animateViewChange("profile")}>
-                <Text style={styles.cancelText}>← Cancel</Text>
+                <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <Text style={styles.editHeaderTitle}>Edit Profile</Text>
               <Animated.View
@@ -675,8 +699,8 @@ export default function ProfileScreen() {
               <FormInput
                 icon="✉️"
                 label="Email"
-                value={tempEmail}
-                onChangeText={setTempEmail}
+                value={tempEmail || email || "No email connected"}
+                editable={false}
               />
               <FormInput
                 icon="📞"
@@ -753,7 +777,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.editHeaderRow}>
               <Pressable onPress={() => animateViewChange("profile")}>
-                <Text style={styles.cancelText}>← Cancel</Text>
+                <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <View style={styles.addHeaderTitleRow}>
                 <View style={styles.miniCalendarBadge}>
@@ -973,10 +997,14 @@ export default function ProfileScreen() {
               )}
             </View>
             <View style={styles.userDetails}>
-              <Text style={styles.name}>{name}</Text>
+              <Text style={styles.name}>{username || name || "Explorer"}</Text>
+              <Text
+                style={{ color: "#8a9bbd", fontSize: 12, fontWeight: "600" }}
+              >
+                {name}
+              </Text>
               {email ? <Text style={styles.email}>{email}</Text> : null}
             </View>
-            <Image source={astro} style={styles.mascot} resizeMode="contain" />
           </View>
 
           <View style={styles.subHeaderRow}>
@@ -1075,22 +1103,27 @@ function FormInput({
   value,
   onChangeText,
   borderless,
+  editable = true,
 }: {
   icon: string;
   label: string;
   value: string;
-  onChangeText: (v: string) => void;
+  onChangeText?: (v: string) => void;
   borderless?: boolean;
-}) {
+  editable?: boolean;
+}): React.JSX.Element {
   return (
     <View style={[styles.inputRow, borderless && { borderBottomWidth: 0 }]}>
       <Text style={styles.inputIconSymbol}>{icon}</Text>
       <View style={styles.inputFieldCopy}>
-        <Text style={styles.inputLabel}>{label}</Text>
+        <Text style={styles.inputLabel}>
+          {label} {!editable ? " " : ""}
+        </Text>
         <TextInput
-          style={styles.textInputPlain}
+          style={[styles.textInputPlain, !editable && { color: "#7a8fb8" }]}
           value={value}
           onChangeText={onChangeText}
+          editable={editable}
           placeholderTextColor="#68779a"
         />
       </View>
@@ -1098,7 +1131,7 @@ function FormInput({
   );
 }
 
-function Badges() {
+function Badges(): React.JSX.Element {
   return (
     <View>
       <Text style={styles.section}>🏅 Badges & Achievements</Text>
@@ -1150,7 +1183,7 @@ function SchedulePreview({
   sessions: LocalSession[];
   onCompleteDelete: (id: string) => void;
   onAddPress: () => void;
-}) {
+}): React.JSX.Element {
   return (
     <View>
       <View style={styles.scheduleHeading}>
@@ -1209,7 +1242,7 @@ function Stat({
   icon: string;
   value: string;
   label: string;
-}) {
+}): React.JSX.Element {
   return (
     <View style={styles.stat}>
       <Text style={styles.statIcon}>{icon}</Text>
@@ -1714,34 +1747,6 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 2,
   },
-  actionButtonCard: {
-    backgroundColor: "#202c52",
-    borderColor: "#4d6199",
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  actionButtonText: { color: "#ffffff", fontSize: 14, fontWeight: "900" },
-  actionButtonArrow: { color: "#ffffff", fontSize: 16, fontWeight: "900" },
-  dangerZoneCard: {
-    backgroundColor: "#381622",
-    borderColor: "#a32b3d",
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dangerZoneText: { color: "#ff3e58", fontSize: 14, fontWeight: "900" },
-  dangerZoneArrow: { color: "#ff3e58", fontSize: 16, fontWeight: "900" },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",

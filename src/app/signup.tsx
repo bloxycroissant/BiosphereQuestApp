@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { Link, router } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,17 +18,19 @@ import {
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
+const STORAGE_KEY = "@biosphere_profile_data_v1";
+
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 const stella = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
-export default function SignupScreen() {
+export default function SignupScreen(): React.JSX.Element {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
 
-  const handleSignup = async () => {
+  const handleSignup = async (): Promise<void> => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const trimmedEmail = email.trim();
 
@@ -61,6 +63,10 @@ export default function SignupScreen() {
     try {
       const guestName =
         (await AsyncStorage.getItem("explorerName")) || "Explorer";
+      const guestUsername =
+        (await AsyncStorage.getItem("explorerUsername")) ||
+        guestName ||
+        "Explorer";
       const guestGrade = (await AsyncStorage.getItem("explorerGrade")) || "1";
       const guestSubjects =
         (await AsyncStorage.getItem("explorerSubjects")) || "[]";
@@ -72,7 +78,7 @@ export default function SignupScreen() {
         parsedSubjects = [];
       }
 
-      console.log("🚀 Sending request to Supabase with email:", trimmedEmail);
+      console.log("🚀 Sending signup to Supabase with email:", trimmedEmail);
 
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
@@ -80,6 +86,7 @@ export default function SignupScreen() {
         options: {
           data: {
             full_name: guestName,
+            username: guestUsername,
             grade_level: guestGrade,
             topics: Array.isArray(parsedSubjects) ? parsedSubjects : [],
             level: 0,
@@ -94,18 +101,28 @@ export default function SignupScreen() {
         return;
       }
 
-      if (!data?.user) {
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const parsed = savedData ? JSON.parse(savedData) : {};
+      parsed.name = guestName;
+      parsed.username = guestUsername;
+      parsed.email = trimmedEmail;
+      parsed.authProvider = "email";
+      parsed.gradeYear = `Grade ${guestGrade}`;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+
+      if (!data?.session) {
         Alert.alert(
           "Check Your Email",
           "We sent a confirmation email. Please verify it before logging in.",
         );
+        router.push({
+          pathname: "/verifyEmail" as any,
+          params: { email: trimmedEmail },
+        });
         return;
       }
 
-      router.push({
-        pathname: "/verifyEmail",
-        params: { email: trimmedEmail },
-      } as any);
+      router.replace("/home" as any);
     } catch (error) {
       console.error("Signup error:", error);
       Alert.alert("Error", "An unexpected error occurred during signup.");
@@ -128,7 +145,7 @@ export default function SignupScreen() {
           <View style={styles.content}>
             <Pressable
               onPress={() =>
-                router.canGoBack() ? router.back() : router.replace("/")
+                router.canGoBack() ? router.back() : router.replace("/" as any)
               }
             >
               <Text style={styles.back}>‹ Back</Text>
@@ -216,7 +233,10 @@ export default function SignupScreen() {
   );
 }
 
-function Field({ label, ...props }: { label: string } & TextInputProps) {
+function Field({
+  label,
+  ...props
+}: { label: string } & TextInputProps): React.JSX.Element {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
