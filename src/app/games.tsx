@@ -17,7 +17,22 @@ import { GradeLevel } from './data/questionGenerators';
 const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
 const gameThemeMusic = require('../../assets/BiosphereQuestBackgroundMusic/The Game Show Theme Music - (192 Kbps).mp3');
 
-const gameCatalog = [
+interface GameItem {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: any;
+  difficulty: string;
+  xpText: string;
+  badge: string;
+  tutorial?: {
+    objective: string;
+    steps: string[];
+  };
+  isPlaceholder?: boolean;
+}
+
+const gameCatalog: GameItem[] = [
   {
     key: 'flashcards',
     title: 'Flashcards',
@@ -252,27 +267,31 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   };
 
-  const getOrderedGames = () => {
-    if (difficulty !== 'All') {
-      return gameCatalog.filter(item => item.difficulty === difficulty);
-    }
-    return [
-      gameCatalog.find(i => i.key === 'flashcards')!,
-      gameCatalog.find(i => i.key === 'scramble')!,
-      gameCatalog.find(i => i.key === 'memory')!,
-      gameCatalog.find(i => i.key === 'ninja')!,
-      gameCatalog.find(i => i.key === 'whack')!,
-      gameCatalog.find(i => i.key === 'codebreaker')!,
-    ].filter(Boolean);
-  };
+  // Get matching items based on selected filter
+  const matchedGames = difficulty === 'All' 
+    ? gameCatalog 
+    : gameCatalog.filter(item => item.difficulty === difficulty);
 
-  const visibleGames = getOrderedGames();
-  
-  // This chunks the games into explicit rows of 3 to absolutely force the 3-column layout
-  const chunkedGames = [];
-  for (let i = 0; i < visibleGames.length; i += 3) {
-    chunkedGames.push(visibleGames.slice(i, i + 3));
+  // Pad items up to a total of 6 slots so the 2x3 grid structure stays completely locked in
+  const paddedGames: GameItem[] = [...matchedGames];
+  while (paddedGames.length < 6) {
+    paddedGames.push({ 
+      isPlaceholder: true, 
+      key: `placeholder-${paddedGames.length}`,
+      title: '',
+      subtitle: '',
+      icon: null,
+      difficulty: '',
+      xpText: '',
+      badge: '',
+    });
   }
+
+  // Explicitly split into 2 rows of 3 columns
+  const chunkedGames = [
+    paddedGames.slice(0, 3),
+    paddedGames.slice(3, 6),
+  ];
 
   useEffect(() => {
     Animated.spring(entrance, {
@@ -330,7 +349,9 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   };
 
-  const handleGamePress = (gameItem: any) => {
+  const handleGamePress = (gameItem: GameItem) => {
+    if (gameItem.isPlaceholder) return;
+
     if (studyFirstEnabled) {
       Alert.alert(
         "Mini-Games Locked", 
@@ -484,6 +505,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
                   icon: require('../../assets/BiosphereQuestAssets/Brain Icon.png'),
                   difficulty: 'Easy',
                   xpText: '+150 XP',
+                  badge: '🚀 Epic',
                   tutorial: {
                     objective: 'Answer multiple-choice questions correctly to score big XP points.',
                     steps: [
@@ -532,17 +554,31 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             })}
           </View>
 
-          {/* Fully fluid 2x3 Game Grid rendering that automatically fills whitespace */}
+          {/* Locked Strict 2x3 Grid Container */}
           <Animated.View style={[styles.grid, { transform: [{ scale: gridAnim }] }]}>
             {chunkedGames.map((row, rowIndex) => (
               <View key={`row-${rowIndex}`} style={styles.gridRow}>
                 {row.map((item) => {
+                  if (item.isPlaceholder) {
+                    return <View key={item.key} style={[styles.cardWrapper, { flex: 1, opacity: 0 }]} pointerEvents="none" />;
+                  }
+
                   const themeColor = getDifficultyColor(item.difficulty);
                   const anim = cardAnims[item.key as keyof typeof cardAnims] || new Animated.Value(1);
+
                   return (
-                    <Animated.View key={item.key} style={{ flex: 1, transform: [{ scale: anim }] }}>
+                    <Animated.View 
+                      key={item.key} 
+                      style={[
+                        styles.cardWrapper, 
+                        { 
+                          flex: 1, 
+                          transform: [{ scale: anim }]
+                        }
+                      ]}
+                    >
                       <Pressable
-                        style={styles.gameCard}
+                        style={[styles.gameCard, { borderColor: themeColor }]}
                         onPress={() => handleGamePress(item)}
                       >
                         <View style={styles.cardBadgeContainer}>
@@ -562,7 +598,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
                           </Text>
                           <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
                         </View>
-                        <View style={styles.cardFooter}>
+                        <View style={[styles.cardFooter, { borderTopColor: `${themeColor}40` }]}>
                           <Text style={styles.lightningIcon}>⚡</Text>
                           <Text style={[styles.cardXp, { color: themeColor }]} numberOfLines={1}>
                             {item.xpText}
@@ -810,24 +846,23 @@ const styles = StyleSheet.create({
   filterText: { color: '#94a3b8', fontSize: 10.5, fontWeight: '800' },
   filterTextActive: { color: '#ffffff' },
   
-  // Grid container: simply stacks the rows
   grid: { 
     flexDirection: 'column', 
     gap: 8, 
     marginTop: 10, 
   },
-  // Grid row: Flexes to 100% width and spaces children evenly
   gridRow: {
     flexDirection: 'row',
     gap: 8,
     width: '100%',
   },
-  // Game Card: Auto-scales height based on flexible width using aspectRatio
+  cardWrapper: {
+    // Flex wrapper style
+  },
   gameCard: {
     width: '100%',
     aspectRatio: 0.8,
     backgroundColor: '#131d3b',
-    borderColor: '#30478a',
     borderWidth: 1.2,
     borderRadius: 16,
     padding: 8,
@@ -877,7 +912,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'space-between', 
     borderTopWidth: 1,
-    borderTopColor: 'rgba(48, 71, 138, 0.4)',
     paddingTop: 4,
   },
   lightningIcon: { fontSize: 8 },
@@ -1009,4 +1043,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-});
+}); 
