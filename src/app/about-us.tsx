@@ -1,7 +1,7 @@
+import { GradientSafeAreaView as SafeAreaView } from '@/components/gradient-safe-area';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View, Linking } from 'react-native';
-import { GradientSafeAreaView as SafeAreaView } from '@/components/gradient-safe-area';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const logo = require('../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png');
 const stella = require('../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png');
@@ -9,9 +9,9 @@ const astro = require('../../assets/BiosphereQuestAssets/Astro (Biosphere Quest 
 
 export default function AboutUsScreen() {
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@biospherequest.app?subject=Support%20Inquiry');
+    Linking.openURL('mailto:denisebiospherequest@gmail.com?subject=Support%20Inquiry');
   };
-
+  
   const handleRateUs = () => {
     Linking.openURL('https://play.google.com/store/apps');
   };
