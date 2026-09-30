@@ -18,6 +18,7 @@ import {
   TextInput,
   UIManager,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -1132,6 +1133,9 @@ function FormInput({
 }
 
 function Badges(): React.JSX.Element {
+  const { width } = useWindowDimensions();
+  const badgeWidth = Math.floor((width - 48) / 3);
+
   return (
     <View>
       <Text style={styles.section}>🏅 Badges & Achievements</Text>
@@ -1142,6 +1146,7 @@ function Badges(): React.JSX.Element {
             style={[
               styles.badge,
               {
+                width: badgeWidth,
                 borderColor: achievement.unlocked
                   ? achievement.accent
                   : "#35466e",
@@ -1151,7 +1156,9 @@ function Badges(): React.JSX.Element {
             <Text style={styles.badgeIcon}>
               {achievement.unlocked ? achievement.icon : "🔒"}
             </Text>
-            <Text style={styles.badgeTitle}>{achievement.title}</Text>
+            <Text style={styles.badgeTitle} numberOfLines={2}>
+              {achievement.title}
+            </Text>
             <Text style={styles.badgeXp}>+{achievement.xp} XP</Text>
           </View>
         ))}
@@ -1481,25 +1488,39 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 9,
   },
-  badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  badge: {
-    width: "31.8%",
-    minHeight: 105,
-    backgroundColor: "#172849",
-    borderWidth: 1,
-    borderRadius: 11,
-    padding: 8,
-    alignItems: "center",
+  badges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
-  badgeIcon: { fontSize: 25 },
+  badge: {
+    minHeight: 88,
+    backgroundColor: "#172849",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
   badgeTitle: {
     color: "#fff",
-    fontSize: 10,
-    fontWeight: "900",
+    fontSize: 9.5,
+    fontWeight: "800",
     textAlign: "center",
+    lineHeight: 12,
+    height: 24,
+  },
+  badgeXp: {
+    color: "#f3c84f",
+    fontSize: 8.5,
+    fontWeight: "900",
     marginTop: 3,
   },
-  badgeXp: { color: "#f3c84f", fontSize: 9, marginTop: 4 },
   scheduleHeading: {
     flexDirection: "row",
     alignItems: "center",
