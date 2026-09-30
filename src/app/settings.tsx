@@ -422,7 +422,7 @@ export default function SettingsScreen(): React.JSX.Element {
               onPress={() => router.push("/login" as any)}
             >
               <Text style={styles.rowItemText}>Login or Create Account</Text>
-              <Text style={styles.rowArrow}>→</Text>
+              <Text style={styles.rowArrow}> </Text>
             </Pressable>
           ) : (
             <View>
@@ -575,10 +575,10 @@ export default function SettingsScreen(): React.JSX.Element {
               Dev Factory Reset{" "}
             </Text>
             <Text style={[styles.dangerZoneSub, { color: "#cc8800" }]}>
-              Wipe Supabase auth & all local data
+              For testing only (to be removed on final product)
             </Text>
           </View>
-          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}>→</Text>
+          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}> </Text>
         </Pressable>
       </ScrollView>
     </GradientSafeAreaView>

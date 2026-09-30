@@ -80,6 +80,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const [prevLevel, setPrevLevel] = useState(null);
   const [levelUpText, setLevelUpText] = useState("");
+  const [showLevelUp, setShowLevelUp] = useState(false);
 
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
@@ -288,6 +289,9 @@ export default function ProfileScreen(): React.JSX.Element {
       `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
     );
 
+    setShowLevelUp(true);
+    levelUpAnim.setValue(-120);
+
     Animated.spring(levelUpAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -300,7 +304,10 @@ export default function ProfileScreen(): React.JSX.Element {
         toValue: -120,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setShowLevelUp(false);
+        setLevelUpText("");
+      });
     }, 3500);
   };
 
@@ -939,14 +946,16 @@ export default function ProfileScreen(): React.JSX.Element {
 
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
-      <Animated.View
-        style={[
-          styles.levelUpBanner,
-          { transform: [{ translateY: levelUpAnim }] },
-        ]}
-      >
-        <Text style={styles.levelUpText}>{levelUpText}</Text>
-      </Animated.View>
+      {showLevelUp && (
+        <Animated.View
+          style={[
+            styles.levelUpBanner,
+            { transform: [{ translateY: levelUpAnim }] },
+          ]}
+        >
+          <Text style={styles.levelUpText}>{levelUpText}</Text>
+        </Animated.View>
+      )}
 
       <Animated.View
         style={{ flex: 1, transform: [{ scale: viewTransitionAnim }] }}
