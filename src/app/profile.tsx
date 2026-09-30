@@ -63,9 +63,13 @@ export default function ProfileScreen(): React.JSX.Element {
   const astro = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
   const progress = useProgress();
-  const [currentView, setCurrentView] = useState("profile");
-  const [section, setSection] = useState("badges");
-  const levelUpAnim = useRef(new Animated.Value(-100)).current;
+  const [currentView, setCurrentView] = useState<ViewMode>("profile");
+  const [section, setSection] = useState<Section>("badges");
+
+  const levelUpAnim = useRef(new Animated.Value(-120)).current;
+  const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
+  const [levelUpText, setLevelUpText] = useState<string>("");
+  const [prevLevel, setPrevLevel] = useState<number | null>(null);
 
   const editProfileScale = useRef(new Animated.Value(1)).current;
   const saveProfileScale = useRef(new Animated.Value(1)).current;
@@ -77,10 +81,6 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const addFormAnim = useRef(new Animated.Value(40)).current;
   const addFormOpacity = useRef(new Animated.Value(0)).current;
-
-  const [prevLevel, setPrevLevel] = useState(null);
-  const [levelUpText, setLevelUpText] = useState("");
-  const [showLevelUp, setShowLevelUp] = useState(false);
 
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
@@ -458,13 +458,8 @@ export default function ProfileScreen(): React.JSX.Element {
       if (parsed.lastResetDate) setLastResetDate(parsed.lastResetDate);
 
       const newLvl = parsed.level !== undefined ? parsed.level : baselineLevel;
-      setLevel((currentLvl) => {
-        if (prevLevel !== null && newLvl > currentLvl) {
-          triggerLevelUpAnimation(currentLvl, newLvl);
-        }
-        setPrevLevel(newLvl);
-        return newLvl;
-      });
+      setLevel(newLvl);
+      setPrevLevel(newLvl);
     } catch (e) {
       console.error("Failed to load profile data", e);
     }
@@ -521,7 +516,7 @@ export default function ProfileScreen(): React.JSX.Element {
         friction: 3,
         useNativeDriver: true,
       }),
-    ]).start(() => {
+    ]).start(async () => {
       if (!tempName.trim()) {
         Alert.alert(
           "Incomplete Form",
@@ -529,8 +524,12 @@ export default function ProfileScreen(): React.JSX.Element {
         );
         return;
       }
-      setName(tempName);
-      setUsername(tempUsername);
+
+      const updatedName = tempName.trim();
+      const updatedUsername = tempUsername.trim() || updatedName;
+
+      setName(updatedName);
+      setUsername(updatedUsername);
       setEmail(tempEmail);
       setPhone(tempPhone);
       setBio(tempBio);
@@ -540,9 +539,9 @@ export default function ProfileScreen(): React.JSX.Element {
       setProfileImage(tempProfileImage);
       animateViewChange("profile");
 
-      persistData({
-        name: tempName,
-        username: tempUsername,
+      await persistData({
+        name: updatedName,
+        username: updatedUsername,
         email: tempEmail,
         phone: tempPhone,
         bio: tempBio,
@@ -551,6 +550,25 @@ export default function ProfileScreen(): React.JSX.Element {
         website: tempWebsite,
         profileImage: tempProfileImage,
       });
+
+      await AsyncStorage.setItem("explorerName", updatedName);
+      await AsyncStorage.setItem("explorerUsername", updatedUsername);
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.auth.updateUser({
+            data: {
+              full_name: updatedName,
+              username: updatedUsername,
+            },
+          });
+        }
+      } catch (e) {
+        console.error("Supabase user sync error:", e);
+      }
     });
   };
 
@@ -705,7 +723,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 onChangeText={setTempUsername}
               />
               <FormInput
-                icon="✉️"
+                icon="✉️️"
                 label="Email"
                 value={tempEmail || email || "No email connected"}
                 editable={false}
@@ -946,7 +964,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
-      {showLevelUp && (
+      {Boolean(showLevelUp && levelUpText.trim()) && (
         <Animated.View
           style={[
             styles.levelUpBanner,
@@ -1270,57 +1288,6 @@ function Stat({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#091426" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(9, 20, 38, 0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: "#131e38",
-    borderColor: "#625cff",
-    borderWidth: 1.5,
-    borderRadius: 18,
-    padding: 22,
-    width: "100%",
-    maxWidth: 340,
-    alignItems: "center",
-    shadowColor: "#5857e4",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  modalMessage: {
-    color: "#c7d0e8",
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  modalButtonRow: { flexDirection: "row", gap: 12, width: "100%" },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalCancelBtn: {
-    backgroundColor: "#202c52",
-    borderWidth: 1,
-    borderColor: "#4d6199",
-  },
-  modalCancelText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  modalConfirmBtn: { backgroundColor: "#ff3e58" },
-  modalConfirmText: { color: "#fff", fontWeight: "900", fontSize: 13 },
   levelUpBanner: {
     position: "absolute",
     top: 15,
@@ -1376,23 +1343,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   settingsBtnText: { color: "#dfe7ff", fontWeight: "800", fontSize: 12 },
-  logout: {
-    borderColor: "#f02748",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  logoutText: { color: "#ff3e58", fontWeight: "900", fontSize: 11 },
-  resetBtn: {
-    borderColor: "#5269a0",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#131e38",
-  },
-  resetBtnText: { color: "#8ae2c5", fontWeight: "900", fontSize: 11 },
   identityRow: { flexDirection: "row", alignItems: "center", marginTop: 16 },
   avatar: {
     width: 52,
@@ -1408,7 +1358,6 @@ const styles = StyleSheet.create({
   userDetails: { flex: 1, marginLeft: 10 },
   name: { color: "#fff", fontSize: 18, fontWeight: "900" },
   email: { color: "#bdc8dd", fontSize: 10, marginTop: 2 },
-  mascot: { width: 68, height: 68 },
   subHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1512,10 +1461,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
+  badgeIcon: { fontSize: 20, marginBottom: 4 },
   badgeTitle: {
     color: "#fff",
     fontSize: 9.5,
@@ -1524,12 +1470,7 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     height: 24,
   },
-  badgeXp: {
-    color: "#f3c84f",
-    fontSize: 8.5,
-    fontWeight: "900",
-    marginTop: 3,
-  },
+  badgeXp: { color: "#f3c84f", fontSize: 8.5, fontWeight: "900", marginTop: 3 },
   scheduleHeading: {
     flexDirection: "row",
     alignItems: "center",

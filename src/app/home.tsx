@@ -26,7 +26,7 @@ const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 export default function HomeScreen() {
   const progress = useProgress();
   const appear = useRef(new Animated.Value(0)).current;
-  const levelUpAnim = useRef(new Animated.Value(-100)).current;
+  const levelUpAnim = useRef(new Animated.Value(-120)).current;
 
   const [userName, setUserName] = useState("Explorer");
   const [userGrade, setUserGrade] = useState("");
@@ -39,6 +39,7 @@ export default function HomeScreen() {
 
   const prevLevelRef = useRef<number | null>(null);
   const [levelUpText, setLevelUpText] = useState("");
+  const [showLevelUp, setShowLevelUp] = useState(false);
   const [greeting, setGreeting] = useState("Good morning");
 
   const [isLocked, setIsLocked] = useState(false);
@@ -146,6 +147,9 @@ export default function HomeScreen() {
       `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
     );
 
+    setShowLevelUp(true);
+    levelUpAnim.setValue(-120);
+
     Animated.spring(levelUpAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -158,20 +162,42 @@ export default function HomeScreen() {
         toValue: -120,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setShowLevelUp(false);
+        setLevelUpText("");
+      });
     }, 3500);
   };
 
   const loadSharedProgress = async () => {
     try {
-      const savedName = await AsyncStorage.getItem("explorerName");
-      const savedGrade = await AsyncStorage.getItem("explorerGrade");
-      if (savedName) setUserName(savedName);
-      if (savedGrade) setUserGrade(savedGrade);
+      const guestName = await AsyncStorage.getItem("explorerName");
+      const guestUsername = await AsyncStorage.getItem("explorerUsername");
+      const guestGrade = await AsyncStorage.getItem("explorerGrade");
 
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       if (savedData) {
         const parsed = JSON.parse(savedData);
+
+        // Prioritize updated profile username -> profile name -> guest keys
+        if (parsed.username && parsed.username.trim()) {
+          setUserName(parsed.username.trim());
+        } else if (parsed.name && parsed.name.trim()) {
+          setUserName(parsed.name.trim());
+        } else if (guestUsername && guestUsername.trim()) {
+          setUserName(guestUsername.trim());
+        } else if (guestName && guestName.trim()) {
+          setUserName(guestName.trim());
+        }
+
+        if (parsed.gradeYear) {
+          const match = String(parsed.gradeYear).match(/\d+/);
+          if (match) setUserGrade(match[0]);
+        } else if (guestGrade) {
+          const match = String(guestGrade).match(/\d+/);
+          setUserGrade(match ? match[0] : guestGrade);
+        }
+
         const newLvl = parsed.level !== undefined ? parsed.level : 0;
         const previousLevel = prevLevelRef.current;
 
@@ -190,6 +216,17 @@ export default function HomeScreen() {
           parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
         );
       } else {
+        if (guestUsername && guestUsername.trim()) {
+          setUserName(guestUsername.trim());
+        } else if (guestName && guestName.trim()) {
+          setUserName(guestName.trim());
+        }
+
+        if (guestGrade) {
+          const match = String(guestGrade).match(/\d+/);
+          setUserGrade(match ? match[0] : guestGrade);
+        }
+
         setLevel(0);
         prevLevelRef.current = 0;
         setStreak(0);
@@ -223,14 +260,16 @@ export default function HomeScreen() {
 
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
-      <Animated.View
-        style={[
-          styles.levelUpBanner,
-          { transform: [{ translateY: levelUpAnim }] },
-        ]}
-      >
-        <Text style={styles.levelUpText}>{levelUpText}</Text>
-      </Animated.View>
+      {Boolean(showLevelUp && levelUpText.trim()) && (
+        <Animated.View
+          style={[
+            styles.levelUpBanner,
+            { transform: [{ translateY: levelUpAnim }] },
+          ]}
+        >
+          <Text style={styles.levelUpText}>{levelUpText}</Text>
+        </Animated.View>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.content}
