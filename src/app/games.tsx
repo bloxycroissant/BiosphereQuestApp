@@ -15,7 +15,7 @@ import TutorialModal from './components/TutorialModal';
 import { GradeLevel } from './data/questionGenerators';
 
 const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
-const gameThemeMusic = require('../../assets/BiosphereQuestBackgroundMusic/The Game Show Theme Music - (192 Kbps).mp3');
+const gameThemeMusic = require('../../assets/BiosphereQuestSoundEffectsandMusic/The Game Show Theme Music - (192 Kbps).mp3');
 
 interface GameItem {
   key: string;

@@ -1,24 +1,24 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { achievements } from "@/constants/achievements";
-import { useProgress } from "@/hooks/use-progress";
+import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  Image,
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  UIManager,
-  View,
-  useWindowDimensions,
+    Alert,
+    Animated,
+    Image,
+    LayoutAnimation,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    UIManager,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -443,21 +443,20 @@ export default function ProfileScreen(): React.JSX.Element {
       if (parsed.streak !== undefined) setStreak(parsed.streak);
       if (parsed.lessons !== undefined) setLessons(parsed.lessons);
 
-      if (parsed.xp !== undefined) {
-        setXp(parsed.xp);
-      } else {
-        setXp(baselineXp);
-      }
+      const restoredXp = normalizeXpValue(parsed.xp ?? baselineXp);
+      setXp(restoredXp);
 
-      if (parsed.nextLevelXp !== undefined) {
+      if (Number.isFinite(parsed.nextLevelXp)) {
         setNextLevelXp(parsed.nextLevelXp);
       } else {
-        setNextLevelXp(baselineNextXp);
+        setNextLevelXp((Math.floor(restoredXp / 100) + 1) * 100);
       }
 
       if (parsed.lastResetDate) setLastResetDate(parsed.lastResetDate);
 
-      const newLvl = parsed.level !== undefined ? parsed.level : baselineLevel;
+      const newLvl = Number.isFinite(parsed.level)
+        ? parsed.level
+        : Math.floor(restoredXp / 100) + 1;
       setLevel(newLvl);
       setPrevLevel(newLvl);
     } catch (e) {

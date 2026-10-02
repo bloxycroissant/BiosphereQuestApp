@@ -47,8 +47,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "bd78f9f0-6edc-4cef-a1d4-41677424ddf7"
+        "projectId": "eeb9f2b0-3e50-4840-8b71-12da72b1fef1"
       }
-    }
+    },
+    "owner": "bloxycroissant"
   }
 }

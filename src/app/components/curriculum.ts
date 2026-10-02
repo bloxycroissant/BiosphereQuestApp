@@ -122,22 +122,22 @@ const expandedScience: Record<number, LessonInput[]> = {
   ],
   3: [
     ['Three States of Matter', 'Solids have fixed shape and volume, liquids keep volume but take a container shape, and gases have neither fixed shape nor volume.', 'A wood block is a solid, milk is a liquid, and air inside a balloon is a gas.', 'Medium'],
-    ['Animal Life Cycles', 'Animals pass through predictable stages as they grow and reproduce.', 'A frog life cycle is egg, tadpole, froglet, and adult frog.', 'Hard'],
+    ['Animal Life Cycles', 'Different animal groups pass through different stages as they grow; comparing stages shows how young organisms develop into adults.', 'A frog develops from egg to tadpole to adult, while a butterfly develops from egg to caterpillar to chrysalis to adult.', 'Hard'],
     ['Gravity and Soil', 'Gravity pulls objects toward Earth, and soil contains materials with different properties.', 'A dropped apple falls because of gravity. Sand has coarse grains, clay is sticky when wet, and loam is rich in organic matter.', 'Hard'],
   ],
   4: [
-    ['Physical and Chemical Changes', 'A physical change alters form, while a chemical change creates a new substance.', 'Tearing paper is physical. Burning paper or rusting iron is chemical.', 'Hard'],
+    ['Physical and Chemical Changes', 'Evidence such as a new material can indicate a chemical change, while a change of state can happen without making a new substance.', 'A nail forms rust when iron reacts with oxygen; water freezes into ice without becoming a different substance.', 'Hard'],
     ['Organ Systems and Adaptations', 'Body systems work together, and adaptations help organisms survive in their habitats.', 'The skull protects the brain, ribs protect the heart and lungs, camels store fat in humps, and fish use gills.', 'Hard'],
     ['The Water Cycle', 'Water moves through evaporation, condensation, precipitation, and collection in a continuous cycle.', 'Heat causes evaporation, clouds form through condensation, and rain falls as precipitation.', 'Medium'],
   ],
   5: [
-    ['The Five Rs', 'Reduce, reuse, recycle, repair, and rot are ways to manage waste and protect resources.', 'Use a cloth bag to reduce disposable plastic and process old cans into new products by recycling.', 'Medium'],
-    ['Plant Reproduction', 'Flowering plants use pollen, flowers, seeds, and fruits to reproduce.', 'Bees can move pollen from the stamen to the pistil, helping a plant form seeds.', 'Hard'],
-    ['Series and Parallel Circuits', 'A series circuit has one path for current, while a parallel circuit has multiple branches.', 'If one bulb fails in a series circuit all go dark; in a parallel circuit the other bulbs can stay lit.', 'Hard'],
+    ['The Five Rs', 'Repairing useful items and composting suitable organic waste are ways to keep materials in use and reduce what is discarded.', 'Mend a torn school bag so it can be used longer, and compost fruit peels to return organic matter to the soil.', 'Medium'],
+    ['Plant Reproduction', 'Pollination transfers pollen to a flower part where fertilization can occur; seeds may then develop and be dispersed.', 'A bee carries pollen between flowers, and a mature fruit protects seeds that may be carried away by animals.', 'Hard'],
+    ['Series and Parallel Circuits', 'Circuit arrangement affects whether components share one path or have separate branches that can operate independently.', 'With separate branches in a parallel circuit, opening one lamp branch does not necessarily break the path through another lamp.', 'Hard'],
     ['Weathering and Erosion', 'Weathering breaks material apart, while erosion moves the broken material elsewhere.', 'Plant roots can crack a rock through weathering, while rain can wash the dirt downhill through erosion.', 'Hard'],
   ],
   6: [
-    ['Separating Mixtures', 'Mixtures can be separated by using differences in size, solubility, or magnetic properties.', 'Filter sand from water, evaporate saltwater to leave crystals, and use a magnet to remove iron filings.', 'Hard'],
+    ['Separating Mixtures', 'Sieving separates solid materials of different particle sizes by allowing smaller particles to pass through openings.', 'Pass a dry mixture of coarse grains and fine particles through a suitable sieve to collect the larger pieces separately.', 'Hard'],
     ['Body System Interactions', 'Body systems cooperate to move nutrients and oxygen to cells and remove waste.', 'The digestive system breaks food into nutrients, and the bloodstream carries those nutrients to cells.', 'Impossible'],
     ['Energy Transformations', 'Energy can change from one form into another while powering devices and processes.', 'A battery changes chemical energy into electrical energy, then a flashlight changes it into light and heat.', 'Hard'],
     ['Plate Tectonics and Space', 'Moving tectonic plates shape Earth, while rotation and revolution create predictable space patterns.', 'Colliding plates can form mountains and earthquakes. Earth rotates in 24 hours and revolves around the Sun in about 365.25 days.', 'Impossible'],

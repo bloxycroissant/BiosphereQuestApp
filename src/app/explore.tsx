@@ -1,5 +1,5 @@
+import { curriculum, type Lesson, type Subject } from "@/app/components/curriculum";
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
-import { curriculum, type Lesson, type Subject } from "@/constants/curriculum";
 import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
@@ -8,7 +8,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Easing,
   ImageSourcePropType,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +18,7 @@ import {
   Text,
   View,
 } from "react-native";
+import NotebookBookViewer from "./components/notebookbookviewer";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
@@ -51,6 +54,80 @@ export default function ExploreScreen(): React.JSX.Element {
     subject: Subject;
     lesson: Lesson;
   } | null>(null);
+  const [pendingLesson, setPendingLesson] = useState<{
+    subject: Subject;
+    lesson: Lesson;
+  } | null>(null);
+  const [lessonView, setLessonView] = useState<'notebook' | 'classic' | null>(null);
+  const [isLessonChooserVisible, setIsLessonChooserVisible] = useState(false);
+  const screenTransition = React.useMemo(() => new Animated.Value(0), []);
+  const transitionInProgress = useRef(false);
+
+  const openLesson = (subject: Subject, lesson: Lesson): void => {
+    if (transitionInProgress.current || selected || pendingLesson) return;
+
+    setPendingLesson({ subject, lesson });
+    setIsLessonChooserVisible(true);
+  };
+
+  const chooseLessonView = (view: 'notebook' | 'classic'): void => {
+    if (!pendingLesson || transitionInProgress.current) return;
+
+    transitionInProgress.current = true;
+    screenTransition.setValue(0);
+    setSelected(pendingLesson);
+    setLessonView(view);
+    setPendingLesson(null);
+    setIsLessonChooserVisible(false);
+
+    requestAnimationFrame(() => {
+      Animated.timing(screenTransition, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        transitionInProgress.current = false;
+      });
+    });
+  };
+
+  const finishLesson = (xpReward?: number): void => {
+    if (transitionInProgress.current || !selected) return;
+
+    transitionInProgress.current = true;
+    Animated.timing(screenTransition, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+          if (xpReward !== undefined) {
+            void completeLesson(15, xpReward);
+          }
+        setSelected(null);
+          setLessonView(null);
+      }
+      transitionInProgress.current = false;
+    });
+  };
+
+  const closeLesson = (): void => finishLesson();
+
+  const courseScreenOpacity = screenTransition.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  const courseScreenScale = screenTransition.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.985],
+  });
+  const notebookScreenOpacity = screenTransition;
+  const notebookScreenScale = screenTransition.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.985, 1],
+  });
 
   const fetchActiveGrade = async (): Promise<void> => {
     try {
@@ -112,96 +189,219 @@ export default function ExploreScreen(): React.JSX.Element {
     }
   };
 
-  if (selected) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-        >
-          <Pressable onPress={() => setSelected(null)}>
-            <Text style={styles.back}>‹ Back to courses</Text>
-          </Pressable>
-          <View
-            style={[styles.lessonHero, { borderColor: selected.subject.color }]}
-          >
-            <Text style={styles.bigIcon}>{selected.subject.icon}</Text>
-            <Text style={styles.detailTitle}>{selected.lesson.title}</Text>
-            <Text style={styles.pill}>
-              {selected.lesson.difficulty} mission
-            </Text>
-          </View>
-          <Info
-            title="SUBJECT KNOWLEDGE"
-            text={subjectKnowledge[selected.subject.title]}
-          />
-          <Info title="DEFINITION" text={selected.lesson.meaning} />
-          <Info title="EXAMPLE" text={selected.lesson.example} />
-          <Pressable
-            onPress={() => {
-              completeLesson(40);
-              setSelected(null);
-            }}
-            style={styles.startButton}
-          >
-            <Text style={styles.startText}>Complete lesson · +40 XP →</Text>
-          </Pressable>
-        </ScrollView>
-        <BottomNavigation />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
+    <View style={styles.screenContainer}>
+      <Animated.View
+        pointerEvents={selected ? "none" : "auto"}
+        style={[
+          styles.screenLayer,
+          {
+            opacity: courseScreenOpacity,
+            transform: [{ scale: courseScreenScale }],
+          },
+        ]}
       >
-        <View style={styles.header}>
-          <Pressable onPress={handleBack}>
-            <Text style={styles.back}> Back</Text>
-          </Pressable>
-          <View style={styles.headerTitle}>
-            <Image source={astro} style={styles.headerMascot} />
-            <Text style={styles.title}> My Courses</Text>
+        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <Pressable onPress={handleBack}>
+                <Text style={styles.back}> Back</Text>
+              </Pressable>
+              <View style={styles.headerTitle}>
+                <Image source={astro} style={styles.headerMascot} />
+                <Text style={styles.title}> My Courses</Text>
+              </View>
+            </View>
+
+            <View style={styles.search}>
+              <Text style={styles.searchText}>⌕ Search courses...</Text>
+            </View>
+
+            {/* Clean Active Grade Status Banner (Manual Tabs Removed) */}
+            <View style={styles.activeGradeBanner}>
+              <View>
+                <Text style={styles.activeGradeBadge}>GRADE {grade} SCHOLAR</Text>
+                <Text style={styles.activeGradeSubtitle}>
+                  Active Math & Science Curriculum
+                </Text>
+              </View>
+              <Pressable
+                style={styles.changeGradeBtn}
+                onPress={() => router.push("/settings" as any)}
+              >
+                <Text style={styles.changeGradeText}>Change ⚙️</Text>
+              </Pressable>
+            </View>
+
+            {/* Curriculum mapped with unique composite keys */}
+            {curriculum[grade]?.map((subject, subjectIndex) => (
+              <SubjectCard
+                key={`${subject.title}-${subjectIndex}`}
+                subject={subject}
+                onLesson={(lesson) => openLesson(subject, lesson)}
+              />
+            ))}
+          </ScrollView>
+          <BottomNavigation />
+        </SafeAreaView>
+      </Animated.View>
+
+      {selected && (
+        <Animated.View
+          style={[
+            styles.screenLayer,
+            {
+              opacity: notebookScreenOpacity,
+              transform: [{ scale: notebookScreenScale }],
+            },
+          ]}
+        >
+          {lessonView === 'notebook' && (
+            <NotebookBookViewer
+              gradeLevel={grade}
+              initialSubject={selected.subject}
+              initialLesson={selected.lesson}
+              onBack={closeLesson}
+              onComplete={(xpReward) => finishLesson(xpReward)}
+            />
+          )}
+          {lessonView === 'classic' && (
+            <ClassicLessonView
+              subject={selected.subject}
+              lesson={selected.lesson}
+              onBack={closeLesson}
+              onComplete={() => finishLesson(40)}
+            />
+          )}
+        </Animated.View>
+      )}
+
+      <Modal
+        visible={isLessonChooserVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsLessonChooserVisible(false);
+          setPendingLesson(null);
+        }}
+      >
+        <View style={styles.chooserBackdrop}>
+          <View style={styles.chooserPanel}>
+            <Text style={styles.chooserTitle}>Choose a lesson view</Text>
+            <Text style={styles.chooserLesson}>{pendingLesson?.lesson.title}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => chooseLessonView('notebook')}
+              style={styles.chooserOption}
+            >
+              <Text style={styles.chooserOptionTitle}>Notebook</Text>
+              <Text style={styles.chooserOptionDescription}>Explore the full lesson, one page at a time.</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => chooseLessonView('classic')}
+              style={styles.chooserOption}
+            >
+              <Text style={styles.chooserOptionTitle}>Quick lesson</Text>
+              <Text style={styles.chooserOptionDescription}>Read the key idea, definition, and example.</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsLessonChooserVisible(false);
+                setPendingLesson(null);
+              }}
+              style={styles.chooserCancel}
+            >
+              <Text style={styles.chooserCancelText}>Cancel</Text>
+            </Pressable>
           </View>
         </View>
+      </Modal>
+    </View>
+  );
+}
 
-        <View style={styles.search}>
-          <Text style={styles.searchText}>⌕ Search courses...</Text>
+function ClassicLessonView({
+  subject,
+  lesson,
+  onBack,
+  onComplete,
+}: {
+  subject: Subject;
+  lesson: Lesson;
+  onBack: () => void;
+  onComplete: () => void;
+}): React.JSX.Element {
+  return (
+    <SafeAreaView style={styles.classicSafeArea} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.classicContent} showsVerticalScrollIndicator={false}>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.classicBackButton}>
+          <Text style={styles.classicBackText}>‹ Back to courses</Text>
+        </Pressable>
+        <View style={[styles.classicHero, { borderColor: subject.color }]}>
+          <Text style={styles.classicIcon}>{subject.icon}</Text>
+          <Text style={styles.classicTitle}>{lesson.title}</Text>
+          <Text style={styles.classicDifficulty}>{lesson.difficulty} mission</Text>
         </View>
-
-        {/* Clean Active Grade Status Banner (Manual Tabs Removed) */}
-        <View style={styles.activeGradeBanner}>
-          <View>
-            <Text style={styles.activeGradeBadge}>GRADE {grade} SCHOLAR</Text>
-            <Text style={styles.activeGradeSubtitle}>
-              Active Math & Science Curriculum
+        <View style={styles.classicInfo}>
+          <Text style={styles.classicInfoLabel}>About this subject</Text>
+          <Text style={styles.classicInfoText}>{subjectKnowledge[subject.title]}</Text>
+        </View>
+        <View style={styles.classicInfo}>
+          <View style={styles.classicSectionHeader}>
+            <View style={styles.classicSectionNumber}>
+              <Text style={styles.classicSectionNumberText}>1</Text>
+            </View>
+            <View style={styles.classicSectionHeading}>
+              <Text style={styles.classicInfoLabel}>The big idea</Text>
+              <Text style={styles.classicInfoHeading}>What does it mean?</Text>
+            </View>
+          </View>
+          <Text style={styles.classicInfoText}>{lesson.meaning}</Text>
+          <View style={styles.classicGuide}>
+            <Text style={styles.classicGuideTitle}>Keep this in mind</Text>
+            <Text style={styles.classicGuideText}>
+              Look for this idea in the example below.
             </Text>
           </View>
-          <Pressable
-            style={styles.changeGradeBtn}
-            onPress={() => router.push("/settings" as any)}
-          >
-            <Text style={styles.changeGradeText}>Change ⚙️</Text>
-          </Pressable>
         </View>
-
-        {/* Curriculum mapped with unique composite keys */}
-        {curriculum[grade]?.map((subject, subjectIndex) => (
-          <SubjectCard
-            key={`${subject.title}-${subjectIndex}`}
-            subject={subject}
-            onLesson={(lesson) => setSelected({ subject, lesson })}
-          />
-        ))}
+        <View style={styles.classicInfo}>
+          <View style={styles.classicSectionHeader}>
+            <View style={styles.classicSectionNumber}>
+              <Text style={styles.classicSectionNumberText}>2</Text>
+            </View>
+            <View style={styles.classicSectionHeading}>
+              <Text style={styles.classicInfoLabel}>Let’s look</Text>
+              <Text style={styles.classicInfoHeading}>See it in an example</Text>
+            </View>
+          </View>
+          <Text style={styles.classicInfoText}>{lesson.example}</Text>
+          <View style={styles.classicGuide}>
+            <Text style={styles.classicGuideTitle}>Think it through</Text>
+            <View style={styles.classicGuideStep}>
+              <Text style={styles.classicGuideStepNumber}>1</Text>
+              <Text style={styles.classicGuideText}>Read what happens in the example.</Text>
+            </View>
+            <View style={styles.classicGuideStep}>
+              <Text style={styles.classicGuideStepNumber}>2</Text>
+              <Text style={styles.classicGuideText}>Find the part that shows the big idea.</Text>
+            </View>
+            <View style={styles.classicGuideStep}>
+              <Text style={styles.classicGuideStepNumber}>3</Text>
+              <Text style={styles.classicGuideText}>Explain how the two are connected.</Text>
+            </View>
+          </View>
+        </View>
+        <Pressable accessibilityRole="button" onPress={onComplete} style={styles.classicCompleteButton}>
+          <Text style={styles.classicCompleteText}>Complete lesson · +40 XP →</Text>
+        </Pressable>
       </ScrollView>
-      <BottomNavigation />
     </SafeAreaView>
   );
 }
@@ -245,21 +445,6 @@ function SubjectCard({
           <Text style={styles.lessonArrow}>›</Text>
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-function Info({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.info}>
-      <Text style={styles.detailLabel}>{title}</Text>
-      <Text style={styles.detailBody}>{text}</Text>
     </View>
   );
 }
@@ -333,6 +518,10 @@ function NavigationItem({
 }
 
 const styles = StyleSheet.create({
+  screenContainer: { flex: 1 },
+  screenLayer: {
+    ...StyleSheet.absoluteFill,
+  },
   safeArea: { flex: 1, backgroundColor: "#091426" },
   scrollView: {
     flex: 1,
@@ -430,45 +619,106 @@ const styles = StyleSheet.create({
   lessonTitle: { color: "#fff", fontWeight: "800", fontSize: 12 },
   lessonDifficulty: { color: "#b9c9e5", fontSize: 9, marginTop: 2 },
   lessonArrow: { color: "#fff", fontSize: 24 },
-  lessonHero: {
-    alignItems: "center",
-    backgroundColor: "#182e5d",
-    borderWidth: 1,
-    borderRadius: 15,
-    padding: 16,
+  chooserBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 22,
+    backgroundColor: "rgba(4, 10, 28, 0.78)",
   },
-  bigIcon: { fontSize: 40 },
-  detailTitle: {
-    color: "#fff",
-    fontSize: 21,
-    fontWeight: "900",
-    textAlign: "center",
-    marginTop: 7,
-  },
-  pill: { color: "#9af2bc", fontWeight: "900", marginTop: 5 },
-  info: {
-    backgroundColor: "#30358d",
-    borderColor: "#5d62ef",
+  chooserPanel: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+    padding: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderRadius: 14,
+    borderColor: "#6866ee",
+    backgroundColor: "#17284e",
+  },
+  chooserTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  chooserLesson: { color: "#c7d4ee", fontSize: 14, marginTop: 5, marginBottom: 14 },
+  chooserOption: {
     padding: 14,
-    marginTop: 12,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#555bd2",
+    backgroundColor: "#2c367f",
   },
-  detailLabel: {
-    color: "#f3ca45",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  detailBody: { color: "#fff", fontSize: 15, lineHeight: 23, marginTop: 8 },
-  startButton: {
-    backgroundColor: "#6258ff",
-    borderRadius: 10,
+  chooserOptionTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  chooserOptionDescription: { color: "#d8def7", fontSize: 13, lineHeight: 19, marginTop: 4 },
+  chooserCancel: { alignSelf: "flex-end", paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
+  chooserCancelText: { color: "#c9c7fa", fontSize: 14, fontWeight: "700" },
+  classicSafeArea: { flex: 1, backgroundColor: "#0b142d" },
+  classicContent: { flexGrow: 1, padding: 18, paddingBottom: 24 },
+  classicBackButton: { alignSelf: "flex-start", paddingVertical: 8, marginBottom: 8 },
+  classicBackText: { color: "#df91f4", fontSize: 15, fontWeight: "800" },
+  classicHero: {
     alignItems: "center",
-    padding: 13,
-    marginTop: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    backgroundColor: "#172e59",
   },
-  startText: { color: "#fff", fontWeight: "900" },
+  classicIcon: { fontSize: 52, marginBottom: 8 },
+  classicTitle: { color: "#fff", fontSize: 23, lineHeight: 29, fontWeight: "900", textAlign: "center" },
+  classicDifficulty: { color: "#81e6b1", fontSize: 15, fontWeight: "800", marginTop: 8 },
+  classicInfo: {
+    padding: 18,
+    marginBottom: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#575ee5",
+    backgroundColor: "#303783",
+  },
+  classicInfoLabel: { color: "#ffda61", fontSize: 13, fontWeight: "900", marginBottom: 4 },
+  classicInfoHeading: { color: "#fff", fontSize: 19, lineHeight: 25, fontWeight: "900" },
+  classicInfoText: { color: "#f4f5ff", fontSize: 18, lineHeight: 29, marginTop: 12 },
+  classicSectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
+  classicSectionNumber: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    borderRadius: 19,
+    backgroundColor: "#6255f5",
+  },
+  classicSectionNumberText: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  classicSectionHeading: { flex: 1 },
+  classicGuide: {
+    padding: 14,
+    marginTop: 16,
+    borderRadius: 14,
+    backgroundColor: "#202b70",
+  },
+  classicGuideTitle: { color: "#ffda61", fontSize: 15, fontWeight: "900", marginBottom: 7 },
+  classicGuideText: { flex: 1, color: "#f4f5ff", fontSize: 15, lineHeight: 22 },
+  classicGuideStep: { flexDirection: "row", alignItems: "flex-start", marginTop: 7 },
+  classicGuideStepNumber: {
+    width: 23,
+    height: 23,
+    textAlign: "center",
+    textAlignVertical: "center",
+    marginRight: 9,
+    borderRadius: 12,
+    overflow: "hidden",
+    color: "#17284e",
+    backgroundColor: "#ffda61",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  classicCompleteButton: {
+    minHeight: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "#6255f5",
+  },
+  classicCompleteText: { color: "#fff", fontSize: 17, fontWeight: "900", textAlign: "center" },
 });
 
 const navStyles = StyleSheet.create({

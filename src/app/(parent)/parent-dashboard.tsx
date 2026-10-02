@@ -1,18 +1,19 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
+import { normalizeXpValue } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
+    Animated,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
@@ -100,7 +101,7 @@ export default function ParentDashboardScreen() {
         setGradeLevel(
           parsed.gradeYear || (guestGrade ? `Grade ${guestGrade}` : "Grade 1"),
         );
-        if (parsed.xp !== undefined) setXp(parsed.xp);
+        if (parsed.xp !== undefined) setXp(normalizeXpValue(parsed.xp));
         if (parsed.lessons !== undefined) setLessonsCompleted(parsed.lessons);
         if (parsed.streak !== undefined) setStreak(parsed.streak);
         if (parsed.accuracy !== undefined)

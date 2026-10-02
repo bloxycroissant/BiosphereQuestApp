@@ -1,19 +1,19 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
-import { useProgress } from "@/hooks/use-progress";
+import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  ImageSourcePropType,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    Animated,
+    ImageSourcePropType,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from "react-native";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
@@ -198,7 +198,10 @@ export default function HomeScreen() {
           setUserGrade(match ? match[0] : guestGrade);
         }
 
-        const newLvl = parsed.level !== undefined ? parsed.level : 0;
+        const restoredXp = normalizeXpValue(parsed.xp);
+        const newLvl = Number.isFinite(parsed.level)
+          ? parsed.level
+          : Math.floor(restoredXp / 100) + 1;
         const previousLevel = prevLevelRef.current;
 
         setLevel((currentLvl) => {
@@ -211,7 +214,7 @@ export default function HomeScreen() {
 
         setStreak(parsed.streak !== undefined ? parsed.streak : 0);
         setLessons(parsed.lessons !== undefined ? parsed.lessons : 0);
-        setXp(parsed.xp !== undefined ? parsed.xp : 0);
+        setXp(restoredXp);
         setStudyMinutes(
           parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
         );
@@ -380,22 +383,43 @@ export default function HomeScreen() {
       </ScrollView>
 
       <Modal visible={isLocked} animationType="fade" transparent={true}>
-        <Pressable
-          style={styles.lockOverlay}
+        <View style={styles.lockOverlay}>
+          <Pressable
+            style={styles.lockBackdropButton}
           onPress={() => {
             setIsLocked(false);
             router.replace("/");
           }}
-        >
-          <View style={styles.lockContentContainer}>
-            <Text style={styles.lockEmoji}>🛡️</Text>
-            <Text style={styles.lockTitle}>Locked by Parent</Text>
-            <Text style={styles.lockDesc}>{lockMessage}</Text>
-            <Text style={styles.lockActionHint}>
-              Tap anywhere to return to the welcome screen
-            </Text>
+            accessibilityRole="button"
+            accessibilityLabel="Return to the welcome screen"
+          />
+          <View style={styles.lockContentContainer} pointerEvents="box-none">
+            <View style={styles.lockCopy} pointerEvents="none">
+              <Text style={styles.lockEmoji}>🛡️</Text>
+              <Text style={styles.lockTitle}>Locked by Parent</Text>
+              <Text style={styles.lockDesc}>{lockMessage}</Text>
+              <Text style={styles.lockActionHint}>
+                Tap anywhere else to return to the welcome screen
+              </Text>
+            </View>
+            <Pressable
+              style={styles.parentControlsButton}
+              onPress={() => {
+                setIsLocked(false);
+                router.push({
+                  pathname: "/settings",
+                  params: { openParentControls: "true" },
+                } as any);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Open Parental Controls"
+            >
+              <Text style={styles.parentControlsButtonText}>
+                Parental Controls
+              </Text>
+            </Pressable>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </GradientSafeAreaView>
   );
@@ -578,6 +602,7 @@ const styles = StyleSheet.create({
   },
   lockOverlay: {
     flex: 1,
+    position: "relative",
     backgroundColor: "rgba(9, 11, 32, 0.95)",
     justifyContent: "center",
     alignItems: "center",
@@ -588,6 +613,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
     width: "100%",
+  },
+  lockBackdropButton: {
+    ...StyleSheet.absoluteFill,
+  },
+  lockCopy: {
+    alignItems: "center",
+    width: "100%",
+  },
+  parentControlsButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#a5b4fc",
+    backgroundColor: "#252b58",
+  },
+  parentControlsButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
   },
   lockEmoji: { fontSize: 50, marginBottom: 12 },
   lockTitle: {

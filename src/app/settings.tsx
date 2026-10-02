@@ -1,17 +1,17 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -40,6 +40,9 @@ export default function SettingsScreen(): React.JSX.Element {
   const [userEmail, setUserEmail] = useState("");
   const [isGoogleAuth, setIsGoogleAuth] = useState(false);
   const [currentGrade, setCurrentGrade] = useState(1);
+  const { openParentControls } = useLocalSearchParams<{
+    openParentControls?: string;
+  }>();
 
   const handleBack = (): void => {
     if (router.canGoBack()) {
@@ -175,7 +178,7 @@ export default function SettingsScreen(): React.JSX.Element {
     }
   };
 
-  const handleParentControlsPress = async (): Promise<void> => {
+  const handleParentControlsPress = useCallback(async (): Promise<void> => {
     try {
       const controlsData = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       const controls = controlsData ? JSON.parse(controlsData) : null;
@@ -190,7 +193,17 @@ export default function SettingsScreen(): React.JSX.Element {
     } catch (e) {
       router.push("/parent-dashboard" as any);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (openParentControls !== "true") return;
+
+    const frameId = requestAnimationFrame(() => {
+      void handleParentControlsPress();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [openParentControls, handleParentControlsPress]);
 
   const handleParentGateSubmit = (): void => {
     if (securityAnswer.trim().toLowerCase() === savedKeyword.toLowerCase()) {

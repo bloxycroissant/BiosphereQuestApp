@@ -1,5 +1,5 @@
-import { useState, useEffect, createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
 const STORAGE_KEY = '@biosphere_profile_data_v1';
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@ type Progress = {
 
 type ProgressContextValue = Progress & { 
   addXp: (amount: number) => Promise<void>; 
-  completeLesson: (minutes: number) => Promise<void>; 
+  completeLesson: (minutes?: number, xpReward?: number) => Promise<void>; 
   completeGame: (amount: number) => Promise<void>; 
   addSession: (session: Omit<StudySession, 'id' | 'done'>) => Promise<void>; 
   updateSession: (id: number | string, changes: Partial<StudySession>) => Promise<void>;
@@ -58,6 +58,27 @@ const initialProgress: Progress = {
   flashcardsEnabled: true,
   lastResetDate: Date.now(),
   lastActiveDate: null,
+};
+
+export const normalizeXpValue = (value: unknown): number => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  }
+
+  if (typeof value !== 'string') return 0;
+
+  const segments = value.trim().split('[object Object]');
+  if (segments.length === 1) {
+    const numericValue = Number(segments[0]);
+    return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : 0;
+  }
+
+  return segments.reduce((total, segment) => {
+    const numericValue = Number(segment);
+    return Number.isFinite(numericValue) && numericValue >= 0
+      ? total + numericValue
+      : total;
+  }, 0);
 };
 
 // Helper to get local date string "YYYY-MM-DD"
@@ -142,8 +163,28 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           }
         }
 
-        const mergedState = { ...data, streak: evaluatedStreak };
+        const xp = normalizeXpValue(data.xp ?? initialProgress.xp);
+        const level = Number.isFinite(data.level)
+          ? data.level
+          : Math.floor(xp / 100) + 1;
+        const nextLevelXp = Number.isFinite(data.nextLevelXp)
+          ? data.nextLevelXp
+          : level * 100;
+        const mergedState = {
+          ...data,
+          xp,
+          level,
+          nextLevelXp,
+          streak: evaluatedStreak,
+        };
         setProgress((prev) => ({ ...prev, ...mergedState }));
+        if (
+          data.xp !== xp ||
+          data.level !== level ||
+          data.nextLevelXp !== nextLevelXp
+        ) {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
+        }
       } else {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initialProgress));
       }
@@ -153,6 +194,8 @@ export function ProgressProvider({ children }: PropsWithChildren) {
   };
 
   const addXp = async (amount: number) => {
+    if (!Number.isFinite(amount) || amount < 0) return;
+
     await new Promise<void>((resolve) => {
       setProgress((current) => {
         const xp = current.xp + amount;
@@ -178,9 +221,18 @@ export function ProgressProvider({ children }: PropsWithChildren) {
     });
   };
 
-  const completeLesson = async (minutes: number = 15) => {
+  const completeLesson = async (minutes: number = 15, xpReward: number = 40) => {
+    if (
+      !Number.isFinite(minutes) ||
+      minutes < 0 ||
+      !Number.isFinite(xpReward) ||
+      xpReward < 0
+    ) {
+      return;
+    }
+
     await recordActivity();
-    await addXp(40);
+    await addXp(xpReward);
     await new Promise<void>((resolve) => {
       setProgress((current) => {
         const lessons = current.lessons + 1;
