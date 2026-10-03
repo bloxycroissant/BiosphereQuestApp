@@ -26,10 +26,10 @@ export const GAMES_LIST: GameMeta[] = [
     icon: '📝',
     xpText: '+150 XP',
     tutorial: {
-      objective: 'Answer 5 multiple-choice questions before the timer expires.',
+      objective: 'Answer five Math and Science multiple-choice questions, each within 15 seconds.',
       howToPlay: [
         'Read the question at the top of the card.',
-        'Keep an eye on the 15-second countdown timer.',
+        'Keep an eye on the 15-second countdown timer and the question progress bar.',
         'Tap the correct answer from the 4 options.',
       ],
       example: 'Q: Which animal is a mammal? -> Answer: Dolphin',
@@ -41,11 +41,11 @@ export const GAMES_LIST: GameMeta[] = [
     icon: '🃏',
     xpText: '+80 XP per cycle',
     tutorial: {
-      objective: 'Review key terms and concepts using interactive flashcards.',
+      objective: 'Review six grade-level Math and Science cards in a flip-card deck.',
       howToPlay: [
         'Read the prompt or question on the front.',
         'Tap the card to flip it over and inspect the answer.',
-        'Mark "Got it" to advance or "Review Again" to repeat.',
+        'Mark "Got it" when mastered or "Review Again" to see the card again before the cycle ends.',
       ],
       example: 'Front: What process helps a plant grow toward sunlight? -> Back: Photosynthesis!',
     },
@@ -56,10 +56,10 @@ export const GAMES_LIST: GameMeta[] = [
     icon: '🧩',
     xpText: '+20 to +120 XP',
     tutorial: {
-      objective: 'Unscramble jumbled letter tiles using the clue provided.',
+      objective: 'Unscramble movable letter tiles using the clue before the 30-second timer expires.',
       howToPlay: [
         'Read the clue text below the empty slots.',
-        'Tap or drag jumbled letter tiles into the correct sequence.',
+        'Tap letters to fill the answer slots; tap a filled slot to return its letter.',
         'Complete the word before time runs out!',
       ],
       example: 'Clue: Plant food making process -> Target: PHOTOSYNTHESIS',
@@ -71,11 +71,11 @@ export const GAMES_LIST: GameMeta[] = [
     icon: '🧠',
     xpText: '+40 to +200 XP',
     tutorial: {
-      objective: 'Flip cards in a grid to find matching conceptual pairs.',
+      objective: 'Clear a 4×4 grid by matching eight related Math and Science pairs.',
       howToPlay: [
         'Tap two face-down cards to reveal their contents.',
         'Match related terms (e.g., H2O with Water Droplet).',
-        'Clear the grid in fewer turns for higher XP.',
+        'Finish within 90 seconds; faster clears and higher grades award more XP.',
       ],
       example: 'Match: "H2O" <-> "Water Droplet"',
     },
@@ -84,13 +84,13 @@ export const GAMES_LIST: GameMeta[] = [
     key: 'NUMBER_NINJA',
     title: 'Number Ninja',
     icon: '🥷',
-    xpText: '+50 XP per answer',
+    xpText: '+50 XP per correct answer',
     tutorial: {
-      objective: 'Solve math equations rapidly in an arcade setting.',
+      objective: 'Solve ten grade-level math equations with a 15-second limit per question.',
       howToPlay: [
         'Watch math prompts pop up or scroll on screen.',
         'Calculate the answer quickly.',
-        'Tap the matching target number before it disappears.',
+        'Tap the correct answer from the four choices before time runs out.',
       ],
       example: 'Prompt: 15 × 4 = ? -> Answer: 60',
     },
@@ -101,11 +101,11 @@ export const GAMES_LIST: GameMeta[] = [
     icon: '🔨',
     xpText: '+100 XP',
     tutorial: {
-      objective: 'Whack target numbers matching the prompt while avoiding penalties.',
+      objective: 'Hit ten numbers that match the target rule before the 45-second timer expires.',
       howToPlay: [
         'Check the active prompt rule (e.g., "Whack Multiples of 3").',
-        'Tap numbers popping up that satisfy the rule.',
-        'Avoid tapping wrong numbers to prevent score loss.',
+        'Tap target numbers in the 3×3 grid to increase your score.',
+        'Wrong numbers deduct a point; reach the quota for +100 XP.',
       ],
       example: 'Prompt: Whack Multiples of 3! -> Hit: [9], [12]',
     },
@@ -114,13 +114,13 @@ export const GAMES_LIST: GameMeta[] = [
     key: 'CODEBREAKER',
     title: 'Codebreaker',
     icon: '🔐',
-    xpText: '+500 XP',
+    xpText: 'Up to +500 XP',
     tutorial: {
-      objective: 'Identify pattern logic to unlock missing code slots.',
+      objective: 'Solve ten Math or Science sequences to unlock the secret nature code.',
       howToPlay: [
         'Examine the sequence of numbers or nature icons.',
         'Determine the step rule (e.g., +5, x3, or growth cycle).',
-        'Select the missing item to complete the sequence.',
+        'Choose the missing number or life-cycle stage; earn 50 XP for each correct answer.',
       ],
       example: 'Pattern: [ 10 ] -> [ 15 ] -> [ 20 ] -> [ ? ] -> Answer: 25',
     },

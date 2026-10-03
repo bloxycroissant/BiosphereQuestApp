@@ -12,7 +12,7 @@ import { QuizGame } from './components/minigames/QuizGame';
 import { WhackANumberGame } from './components/minigames/WhackANumberGame';
 import { WordScrambleGame } from './components/minigames/WordScrambleGame';
 import TutorialModal from './components/TutorialModal';
-import { GradeLevel } from './data/questionGenerators';
+import { GradeLevel, Subject } from './data/questionGenerators';
 
 const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
 const gameThemeMusic = require('../../assets/BiosphereQuestSoundEffectsandMusic/The Game Show Theme Music - (192 Kbps).mp3');
@@ -159,6 +159,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   const [activeGameRunning, setActiveGameRunning] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState(1);
   const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(null);
+  const [memorySubjectPickerVisible, setMemorySubjectPickerVisible] = useState(false);
+  const [memorySubject, setMemorySubject] = useState<Subject>('Both');
 
   // Background Music & Mute States using expo-audio
   const musicPlayer = useAudioPlayer(gameThemeMusic);
@@ -197,6 +199,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   const gridAnim = useRef(new Animated.Value(1)).current;
   const entrance = useRef(new Animated.Value(0)).current;
   const leaderboardPulse = useRef(new Animated.Value(1)).current;
+  const memorySubjectModalAnim = useRef(new Animated.Value(0)).current;
 
   // Load parent controls rules AND the user's saved grade
   useEffect(() => {
@@ -333,6 +336,17 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   }, [lockedModalInfo.visible, lockedModalAnim]);
 
+  useEffect(() => {
+    if (!memorySubjectPickerVisible) return;
+    memorySubjectModalAnim.setValue(0);
+    Animated.spring(memorySubjectModalAnim, {
+      toValue: 1,
+      tension: 58,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  }, [memorySubjectPickerVisible, memorySubjectModalAnim]);
+
   const handleFilterPress = (item: string) => {
     Animated.sequence([
       Animated.timing(gridAnim, { toValue: 0.95, duration: 60, useNativeDriver: true }),
@@ -393,6 +407,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       const gradeKey = `Grade ${selectedGrade}`;
       if (gradeLocks[gradeKey]) {
         setLockedModalInfo({ visible: true, gradeNum: selectedGrade });
+      } else if (selectedGame === 'memory') {
+        setMemorySubjectPickerVisible(true);
       } else {
         setActiveGameRunning(true);
       }
@@ -401,6 +417,12 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
 
   const handleTutorialClose = () => {
     closeTutorialWithAnimation();
+  };
+
+  const handleMemorySubjectSelect = (subject: Subject) => {
+    setMemorySubject(subject);
+    setMemorySubjectPickerVisible(false);
+    setActiveGameRunning(true);
   };
 
   const handleFinishGame = (earnedXp: number = 50) => {
@@ -426,7 +448,9 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       },
       onFinish: handleFinishGame,
       onComplete: handleFinishGame,
-      onSuccess: handleFinishGame,
+      onSuccess: (earnedXp: number) => {
+        if (earnedXp > 0) addXp(earnedXp);
+      },
     } as any;
 
     switch (selectedGame) {
@@ -439,7 +463,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       case 'ninja':
         return <NumberNinjaGame {...commonProps} />;
       case 'memory':
-        return <MemoryMatchGame {...commonProps} />;
+        return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
       case 'whack':
         return <WhackANumberGame {...commonProps} />;
       case 'codebreaker':
@@ -706,6 +730,78 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       <Modal visible={activeGameRunning} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#091426' }}>
           {renderActiveGame()}
+        </View>
+      </Modal>
+
+      <Modal
+        visible={memorySubjectPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setMemorySubjectPickerVisible(false);
+          setSelectedGame(null);
+        }}
+      >
+        <View style={styles.subjectBackdrop}>
+          <Animated.View
+            style={[
+              styles.subjectDialog,
+              {
+                opacity: memorySubjectModalAnim,
+                transform: [
+                  { scale: memorySubjectModalAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) },
+                  { translateY: memorySubjectModalAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.subjectEyebrow}>✨ YOUR NEXT ADVENTURE</Text>
+            <Text style={styles.subjectTitle}>Pick a subject</Text>
+            <Text style={styles.subjectDescription}>Choose what you want to practice in Memory Match.</Text>
+            <View style={styles.subjectChoices}>
+              {([
+                { value: 'Science', icon: '🔬', color: '#32d583', copy: 'Explore nature' },
+                { value: 'Math', icon: '📐', color: '#38bdf8', copy: 'Solve & discover' },
+              ] as const).map((choice) => (
+                <Pressable
+                  key={choice.value}
+                  accessibilityRole="button"
+                  onPress={() => handleMemorySubjectSelect(choice.value)}
+                  style={({ pressed }) => [
+                    styles.subjectChoice,
+                    { borderColor: choice.color, shadowColor: choice.color },
+                    pressed && styles.choicePressed,
+                  ]}
+                >
+                  <Text style={styles.subjectChoiceIcon}>{choice.icon}</Text>
+                  <Text style={[styles.subjectChoiceTitle, { color: choice.color }]}>{choice.value}</Text>
+                  <Text style={styles.subjectChoiceCopy}>{choice.copy}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => handleMemorySubjectSelect('Both')}
+              style={({ pressed }) => [styles.bothChoice, pressed && styles.choicePressed]}
+            >
+              <Text style={styles.bothChoiceIcon}>🌟</Text>
+              <View style={styles.bothChoiceCopy}>
+                <Text style={styles.bothChoiceTitle}>Both subjects</Text>
+                <Text style={styles.bothChoiceSubtitle}>Mix science and math</Text>
+              </View>
+              <Text style={styles.choiceArrow}>→</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setMemorySubjectPickerVisible(false);
+                setSelectedGame(null);
+              }}
+              style={styles.subjectCancel}
+            >
+              <Text style={styles.subjectCancelText}>Not now</Text>
+            </Pressable>
+          </Animated.View>
         </View>
       </Modal>
     </GradientSafeAreaView>
@@ -977,6 +1073,65 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
   },
+  subjectBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 10, 24, 0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+  },
+  subjectDialog: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: '#18b9e8',
+    backgroundColor: '#102638',
+    padding: 16,
+    shadowColor: '#17c8f0',
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 9,
+  },
+  subjectEyebrow: { color: '#4ade80', textAlign: 'center', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  subjectTitle: { color: '#fff', textAlign: 'center', fontSize: 22, fontWeight: '900', marginTop: 6 },
+  subjectDescription: { color: '#b1c8d6', textAlign: 'center', fontSize: 11, fontWeight: '600', marginTop: 5, marginBottom: 12 },
+  subjectChoices: { flexDirection: 'row', gap: 10 },
+  subjectChoice: {
+    flex: 1,
+    minHeight: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: '#142e40',
+    padding: 9,
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  subjectChoiceIcon: { fontSize: 24, marginBottom: 4 },
+  subjectChoiceTitle: { fontSize: 13, fontWeight: '900' },
+  subjectChoiceCopy: { color: '#b1c8d6', fontSize: 9, fontWeight: '700', marginTop: 3, textAlign: 'center' },
+  bothChoice: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 11,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#a855f7',
+    backgroundColor: '#292441',
+  },
+  bothChoiceIcon: { fontSize: 21, marginRight: 10 },
+  bothChoiceCopy: { flex: 1 },
+  bothChoiceTitle: { color: '#e9d5ff', fontSize: 12, fontWeight: '900' },
+  bothChoiceSubtitle: { color: '#b9a0d1', fontSize: 9, marginTop: 1 },
+  choiceArrow: { color: '#fff', fontSize: 19, fontWeight: '900' },
+  choicePressed: { transform: [{ scale: 0.97 }], opacity: 0.86 },
+  subjectCancel: { alignItems: 'center', paddingVertical: 7, marginTop: 1 },
+  subjectCancelText: { color: '#98afbd', fontSize: 11, fontWeight: '800' },
   modalBackdropCenter: {
     flex: 1,
     backgroundColor: 'rgba(5, 11, 24, 0.8)',

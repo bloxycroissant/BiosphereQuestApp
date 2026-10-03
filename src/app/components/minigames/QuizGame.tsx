@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Animated, ViewStyle, TextStyle, ScrollView } from 'react-native';
-import { generateQuizQuestion, QuizQuestion, GradeLevel } from '../../data/questionGenerators';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle, ScrollView } from 'react-native';
+import { generateQuizQuestions, GradeLevel, QuizQuestion } from '../../data/questionGenerators';
+import { MinigameMotion } from './MinigameMotion';
 
 interface Props {
   grade: GradeLevel;
@@ -8,228 +9,138 @@ interface Props {
   onClose: () => void;
 }
 
+const QUESTION_COUNT = 5;
+const QUESTION_SECONDS = 15;
+
 export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
-  const [currentGrade, setCurrentGrade] = useState<GradeLevel>(grade);
-  const [isGradeModalVisible, setIsGradeModalVisible] = useState(false);
+  const [questions] = useState<QuizQuestion[]>(() => generateQuizQuestions(grade, QUESTION_COUNT));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(QUESTION_SECONDS);
   const [isFinished, setIsFinished] = useState(false);
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const optionScale = useRef(new Animated.Value(1)).current;
-  
-  const starAnim1 = useRef(new Animated.Value(0)).current;
-  const starAnim2 = useRef(new Animated.Value(0)).current;
-  const popStarScale = useRef(new Animated.Value(1)).current;
+  const [score, setScore] = useState(0);
 
   useEffect(() => {
-    let initialPool: QuizQuestion[] = [];
-    const safeGrade = (Math.max(1, Math.min(6, currentGrade))) as GradeLevel;
-    
-    for (let i = 0; i < 5; i++) {
-      initialPool.push(generateQuizQuestion(safeGrade));
-    }
-    setQuestions(initialPool);
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setIsFinished(false);
+    if (isFinished || selectedOption !== null) return;
+    const timer = setTimeout(() => {
+      const nextTime = Math.max(0, timeLeft - 1);
+      setTimeLeft(nextTime);
+      if (nextTime === 0) setSelectedOption('');
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, selectedOption, isFinished]);
 
-    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(starAnim1, { toValue: 1, duration: 3000, useNativeDriver: true }),
-        Animated.timing(starAnim1, { toValue: 0, duration: 3000, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(starAnim2, { toValue: 1, duration: 4500, useNativeDriver: true }),
-        Animated.timing(starAnim2, { toValue: 0, duration: 4500, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(popStarScale, { toValue: 1.3, duration: 1500, useNativeDriver: true }),
-        Animated.timing(popStarScale, { toValue: 1, duration: 1500, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [currentGrade]);
-
-  const handleSelectOption = (option: string) => {
-    if (selectedOption !== null || questions.length === 0) return;
-
+  const chooseAnswer = (option: string) => {
+    if (selectedOption !== null) return;
     setSelectedOption(option);
-    const currentQ = questions[currentIndex];
-    const isCorrect = option === currentQ.answer;
-
-    if (isCorrect) {
-      setScore((prev) => prev + 30);
-    }
-
-    Animated.sequence([
-      Animated.timing(optionScale, { toValue: 0.94, duration: 80, useNativeDriver: true }),
-      Animated.spring(optionScale, { toValue: 1, friction: 3, useNativeDriver: true }),
-    ]).start();
+    if (option === questions[currentIndex]?.answer) setScore((current) => current + 1);
   };
 
-  const handleNextQuestion = () => {
-    setSelectedOption(null);
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
+  const nextQuestion = () => {
+    if (currentIndex + 1 === questions.length) {
       setIsFinished(true);
       onSuccess(150);
+      return;
     }
+    setCurrentIndex((index) => index + 1);
+    setSelectedOption(null);
+    setTimeLeft(QUESTION_SECONDS);
   };
-
-  if (questions.length === 0 || !questions[currentIndex]) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: '#38bdf8', fontWeight: '900', fontSize: 16 }}>Loading Challenge...</Text>
-      </View>
-    );
-  }
-
-  const currentQ = questions[currentIndex];
 
   if (isFinished) {
     return (
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        <View style={styles.contentCard}>
-          <Text style={styles.header}>🏆 Daily Challenge Completed!</Text>
-          <Text style={styles.subtext}>Come back in 24 hours for a brand new set of questions!</Text>
-          
-          <View style={styles.displayBox}>
-            <Text style={styles.scoreText}>+150 XP Claimed! ⚡</Text>
-            <Text style={styles.detailText}>Grade {currentGrade} Mastery Updated.</Text>
-          </View>
-
-          <TouchableOpacity style={styles.actionButton} onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.actionButtonText}>Return to Dashboard ➔</Text>
+      <MinigameMotion style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>DAILY CHALLENGE COMPLETE</Text>
+          <Text style={styles.title}>🌟 Great work!</Text>
+          <Text style={styles.copy}>You answered {score} of {questions.length} questions correctly.</Text>
+          <Text style={styles.reward}>+150 XP</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
+            <Text style={styles.buttonText}>Back to Games</Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </MinigameMotion>
     );
   }
 
+  const question = questions[currentIndex];
+  const answered = selectedOption !== null;
+  const progress = (currentIndex + 1) / questions.length;
+
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Animated.Text style={[styles.popStar, { top: '10%', left: '8%', transform: [{ translateY: starAnim1.interpolate({ inputRange: [0, 1], outputRange: [0, -18] }) }, { scale: popStarScale }] }]}>🌟</Animated.Text>
-      <Animated.Text style={[styles.popStar, { top: '28%', right: '10%', transform: [{ translateY: starAnim2.interpolate({ inputRange: [0, 1], outputRange: [0, 22] }) }] }]}>✨</Animated.Text>
-      <Animated.Text style={[styles.popStar, { bottom: '15%', left: '12%', transform: [{ scale: popStarScale }] }]}>⭐</Animated.Text>
-
+    <MinigameMotion key={`question-${currentIndex}`} style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-          <Text style={styles.backButtonText}>← Quit Quiz</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.levelBadge} 
-          onPress={() => setIsGradeModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.levelBadgeText}>🎓 Grade {currentGrade} • Q {currentIndex + 1}/5 ▼</Text>
-        </TouchableOpacity>
-
-        <View style={styles.xpBadge}>
-          <Text style={styles.xpBadgeText}>⚡ +150 XP</Text>
-        </View>
+        <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+        <Text style={styles.progressText}>Question {currentIndex + 1} of {questions.length}</Text>
+        <Text style={[styles.timer, timeLeft <= 5 && styles.timerWarning]}>00:{String(timeLeft).padStart(2, '0')}</Text>
       </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.contentCard}>
-          <Text style={styles.header}>Math & Science Daily Quiz</Text>
-          <Text style={styles.subtext}>Curriculum Mode (24hr Lock Enabled)</Text>
-
-          <View style={styles.questionBox}>
-            <Text style={styles.questionText}>{currentQ.question}</Text>
-          </View>
-
-          <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, index) => {
-              let dynOptionStyle = styles.optionButton;
-              let dynTextStyle = styles.optionText;
-
-              if (selectedOption !== null) {
-                if (option === currentQ.answer) {
-                  dynOptionStyle = [styles.optionButton, styles.correctOption] as any;
-                  dynTextStyle = [styles.optionText, styles.correctText] as any;
-                } else if (option === selectedOption) {
-                  dynOptionStyle = [styles.optionButton, styles.wrongOption] as any;
-                  dynTextStyle = [styles.optionText, styles.wrongText] as any;
-                }
-              }
-
+      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>GRADE {grade} • MATH & SCIENCE</Text>
+          <Text style={styles.title}>Daily Quiz</Text>
+          <Text style={styles.question}>{question.question}</Text>
+          <View style={styles.options}>
+            {question.options.map((option, index) => {
+              const correct = answered && option === question.answer;
+              const incorrect = answered && option === selectedOption && option !== question.answer;
               return (
-                <Animated.View key={index} style={{ transform: [{ scale: optionScale }], width: '100%' }}>
-                  <TouchableOpacity
-                    style={dynOptionStyle}
-                    onPress={() => handleSelectOption(option)}
-                    activeOpacity={0.8}
-                    disabled={selectedOption !== null}
-                  >
-                    <Text style={dynTextStyle}>{option}</Text>
-                  </TouchableOpacity>
-                </Animated.View>
+                <TouchableOpacity
+                  key={`${index}-${option}`}
+                  style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
+                  onPress={() => chooseAnswer(option)}
+                  disabled={answered}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.optionLetter}>{String.fromCharCode(65 + index)}</Text>
+                  <Text style={styles.optionText}>{option}</Text>
+                </TouchableOpacity>
               );
             })}
           </View>
-
-          {selectedOption !== null && (
-            <View style={styles.explanationBox}>
-              <Text style={styles.explanationTitle}>
-                {selectedOption === currentQ.answer ? '🟢 Correct Answer!' : '🔴 Incorrect Answer!'}
+          {answered && (
+            <View style={styles.feedback}>
+              <Text style={styles.feedbackText}>
+                {selectedOption === '' ? `Time's up! Answer: ${question.answer}` :
+                  selectedOption === question.answer ? 'Correct! Nice work.' : `Not quite. The answer is ${question.answer}.`}
               </Text>
-              <Text style={styles.explanationText}>The correct answer is: {currentQ.answer}</Text>
-
-              <TouchableOpacity style={styles.nextButton} onPress={handleNextQuestion} activeOpacity={0.8}>
-                <Text style={styles.nextButtonText}>
-                  {currentIndex < questions.length - 1 ? 'Next Question ➔' : 'Complete Daily Challenge ➔'}
-                </Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={nextQuestion}>
+                <Text style={styles.buttonText}>{currentIndex + 1 === questions.length ? 'Finish Quiz' : 'Next Question'} →</Text>
               </TouchableOpacity>
             </View>
           )}
+          <Text style={styles.rewardHint}>Complete all 5 questions to earn +150 XP</Text>
         </View>
       </ScrollView>
-    </Animated.View>
+    </MinigameMotion>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#091426', position: 'relative' } as ViewStyle,
-  popStar: { position: 'absolute', fontSize: 22, opacity: 0.7, zIndex: 1 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, zIndex: 10 } as ViewStyle,
-  backButtonText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
-  levelBadge: { backgroundColor: 'rgba(241, 198, 91, 0.15)', borderColor: '#f1c65b', borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
-  levelBadgeText: { color: '#f1c65b', fontSize: 11, fontWeight: '900' },
-  xpBadge: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8', borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  xpBadgeText: { color: '#38bdf8', fontSize: 11, fontWeight: '900' },
-  scrollContent: { flexGrow: 1, paddingBottom: 24 },
-  contentCard: { backgroundColor: '#131b2e', margin: 16, padding: 18, borderRadius: 20, alignItems: 'center', borderWidth: 1.2, borderColor: '#30478a', zIndex: 10 } as ViewStyle,
-  header: { color: '#FFF', fontSize: 20, fontWeight: '900', marginBottom: 2, textAlign: 'center' } as TextStyle,
-  subtext: { color: '#94a3b8', fontSize: 11, marginBottom: 16, textAlign: 'center', fontWeight: '600' } as TextStyle,
-  questionBox: { backgroundColor: '#1e293b', paddingVertical: 18, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#334155', marginBottom: 16, width: '100%', alignItems: 'center' },
-  questionText: { color: '#38bdf8', fontSize: 16, fontWeight: '900', textAlign: 'center' },
-  optionsContainer: { width: '100%', gap: 10, marginBottom: 12 },
-  optionButton: { backgroundColor: '#1e293b', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1.5, borderColor: '#334155', width: '100%', alignItems: 'center' },
-  optionText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
-  correctOption: { backgroundColor: 'rgba(34, 197, 94, 0.2)', borderColor: '#22c55e' },
-  correctText: { color: '#4ade80' },
-  wrongOption: { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderColor: '#ef4444' },
-  wrongText: { color: '#f87171' },
-  explanationBox: { backgroundColor: '#1e293b', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#475569', width: '100%', marginTop: 4 },
-  explanationTitle: { fontSize: 14, fontWeight: '900', marginBottom: 4, color: '#f8fafc' },
-  explanationText: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginBottom: 12 },
-  nextButton: { backgroundColor: '#4f46e5', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  nextButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 13 },
-  displayBox: { backgroundColor: '#1e293b', paddingVertical: 24, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1.5, borderColor: '#334155', marginBottom: 30, width: '100%', alignItems: 'center' },
-  scoreText: { color: '#facc15', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
-  detailText: { color: '#94a3b8', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  actionButton: { backgroundColor: '#4f46e5', paddingVertical: 14, width: '100%', borderRadius: 14, borderWidth: 1, borderColor: '#818cf8', alignItems: 'center' },
-  actionButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 15 }
+  container: { flex: 1, backgroundColor: '#091426' } as ViewStyle,
+  topBar: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' } as ViewStyle,
+  backText: { color: '#38bdf8', fontSize: 15, fontWeight: '800' } as TextStyle,
+  progressText: { color: '#e2e8f0', fontSize: 13, fontWeight: '800' } as TextStyle,
+  timer: { color: '#4ade80', fontSize: 14, fontWeight: '900', minWidth: 52, textAlign: 'right' } as TextStyle,
+  timerWarning: { color: '#fb7185' } as TextStyle,
+  progressTrack: { height: 7, backgroundColor: '#1e293b', marginHorizontal: 18, borderRadius: 8, overflow: 'hidden' } as ViewStyle,
+  progressFill: { height: '100%', backgroundColor: '#38bdf8', borderRadius: 8 } as ViewStyle,
+  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 18 } as ViewStyle,
+  card: { backgroundColor: '#131b2e', borderRadius: 22, borderWidth: 1, borderColor: '#263a57', padding: 22, alignItems: 'stretch' } as ViewStyle,
+  eyebrow: { color: '#4ade80', fontSize: 11, fontWeight: '900', letterSpacing: 1.1, textAlign: 'center', marginBottom: 8 } as TextStyle,
+  title: { color: '#fff', fontSize: 23, fontWeight: '900', textAlign: 'center', marginBottom: 20 } as TextStyle,
+  question: { backgroundColor: '#1e293b', borderRadius: 16, padding: 20, color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center', overflow: 'hidden', marginBottom: 18 } as TextStyle,
+  options: { gap: 10 } as ViewStyle,
+  option: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: '#172235' } as ViewStyle,
+  correctOption: { borderColor: '#22c55e', backgroundColor: '#123328' } as ViewStyle,
+  incorrectOption: { borderColor: '#f87171', backgroundColor: '#3b2028' } as ViewStyle,
+  optionLetter: { color: '#38bdf8', fontWeight: '900', width: 22, textAlign: 'center' } as TextStyle,
+  optionText: { color: '#f8fafc', fontSize: 15, fontWeight: '700', flex: 1 } as TextStyle,
+  feedback: { marginTop: 16, padding: 14, backgroundColor: '#1e293b', borderRadius: 14 } as ViewStyle,
+  feedbackText: { color: '#e2e8f0', fontWeight: '700', marginBottom: 12, textAlign: 'center' } as TextStyle,
+  primaryButton: { backgroundColor: '#16a34a', padding: 14, borderRadius: 12, alignItems: 'center' } as ViewStyle,
+  buttonText: { color: '#fff', fontSize: 15, fontWeight: '900' } as TextStyle,
+  rewardHint: { color: '#94a3b8', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 18 } as TextStyle,
+  copy: { color: '#cbd5e1', fontSize: 15, textAlign: 'center', marginBottom: 20 } as TextStyle,
+  reward: { color: '#facc15', fontSize: 26, textAlign: 'center', fontWeight: '900', marginBottom: 24 } as TextStyle,
 });

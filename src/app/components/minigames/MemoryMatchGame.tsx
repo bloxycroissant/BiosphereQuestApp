@@ -1,130 +1,179 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { GradeLevel } from '../../data/questionGenerators';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { generateMemoryPairs, GradeLevel, MemoryMatchCard, Subject } from '../../data/questionGenerators';
+import { MinigameMotion } from './MinigameMotion';
 
 interface Props {
   grade: GradeLevel;
+  subject: Subject;
   onSuccess: (xp: number) => void;
   onClose: () => void;
 }
 
-export const MemoryMatchGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
-  const [currentGrade, setCurrentGrade] = useState<GradeLevel>(grade);
-  const [isGradeModalVisible, setIsGradeModalVisible] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [usedIds, setUsedIds] = useState<string[]>([]);
-  const [currentChallenge, setCurrentChallenge] = useState<any>(null);
+const ROUND_SECONDS = 90;
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const starAnim = useRef(new Animated.Value(0)).current;
+export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, onClose }) => {
+  const seenBoards = useRef(new Set<string>());
+  const [cards, setCards] = useState<MemoryMatchCard[]>(() => generateMemoryPairs(grade, new Set(), subject));
+  const [flipped, setFlipped] = useState<number[]>([]);
+  const [matched, setMatched] = useState<string[]>([]);
+  const [moves, setMoves] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
+  const [completedBoards, setCompletedBoards] = useState(0);
+  const [roundExpired, setRoundExpired] = useState(false);
+  const [tileScales] = useState(() => Array.from({ length: 16 }, () => new Animated.Value(1)));
+  const mismatchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const playSoundEffect = (type: 'tap' | 'success' | 'timeout') => {
-    console.log(`[Memory Match SFX]: ${type}`);
+  useEffect(() => {
+    seenBoards.current.add(boardKey(cards));
+  }, [cards]);
+
+  const startNextBoard = useCallback(() => {
+    if (mismatchTimeout.current) {
+      clearTimeout(mismatchTimeout.current);
+      mismatchTimeout.current = null;
+    }
+    const nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
+    seenBoards.current.add(boardKey(nextCards));
+    setCards(nextCards);
+    setFlipped([]);
+    setMatched([]);
+    setMoves(0);
+    setTimeLeft(ROUND_SECONDS);
+    setRoundExpired(false);
+  }, [grade, subject]);
+
+  useEffect(() => {
+    if (roundExpired) return;
+    const timer = setTimeout(() => {
+      if (timeLeft <= 1) {
+        setTimeLeft(0);
+        setRoundExpired(true);
+      }
+      else setTimeLeft(timeLeft - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, roundExpired]);
+
+  useEffect(() => () => {
+    if (mismatchTimeout.current) clearTimeout(mismatchTimeout.current);
+  }, []);
+
+  const finishRound = () => {
+    const xp = Math.min(200, 40 + Math.round((timeLeft / ROUND_SECONDS) * 140) + (grade - 1) * 4);
+    onSuccess(xp);
+    setCompletedBoards((count) => count + 1);
+    startNextBoard();
   };
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(starAnim, { toValue: 1, duration: 5000, useNativeDriver: true }),
-        Animated.timing(starAnim, { toValue: 0, duration: 5000, useNativeDriver: true }),
-      ])
-    ).start();
-    loadNextUniqueChallenge();
-  }, [currentGrade]);
+  const reveal = (index: number) => {
+    if (roundExpired || flipped.length === 2 || flipped.includes(index) || matched.includes(cards[index].pairId)) return;
+    Animated.sequence([
+      Animated.timing(tileScales[index], { toValue: 0.88, duration: 80, useNativeDriver: true }),
+      Animated.spring(tileScales[index], { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+    const nextFlipped = [...flipped, index];
+    setFlipped(nextFlipped);
+    if (nextFlipped.length !== 2) return;
 
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      playSoundEffect('timeout');
-      loadNextUniqueChallenge();
+    setMoves((count) => count + 1);
+    const [first, second] = nextFlipped.map((cardIndex) => cards[cardIndex]);
+    if (first.pairId === second.pairId) {
+      const nextMatched = [...matched, first.pairId];
+      setMatched(nextMatched);
+      setFlipped([]);
+      if (nextMatched.length === cards.length / 2) finishRound();
       return;
     }
-    const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const loadNextUniqueChallenge = () => {
-    setTimeLeft(60);
-    const pool = [
-      { id: `m1-${currentGrade}`, prompt: `Match Leaf & Roots 🌿`, detail: `Grade ${currentGrade} Biology Pairing` },
-      { id: `m2-${currentGrade}`, prompt: `Match Solid & Liquid 🧊`, detail: `Grade ${currentGrade} Matter Pairing` },
-      { id: `m3-${currentGrade}`, prompt: `Match Predator & Prey 🦅`, detail: `Grade ${currentGrade} Ecosystem Pairing` },
-    ];
-    const available = pool.filter((item) => !usedIds.includes(item.id));
-    const targetPool = available.length > 0 ? pool : pool;
-    if (available.length === 0) setUsedIds([]);
-
-    const randomItem = targetPool[Math.floor(Math.random() * targetPool.length)];
-    if (randomItem) {
-      setUsedIds((prev) => [...prev, randomItem.id]);
-      setCurrentChallenge(randomItem);
-    }
-  };
-
-  const handleNextPress = () => {
-    playSoundEffect('tap');
-    Animated.sequence([
-      Animated.timing(buttonScale, { toValue: 0.9, duration: 80, useNativeDriver: true }),
-      Animated.spring(buttonScale, { toValue: 1, friction: 3, useNativeDriver: true }),
-    ]).start();
-    onSuccess(20);
-    loadNextUniqueChallenge();
+    mismatchTimeout.current = setTimeout(() => {
+      setFlipped([]);
+      mismatchTimeout.current = null;
+    }, 850);
   };
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Animated.Text style={[styles.floatingStar, { top: '25%', right: '15%', transform: [{ translateY: starAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] }) }] }]}>⭐</Animated.Text>
-
+    <MinigameMotion key={boardKey(cards)} style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => { playSoundEffect('tap'); onClose(); }} activeOpacity={0.7}>
-          <Text style={styles.backButtonText}>← Quit Game</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.levelBadge} 
-          onPress={() => setIsGradeModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.levelBadgeText}>🎓 Grade {currentGrade} ▼</Text>
-        </TouchableOpacity>
-
-        <View style={[styles.timerBadge, timeLeft <= 15 && styles.timerWarning]}>
-          <Text style={styles.timerText}>⏳ {timeLeft}s</Text>
-        </View>
+        <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+        <Text style={styles.grade}>Grade {grade} • {subject} • Boards: {completedBoards}</Text>
+        <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
       </View>
-
-      <View style={styles.contentCard}>
-        <Text style={styles.header}>🧠 Memory Match</Text>
-        <Text style={styles.subtext}>{currentChallenge?.detail || 'Flip and pair icons!'}</Text>
-        <View style={styles.displayBox}>
-          <Text style={styles.displayText}>{currentChallenge?.prompt || 'Loading...'}</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>Find the matching pairs</Text>
+        <Text style={styles.subtitle}>
+          {subject === 'Both'
+            ? 'Match each Math or Science term with its meaning.'
+            : `Match each ${subject} term with its meaning.`}{' '}
+          Find all {cards.length / 2} pairs before the 90-second timer runs out.
+        </Text>
+        <Text style={styles.moves}>Moves: {moves} • Flip two cards to check a pair</Text>
+        <View style={styles.grid}>
+          {cards.map((card, index) => {
+            const visible = flipped.includes(index) || matched.includes(card.pairId);
+            return (
+              <Animated.View key={card.id} style={[styles.cardSlot, { transform: [{ scale: tileScales[index] }] }]}>
+                <TouchableOpacity
+                  style={[styles.tile, visible && styles.tileRevealed, matched.includes(card.pairId) && styles.tileMatched]}
+                  onPress={() => reveal(index)}
+                  activeOpacity={0.8}
+                  disabled={roundExpired}
+                  accessibilityRole="button"
+                  accessibilityLabel={visible ? card.content : `Face-down card ${index + 1}`}
+                >
+                  <Text style={[styles.tileText, !visible && styles.hiddenText]} numberOfLines={2}>
+                    {visible ? card.content : '?'}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
         </View>
-        <Animated.View style={{ transform: [{ scale: buttonScale }], width: '100%', alignItems: 'center' }}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleNextPress} activeOpacity={0.8}>
-            <Text style={styles.actionButtonText}>Next Round ➔</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        <Text style={styles.progress}>{matched.length} / {cards.length / 2} pairs found • Faster clears earn more XP (up to 200)</Text>
+        {roundExpired && (
+          <View style={styles.expiredCard}>
+            <Text style={styles.expiredTitle}>Time is up!</Text>
+            <Text style={styles.expiredCopy}>You found {matched.length} of {cards.length / 2} pairs. Start another board when you’re ready.</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={startNextBoard} activeOpacity={0.85}>
+              <Text style={styles.retryButtonText}>Try another board</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-    </Animated.View>
+    </MinigameMotion>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#091426', position: 'relative' } as ViewStyle,
-  floatingStar: { position: 'absolute', fontSize: 20, opacity: 0.6, zIndex: 1 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, zIndex: 10 } as ViewStyle,
-  backButtonText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
-  levelBadge: { backgroundColor: 'rgba(241, 198, 91, 0.15)', borderColor: '#f1c65b', borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  levelBadgeText: { color: '#f1c65b', fontSize: 11, fontWeight: '900' },
-  timerBadge: { backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#334155' },
-  timerWarning: { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' },
-  timerText: { color: '#facc15', fontWeight: '900', fontSize: 12 },
-  contentCard: { flex: 1, backgroundColor: '#131b2e', margin: 16, padding: 20, borderRadius: 20, alignItems: 'center', borderWidth: 1.2, borderColor: '#30478a', justifyContent: 'center', zIndex: 10 } as ViewStyle,
-  header: { color: '#FFF', fontSize: 20, fontWeight: '900', marginBottom: 4, textAlign: 'center' } as TextStyle,
-  subtext: { color: '#94a3b8', fontSize: 12, marginBottom: 24, textAlign: 'center', fontWeight: '600' } as TextStyle,
-  displayBox: { backgroundColor: '#1e293b', paddingVertical: 24, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1.5, borderColor: '#334155', marginBottom: 30, width: '100%', alignItems: 'center' },
-  displayText: { color: '#4ade80', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  actionButton: { backgroundColor: '#4f46e5', paddingVertical: 14, width: '100%', borderRadius: 14, borderWidth: 1, borderColor: '#818cf8', alignItems: 'center' },
-  actionButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 15 }
+  container: { flex: 1, backgroundColor: '#091426' } as ViewStyle,
+  topBar: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' } as ViewStyle,
+  backText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
+  grade: { color: '#e2e8f0', fontSize: 12, fontWeight: '800' } as TextStyle,
+  timer: { color: '#4ade80', fontSize: 13, fontWeight: '900' } as TextStyle,
+  warning: { color: '#fb7185' } as TextStyle,
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 18 } as ViewStyle,
+  title: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 8 } as TextStyle,
+  subtitle: { color: '#cbd5e1', fontSize: 12, fontWeight: '700', lineHeight: 18, textAlign: 'center', marginBottom: 8, maxWidth: 380 } as TextStyle,
+  moves: { color: '#94a3b8', fontSize: 11, fontWeight: '700', textAlign: 'center', marginBottom: 16 } as TextStyle,
+  grid: { width: '100%', maxWidth: 420, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 } as ViewStyle,
+  cardSlot: { width: '22%', height: 82 } as ViewStyle,
+  tile: { flex: 1, width: '100%', padding: 5, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#173254', borderWidth: 1.5, borderColor: '#38bdf8' } as ViewStyle,
+  tileRevealed: { backgroundColor: '#1e293b', borderColor: '#818cf8' } as ViewStyle,
+  tileMatched: { backgroundColor: '#123328', borderColor: '#22c55e' } as ViewStyle,
+  tileText: { color: '#f8fafc', fontSize: 11, fontWeight: '800', textAlign: 'center' } as TextStyle,
+  hiddenText: { color: '#7dd3fc', fontSize: 24, lineHeight: 30 } as TextStyle,
+  progress: { color: '#cbd5e1', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 18 } as TextStyle,
+  expiredCard: { width: '100%', maxWidth: 380, alignItems: 'center', backgroundColor: '#17283a', borderColor: '#fb7185', borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 16 } as ViewStyle,
+  expiredTitle: { color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'center' } as TextStyle,
+  expiredCopy: { color: '#cbd5e1', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 } as TextStyle,
+  retryButton: { backgroundColor: '#117a61', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 11, marginTop: 12 } as ViewStyle,
+  retryButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' } as TextStyle,
 });
+
+const boardKey = (cards: MemoryMatchCard[]): string =>
+  cards.filter((card) => card.id.startsWith('term-'))
+    .map((card) => {
+      const match = cards.find((candidate) => candidate.pairId === card.pairId && candidate.id.startsWith('match-'));
+      return `${card.content}=${match?.content ?? ''}`;
+    })
+    .sort()
+    .join('|');

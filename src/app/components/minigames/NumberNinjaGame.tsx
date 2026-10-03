@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Animated, ViewStyle, TextStyle } from 'react-native';
-import { GradeLevel } from '../../data/questionGenerators';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { generateNinjaProblem, GradeLevel, NinjaProblem } from '../../data/questionGenerators';
+import { MinigameMotion } from './MinigameMotion';
 
 interface Props {
   grade: GradeLevel;
@@ -8,123 +9,113 @@ interface Props {
   onClose: () => void;
 }
 
+const QUESTION_SECONDS = 15;
+
 export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
-  const [currentGrade, setCurrentGrade] = useState<GradeLevel>(grade);
-  const [isGradeModalVisible, setIsGradeModalVisible] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(20);
-  const [usedIds, setUsedIds] = useState<string[]>([]);
-  const [currentChallenge, setCurrentChallenge] = useState<any>(null);
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const starAnim = useRef(new Animated.Value(0)).current;
-
-  const playSoundEffect = (type: 'tap' | 'success' | 'timeout') => {
-    console.log(`[Number Ninja SFX]: ${type}`);
-  };
+  const seenQuestions = useRef(new Set<string>());
+  const [question, setQuestion] = useState<NinjaProblem>(() => generateNinjaProblem(grade));
+  const [questionNumber, setQuestionNumber] = useState(1);
+  const [score, setScore] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState(QUESTION_SECONDS);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(starAnim, { toValue: 1, duration: 3500, useNativeDriver: true }),
-        Animated.timing(starAnim, { toValue: 0, duration: 3500, useNativeDriver: true }),
-      ])
-    ).start();
-    loadNextUniqueChallenge();
-  }, [currentGrade]);
+    seenQuestions.current.add(question.prompt);
+  }, [question.prompt]);
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      playSoundEffect('timeout');
-      loadNextUniqueChallenge();
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+    if (selected !== null) return;
+    const timer = setTimeout(() => {
+      const nextTime = Math.max(0, timeLeft - 1);
+      setTimeLeft(nextTime);
+      if (nextTime === 0) setSelected(-1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, selected]);
 
-  const loadNextUniqueChallenge = () => {
-    setTimeLeft(20);
-    const pool = [
-      { id: `n1-${currentGrade}`, prompt: `${currentGrade * 5} + ${currentGrade * 3} = ?`, detail: `Grade ${currentGrade} Addition Speed Run` },
-      { id: `n2-${currentGrade}`, prompt: `${currentGrade * 4} - ${currentGrade} = ?`, detail: `Grade ${currentGrade} Subtraction Speed Run` },
-      { id: `n3-${currentGrade}`, prompt: `${currentGrade} × 2 = ?`, detail: `Grade ${currentGrade} Multiplication Speed Run` },
-    ];
-    const available = pool.filter((item) => !usedIds.includes(item.id));
-    const targetPool = available.length > 0 ? pool : pool;
-    if (available.length === 0) setUsedIds([]);
-
-    const randomItem = targetPool[Math.floor(Math.random() * targetPool.length)];
-    if (randomItem) {
-      setUsedIds((prev) => [...prev, randomItem.id]);
-      setCurrentChallenge(randomItem);
+  const answer = (value: number) => {
+    if (selected !== null) return;
+    setSelected(value);
+    if (value === question.correctAnswer) {
+      setScore((current) => current + 1);
+      onSuccess(50);
     }
   };
 
-  const handleNextPress = () => {
-    playSoundEffect('tap');
-    Animated.sequence([
-      Animated.timing(buttonScale, { toValue: 0.9, duration: 80, useNativeDriver: true }),
-      Animated.spring(buttonScale, { toValue: 1, friction: 3, useNativeDriver: true }),
-    ]).start();
-    onSuccess(20);
-    loadNextUniqueChallenge();
+  const next = () => {
+    const nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
+    seenQuestions.current.add(nextQuestion.prompt);
+    setQuestion(nextQuestion);
+    setQuestionNumber((number) => number + 1);
+    setSelected(null);
+    setTimeLeft(QUESTION_SECONDS);
   };
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Animated.Text style={[styles.floatingStar, { bottom: '20%', left: '10%', transform: [{ translateY: starAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -12] }) }] }]}>🌟</Animated.Text>
-
+    <MinigameMotion key={`challenge-${questionNumber}`} style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => { playSoundEffect('tap'); onClose(); }} activeOpacity={0.7}>
-          <Text style={styles.backButtonText}>← Quit Game</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.levelBadge} 
-          onPress={() => setIsGradeModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.levelBadgeText}>🎓 Grade {currentGrade} ▼</Text>
-        </TouchableOpacity>
-
-        <View style={[styles.timerBadge, timeLeft <= 5 && styles.timerWarning]}>
-          <Text style={styles.timerText}>⏳ {timeLeft}s</Text>
-        </View>
+        <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+        <Text style={styles.progress}>Grade {grade} • Challenge {questionNumber}</Text>
+        <Text style={[styles.timer, timeLeft <= 5 && styles.warning]}>⏱ {timeLeft}s</Text>
       </View>
-
-      <View style={styles.contentCard}>
-        <Text style={styles.header}>🥷 Number Ninja</Text>
-        <Text style={styles.subtext}>{currentChallenge?.detail || 'Solve rapid arithmetic!'}</Text>
-        <View style={styles.displayBox}>
-          <Text style={styles.displayText}>{currentChallenge?.prompt || '0 + 0 = ?'}</Text>
+      <View style={styles.content}>
+        <Text style={styles.eyebrow}>⚡ +50 XP PER CORRECT ANSWER</Text>
+        <Text style={styles.title}>Number Ninja</Text>
+        <Text style={styles.prompt}>{question.prompt}</Text>
+        <View style={styles.options}>
+          {question.options.map((option) => {
+            const correct = selected !== null && option === question.correctAnswer;
+            const incorrect = selected === option && selected !== question.correctAnswer;
+            return (
+              <TouchableOpacity
+                key={option}
+                style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
+                onPress={() => answer(option)}
+                disabled={selected !== null}
+              >
+                <Text style={styles.optionText}>{option}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <Animated.View style={{ transform: [{ scale: buttonScale }], width: '100%', alignItems: 'center' }}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleNextPress} activeOpacity={0.8}>
-            <Text style={styles.actionButtonText}>Next Equation ➔</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {selected !== null && (
+          <View style={styles.feedback}>
+            <Text style={styles.feedbackText}>
+              {selected === -1 ? `Time's up! The answer was ${question.correctAnswer}.` :
+                selected === question.correctAnswer ? 'Bullseye! +50 XP' : `The answer was ${question.correctAnswer}.`}
+            </Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={next}>
+              <Text style={styles.buttonText}>Next Challenge →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <Text style={styles.score}>Score: {score}</Text>
       </View>
-    </Animated.View>
+    </MinigameMotion>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#091426', position: 'relative' } as ViewStyle,
-  floatingStar: { position: 'absolute', fontSize: 20, opacity: 0.6, zIndex: 1 },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, zIndex: 10 } as ViewStyle,
-  backButtonText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
-  levelBadge: { backgroundColor: 'rgba(241, 198, 91, 0.15)', borderColor: '#f1c65b', borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  levelBadgeText: { color: '#f1c65b', fontSize: 11, fontWeight: '900' },
-  timerBadge: { backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#334155' },
-  timerWarning: { borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' },
-  timerText: { color: '#facc15', fontWeight: '900', fontSize: 12 },
-  contentCard: { flex: 1, backgroundColor: '#131b2e', margin: 16, padding: 20, borderRadius: 20, alignItems: 'center', borderWidth: 1.2, borderColor: '#30478a', justifyContent: 'center', zIndex: 10 } as ViewStyle,
-  header: { color: '#FFF', fontSize: 20, fontWeight: '900', marginBottom: 4, textAlign: 'center' } as TextStyle,
-  subtext: { color: '#94a3b8', fontSize: 12, marginBottom: 24, textAlign: 'center', fontWeight: '600' } as TextStyle,
-  displayBox: { backgroundColor: '#1e293b', paddingVertical: 24, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1.5, borderColor: '#334155', marginBottom: 30, width: '100%', alignItems: 'center' },
-  displayText: { color: '#facc15', fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  actionButton: { backgroundColor: '#4f46e5', paddingVertical: 14, width: '100%', borderRadius: 14, borderWidth: 1, borderColor: '#818cf8', alignItems: 'center' },
-  actionButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 15 }
+  container: { flex: 1, backgroundColor: '#091426' } as ViewStyle,
+  topBar: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' } as ViewStyle,
+  backText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
+  progress: { color: '#cbd5e1', fontSize: 12, fontWeight: '800' } as TextStyle,
+  timer: { color: '#facc15', fontSize: 13, fontWeight: '900' } as TextStyle,
+  warning: { color: '#fb7185' } as TextStyle,
+  content: { flex: 1, justifyContent: 'center', padding: 20 } as ViewStyle,
+  eyebrow: { color: '#facc15', fontSize: 11, textAlign: 'center', fontWeight: '900', letterSpacing: 1, marginBottom: 8 } as TextStyle,
+  title: { color: '#fff', fontSize: 24, textAlign: 'center', fontWeight: '900', marginBottom: 20 } as TextStyle,
+  prompt: { color: '#fef3c7', fontSize: 24, fontWeight: '900', textAlign: 'center', backgroundColor: '#2b2a22', borderRadius: 18, padding: 26, marginBottom: 20, overflow: 'hidden' } as TextStyle,
+  options: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 } as ViewStyle,
+  option: { width: '47%', backgroundColor: '#172235', borderWidth: 1.5, borderColor: '#475569', borderRadius: 14, padding: 18, alignItems: 'center' } as ViewStyle,
+  correctOption: { borderColor: '#22c55e', backgroundColor: '#123328' } as ViewStyle,
+  incorrectOption: { borderColor: '#fb7185', backgroundColor: '#3b2028' } as ViewStyle,
+  optionText: { color: '#fff', fontSize: 22, fontWeight: '900' } as TextStyle,
+  feedback: { marginTop: 18, backgroundColor: '#1e293b', padding: 14, borderRadius: 14 } as ViewStyle,
+  feedbackText: { color: '#e2e8f0', fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: 12 } as TextStyle,
+  primaryButton: { backgroundColor: '#16a34a', padding: 14, borderRadius: 12, alignItems: 'center' } as ViewStyle,
+  buttonText: { color: '#fff', fontSize: 14, fontWeight: '900' } as TextStyle,
+  score: { color: '#94a3b8', fontWeight: '800', textAlign: 'center', marginTop: 20 } as TextStyle,
+  subtitle: { color: '#cbd5e1', marginBottom: 14, fontSize: 15, fontWeight: '700' } as TextStyle,
+  reward: { color: '#facc15', fontSize: 26, fontWeight: '900', marginBottom: 22 } as TextStyle,
 });
