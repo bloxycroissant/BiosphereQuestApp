@@ -72,7 +72,10 @@ export default function LoginScreen(): React.JSX.Element {
       setGoogleLoading(true);
       setErrorMessage("");
 
-      const redirectUrl = makeRedirectUri();
+      const redirectUrl = makeRedirectUri({
+        scheme: "biospherequest",
+      });
+
       console.log("🔗 [Google Auth] Using redirect URI:", redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({

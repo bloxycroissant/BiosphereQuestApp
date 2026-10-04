@@ -5,15 +5,17 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  Animated,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
@@ -43,6 +45,8 @@ export default function ParentDashboardScreen() {
 
   const entrance = useRef(new Animated.Value(0)).current;
   const scaleAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const [keyboardSpace, setKeyboardSpace] = useState(0);
 
   const getScaleAnim = (key: string) => {
     if (!scaleAnims[key]) {
@@ -87,6 +91,27 @@ export default function ParentDashboardScreen() {
     }
 
     loadStudentDataAndControls();
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardSpace(e.endCoordinates.height);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardSpace(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   const loadStudentDataAndControls = async () => {
@@ -215,8 +240,13 @@ export default function ParentDashboardScreen() {
           ]}
         >
           <ScrollView
-            contentContainerStyle={styles.container}
+            ref={scrollViewRef}
+            contentContainerStyle={[
+              styles.container,
+              { paddingBottom: keyboardSpace !== 0 ? keyboardSpace + 24 : 32 },
+            ]}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={styles.headerContainer}>
               <Image source={logo} style={styles.logo} resizeMode="contain" />
@@ -551,7 +581,7 @@ export default function ParentDashboardScreen() {
                   Lock Dashboard & Exit
                 </Text>
                 <Text style={[styles.actionArrow, { color: "#facc15" }]}>
-                    
+                  🚪
                 </Text>
               </Pressable>
             </View>
@@ -565,7 +595,7 @@ export default function ParentDashboardScreen() {
 const styles = StyleSheet.create({
   background: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: "transparent" },
-  container: { padding: 20, gap: 14, paddingBottom: 40 },
+  container: { padding: 20, gap: 14 },
   headerContainer: { alignItems: "center", marginBottom: 4 },
   logo: { width: 50, height: 50, marginBottom: 4 },
   brandTitle: {

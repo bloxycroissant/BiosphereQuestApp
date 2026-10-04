@@ -3,15 +3,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -43,6 +43,9 @@ export default function SettingsScreen(): React.JSX.Element {
   const { openParentControls } = useLocalSearchParams<{
     openParentControls?: string;
   }>();
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleBack = (): void => {
     if (router.canGoBack()) {
@@ -226,26 +229,71 @@ export default function SettingsScreen(): React.JSX.Element {
   };
 
   const handleDeleteAccount = (): void => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to permanently delete your account and wipe all data? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await supabase.auth.signOut();
-              await AsyncStorage.clear();
-              router.replace("/" as any);
-            } catch (error) {
-              console.error("Delete account error:", error);
-            }
-          },
-        },
-      ],
-    );
+    setDeletePassword("");
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDeleteAccount = async (): Promise<void> => {
+    if (!deletePassword.trim()) {
+      Alert.alert(
+        "Required",
+        isGoogleAuth
+          ? "Please type DELETE to confirm."
+          : "Please enter your password to confirm.",
+      );
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      if (!isGoogleAuth) {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: deletePassword,
+        });
+
+        if (authError) {
+          setIsDeleting(false);
+          Alert.alert(
+            "Authentication Failed",
+            "Incorrect password. Please try again.",
+          );
+          return;
+        }
+      } else {
+        if (deletePassword.trim().toUpperCase() !== "DELETE") {
+          setIsDeleting(false);
+          Alert.alert(
+            "Confirmation Mismatch",
+            'Please type "DELETE" to confirm.',
+          );
+          return;
+        }
+      }
+
+      const { error: rpcError } = await supabase.rpc("delete_user");
+      if (rpcError) {
+        setIsDeleting(false);
+        Alert.alert("Error Deleting Account", rpcError.message);
+        return;
+      }
+
+      await supabase.auth.signOut();
+      await AsyncStorage.clear();
+
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
+      setDeletePassword("");
+      setHasAccount(false);
+      setUserEmail("");
+      setIsGoogleAuth(false);
+
+      router.replace("/" as any);
+    } catch (err: any) {
+      setIsDeleting(false);
+      Alert.alert("Error", err?.message || "An unexpected error occurred.");
+    }
   };
 
   const executeResetProgress = async (): Promise<void> => {
@@ -415,6 +463,72 @@ export default function SettingsScreen(): React.JSX.Element {
         </View>
       </Modal>
 
+      {/* Delete Account Password Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeleting) {
+            setDeleteModalVisible(false);
+            setDeletePassword("");
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { color: "#ff4d67" }]}>
+              Delete Account
+            </Text>
+            <Text style={styles.modalMessage}>
+              {isGoogleAuth
+                ? 'This action is permanent and cannot be undone. Type "DELETE" below to confirm.'
+                : "This action is permanent and cannot be undone. Enter your account password to confirm deletion:"}
+            </Text>
+
+            <TextInput
+              style={[styles.securityInput, { borderColor: "#a32b3d" }]}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              placeholder={
+                isGoogleAuth ? 'Type "DELETE"' : "Enter your password"
+              }
+              placeholderTextColor="#68779a"
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry={!isGoogleAuth}
+              editable={!isDeleting}
+            />
+
+            <View style={styles.modalButtonRow}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                disabled={isDeleting}
+                onPress={() => {
+                  setDeleteModalVisible(false);
+                  setDeletePassword("");
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.modalBtn,
+                  styles.modalConfirmBtn,
+                  isDeleting && { opacity: 0.6 },
+                ]}
+                disabled={isDeleting}
+                onPress={confirmDeleteAccount}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {isDeleting ? "Deleting..." : "Confirm Delete"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -458,7 +572,7 @@ export default function SettingsScreen(): React.JSX.Element {
                 <Pressable
                   style={[
                     styles.rowItem,
-                    { borderTopWidth: 1, borderTopColor: "# <0> <5c" },
+                    { borderTopWidth: 1, borderTopColor: "#202c5c" },
                   ]}
                   onPress={() => router.push("/change-password" as any)}
                 >
@@ -576,8 +690,8 @@ export default function SettingsScreen(): React.JSX.Element {
           style={[
             styles.dangerZoneCard,
             {
-              borderColor: "#a>6c00",
-              backgroundColor: "# <b1e05",
+              borderColor: "#a36c00",
+              backgroundColor: "#2b1e05",
               borderRadius: 16,
             },
           ]}

@@ -14,6 +14,7 @@
     },
     "android": {
       "userInterfaceStyle": "dark",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#091426",
         "foregroundImage": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"

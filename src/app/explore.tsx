@@ -1,4 +1,8 @@
-import { curriculum, type Lesson, type Subject } from "@/app/components/curriculum";
+import {
+  curriculum,
+  type Lesson,
+  type Subject,
+} from "@/app/components/curriculum";
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,6 +26,7 @@ import NotebookBookViewer from "./components/notebookbookviewer";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
+const VIEW_PREF_KEY = "@biosphere_preferred_lesson_view_v1";
 
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 const homeIcon = require("../../assets/BiosphereQuestAssets/Home Icon.png");
@@ -58,27 +63,50 @@ export default function ExploreScreen(): React.JSX.Element {
     subject: Subject;
     lesson: Lesson;
   } | null>(null);
-  const [lessonView, setLessonView] = useState<'notebook' | 'classic' | null>(null);
+  const [lessonView, setLessonView] = useState<"notebook" | "classic" | null>(
+    null,
+  );
   const [isLessonChooserVisible, setIsLessonChooserVisible] = useState(false);
+  const [preferredView, setPreferredView] = useState<
+    "notebook" | "classic" | null
+  >(null);
+
+  useEffect(() => {
+    const loadPreference = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(VIEW_PREF_KEY);
+        if (saved === "notebook" || saved === "classic") {
+          setPreferredView(saved);
+        }
+      } catch (e) {
+        console.error("Error reading lesson view preference", e);
+      }
+    };
+    loadPreference();
+  }, []);
+
+  const updatePreferredView = async (view: "notebook" | "classic") => {
+    setPreferredView(view);
+    try {
+      await AsyncStorage.setItem(VIEW_PREF_KEY, view);
+    } catch (e) {
+      console.error("Error saving lesson view preference", e);
+    }
+  };
+
   const screenTransition = React.useMemo(() => new Animated.Value(0), []);
   const transitionInProgress = useRef(false);
 
-  const openLesson = (subject: Subject, lesson: Lesson): void => {
-    if (transitionInProgress.current || selected || pendingLesson) return;
-
-    setPendingLesson({ subject, lesson });
-    setIsLessonChooserVisible(true);
-  };
-
-  const chooseLessonView = (view: 'notebook' | 'classic'): void => {
-    if (!pendingLesson || transitionInProgress.current) return;
-
+  const launchLesson = (
+    subject: Subject,
+    lesson: Lesson,
+    view: "notebook" | "classic",
+  ) => {
+    if (transitionInProgress.current) return;
     transitionInProgress.current = true;
     screenTransition.setValue(0);
-    setSelected(pendingLesson);
+    setSelected({ subject, lesson });
     setLessonView(view);
-    setPendingLesson(null);
-    setIsLessonChooserVisible(false);
 
     requestAnimationFrame(() => {
       Animated.timing(screenTransition, {
@@ -92,6 +120,27 @@ export default function ExploreScreen(): React.JSX.Element {
     });
   };
 
+  const openLesson = (subject: Subject, lesson: Lesson): void => {
+    if (transitionInProgress.current || selected || pendingLesson) return;
+
+    if (preferredView) {
+      launchLesson(subject, lesson, preferredView);
+    } else {
+      setPendingLesson({ subject, lesson });
+      setIsLessonChooserVisible(true);
+    }
+  };
+
+  const chooseLessonView = (view: "notebook" | "classic"): void => {
+    if (!pendingLesson) return;
+    const currentPending = pendingLesson;
+    setPendingLesson(null);
+    setIsLessonChooserVisible(false);
+
+    void updatePreferredView(view);
+    launchLesson(currentPending.subject, currentPending.lesson, view);
+  };
+
   const finishLesson = (xpReward?: number): void => {
     if (transitionInProgress.current || !selected) return;
 
@@ -103,11 +152,11 @@ export default function ExploreScreen(): React.JSX.Element {
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
-          if (xpReward !== undefined) {
-            void completeLesson(15, xpReward);
-          }
+        if (xpReward !== undefined) {
+          void completeLesson(15, xpReward);
+        }
         setSelected(null);
-          setLessonView(null);
+        setLessonView(null);
       }
       transitionInProgress.current = false;
     });
@@ -182,6 +231,10 @@ export default function ExploreScreen(): React.JSX.Element {
   );
 
   const handleBack = (): void => {
+    if (selected) {
+      closeLesson();
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -225,7 +278,9 @@ export default function ExploreScreen(): React.JSX.Element {
             {/* Clean Active Grade Status Banner (Manual Tabs Removed) */}
             <View style={styles.activeGradeBanner}>
               <View>
-                <Text style={styles.activeGradeBadge}>GRADE {grade} SCHOLAR</Text>
+                <Text style={styles.activeGradeBadge}>
+                  GRADE {grade} SCHOLAR
+                </Text>
                 <Text style={styles.activeGradeSubtitle}>
                   Active Math & Science Curriculum
                 </Text>
@@ -236,6 +291,50 @@ export default function ExploreScreen(): React.JSX.Element {
               >
                 <Text style={styles.changeGradeText}>Change ⚙️</Text>
               </Pressable>
+            </View>
+
+            {/* View Mode Toggle Switch */}
+            <View style={styles.viewToggleContainer}>
+              <Text style={styles.viewToggleLabel}>LESSON FORMAT</Text>
+              <View style={styles.viewToggleTrack}>
+                <Pressable
+                  style={[
+                    styles.viewToggleSegment,
+                    (preferredView ?? "notebook") === "notebook" &&
+                      styles.viewToggleSegmentActive,
+                  ]}
+                  onPress={() => updatePreferredView("notebook")}
+                >
+                  <Text
+                    style={[
+                      styles.viewToggleText,
+                      (preferredView ?? "notebook") === "notebook" &&
+                        styles.viewToggleTextActive,
+                    ]}
+                  >
+                    📖 Notebook
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.viewToggleSegment,
+                    preferredView === "classic" &&
+                      styles.viewToggleSegmentActive,
+                  ]}
+                  onPress={() => updatePreferredView("classic")}
+                >
+                  <Text
+                    style={[
+                      styles.viewToggleText,
+                      preferredView === "classic" &&
+                        styles.viewToggleTextActive,
+                    ]}
+                  >
+                    ⚡ Quick Lesson
+                  </Text>
+                </Pressable>
+              </View>
             </View>
 
             {/* Curriculum mapped with unique composite keys */}
@@ -261,7 +360,7 @@ export default function ExploreScreen(): React.JSX.Element {
             },
           ]}
         >
-          {lessonView === 'notebook' && (
+          {lessonView === "notebook" && (
             <NotebookBookViewer
               gradeLevel={grade}
               initialSubject={selected.subject}
@@ -270,7 +369,7 @@ export default function ExploreScreen(): React.JSX.Element {
               onComplete={(xpReward) => finishLesson(xpReward)}
             />
           )}
-          {lessonView === 'classic' && (
+          {lessonView === "classic" && (
             <ClassicLessonView
               subject={selected.subject}
               lesson={selected.lesson}
@@ -293,22 +392,28 @@ export default function ExploreScreen(): React.JSX.Element {
         <View style={styles.chooserBackdrop}>
           <View style={styles.chooserPanel}>
             <Text style={styles.chooserTitle}>Choose a lesson view</Text>
-            <Text style={styles.chooserLesson}>{pendingLesson?.lesson.title}</Text>
+            <Text style={styles.chooserLesson}>
+              {pendingLesson?.lesson.title}
+            </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => chooseLessonView('notebook')}
+              onPress={() => chooseLessonView("notebook")}
               style={styles.chooserOption}
             >
               <Text style={styles.chooserOptionTitle}>Notebook</Text>
-              <Text style={styles.chooserOptionDescription}>Explore the full lesson, one page at a time.</Text>
+              <Text style={styles.chooserOptionDescription}>
+                Explore the full lesson, one page at a time.
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => chooseLessonView('classic')}
+              onPress={() => chooseLessonView("classic")}
               style={styles.chooserOption}
             >
               <Text style={styles.chooserOptionTitle}>Quick lesson</Text>
-              <Text style={styles.chooserOptionDescription}>Read the key idea, definition, and example.</Text>
+              <Text style={styles.chooserOptionDescription}>
+                Read the key idea, definition, and example.
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -340,18 +445,29 @@ function ClassicLessonView({
 }): React.JSX.Element {
   return (
     <SafeAreaView style={styles.classicSafeArea} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.classicContent} showsVerticalScrollIndicator={false}>
-        <Pressable accessibilityRole="button" onPress={onBack} style={styles.classicBackButton}>
-          <Text style={styles.classicBackText}>‹ Back to courses</Text>
+      <ScrollView
+        contentContainerStyle={styles.classicContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.classicBackButton}
+        >
+          <Text style={styles.classicBackText}> Back to courses</Text>
         </Pressable>
         <View style={[styles.classicHero, { borderColor: subject.color }]}>
           <Text style={styles.classicIcon}>{subject.icon}</Text>
           <Text style={styles.classicTitle}>{lesson.title}</Text>
-          <Text style={styles.classicDifficulty}>{lesson.difficulty} mission</Text>
+          <Text style={styles.classicDifficulty}>
+            {lesson.difficulty} mission
+          </Text>
         </View>
         <View style={styles.classicInfo}>
           <Text style={styles.classicInfoLabel}>About this subject</Text>
-          <Text style={styles.classicInfoText}>{subjectKnowledge[subject.title]}</Text>
+          <Text style={styles.classicInfoText}>
+            {subjectKnowledge[subject.title]}
+          </Text>
         </View>
         <View style={styles.classicInfo}>
           <View style={styles.classicSectionHeader}>
@@ -378,7 +494,9 @@ function ClassicLessonView({
             </View>
             <View style={styles.classicSectionHeading}>
               <Text style={styles.classicInfoLabel}>Let’s look</Text>
-              <Text style={styles.classicInfoHeading}>See it in an example</Text>
+              <Text style={styles.classicInfoHeading}>
+                See it in an example
+              </Text>
             </View>
           </View>
           <Text style={styles.classicInfoText}>{lesson.example}</Text>
@@ -386,20 +504,32 @@ function ClassicLessonView({
             <Text style={styles.classicGuideTitle}>Think it through</Text>
             <View style={styles.classicGuideStep}>
               <Text style={styles.classicGuideStepNumber}>1</Text>
-              <Text style={styles.classicGuideText}>Read what happens in the example.</Text>
+              <Text style={styles.classicGuideText}>
+                Read what happens in the example.
+              </Text>
             </View>
             <View style={styles.classicGuideStep}>
               <Text style={styles.classicGuideStepNumber}>2</Text>
-              <Text style={styles.classicGuideText}>Find the part that shows the big idea.</Text>
+              <Text style={styles.classicGuideText}>
+                Find the part that shows the big idea.
+              </Text>
             </View>
             <View style={styles.classicGuideStep}>
               <Text style={styles.classicGuideStepNumber}>3</Text>
-              <Text style={styles.classicGuideText}>Explain how the two are connected.</Text>
+              <Text style={styles.classicGuideText}>
+                Explain how the two are connected.
+              </Text>
             </View>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={onComplete} style={styles.classicCompleteButton}>
-          <Text style={styles.classicCompleteText}>Complete lesson · +40 XP →</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onComplete}
+          style={styles.classicCompleteButton}
+        >
+          <Text style={styles.classicCompleteText}>
+            Complete lesson · +40 XP →
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -584,6 +714,48 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   changeGradeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" },
+  viewToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#101d3b",
+    borderColor: "#203768",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  viewToggleLabel: {
+    color: "#9db0d6",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  viewToggleTrack: {
+    flexDirection: "row",
+    backgroundColor: "#182a52",
+    borderRadius: 8,
+    padding: 3,
+    gap: 4,
+  },
+  viewToggleSegment: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  viewToggleSegmentActive: {
+    backgroundColor: "#524be3",
+  },
+  viewToggleText: {
+    color: "#8fa3cb",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  viewToggleTextActive: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
   subject: {
     backgroundColor: "#132844",
     borderWidth: 1,
@@ -636,7 +808,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#17284e",
   },
   chooserTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  chooserLesson: { color: "#c7d4ee", fontSize: 14, marginTop: 5, marginBottom: 14 },
+  chooserLesson: {
+    color: "#c7d4ee",
+    fontSize: 14,
+    marginTop: 5,
+    marginBottom: 14,
+  },
   chooserOption: {
     padding: 14,
     marginTop: 8,
@@ -646,12 +823,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#2c367f",
   },
   chooserOptionTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  chooserOptionDescription: { color: "#d8def7", fontSize: 13, lineHeight: 19, marginTop: 4 },
-  chooserCancel: { alignSelf: "flex-end", paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
+  chooserOptionDescription: {
+    color: "#d8def7",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  chooserCancel: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
   chooserCancelText: { color: "#c9c7fa", fontSize: 14, fontWeight: "700" },
   classicSafeArea: { flex: 1, backgroundColor: "#0b142d" },
   classicContent: { flexGrow: 1, padding: 18, paddingBottom: 24 },
-  classicBackButton: { alignSelf: "flex-start", paddingVertical: 8, marginBottom: 8 },
+  classicBackButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
   classicBackText: { color: "#df91f4", fontSize: 15, fontWeight: "800" },
   classicHero: {
     alignItems: "center",
@@ -662,8 +853,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#172e59",
   },
   classicIcon: { fontSize: 52, marginBottom: 8 },
-  classicTitle: { color: "#fff", fontSize: 23, lineHeight: 29, fontWeight: "900", textAlign: "center" },
-  classicDifficulty: { color: "#81e6b1", fontSize: 15, fontWeight: "800", marginTop: 8 },
+  classicTitle: {
+    color: "#fff",
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  classicDifficulty: {
+    color: "#81e6b1",
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 8,
+  },
   classicInfo: {
     padding: 18,
     marginBottom: 15,
@@ -672,10 +874,29 @@ const styles = StyleSheet.create({
     borderColor: "#575ee5",
     backgroundColor: "#303783",
   },
-  classicInfoLabel: { color: "#ffda61", fontSize: 13, fontWeight: "900", marginBottom: 4 },
-  classicInfoHeading: { color: "#fff", fontSize: 19, lineHeight: 25, fontWeight: "900" },
-  classicInfoText: { color: "#f4f5ff", fontSize: 18, lineHeight: 29, marginTop: 12 },
-  classicSectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
+  classicInfoLabel: {
+    color: "#ffda61",
+    fontSize: 13,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  classicInfoHeading: {
+    color: "#fff",
+    fontSize: 19,
+    lineHeight: 25,
+    fontWeight: "900",
+  },
+  classicInfoText: {
+    color: "#f4f5ff",
+    fontSize: 18,
+    lineHeight: 29,
+    marginTop: 12,
+  },
+  classicSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
   classicSectionNumber: {
     width: 38,
     height: 38,
@@ -693,9 +914,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#202b70",
   },
-  classicGuideTitle: { color: "#ffda61", fontSize: 15, fontWeight: "900", marginBottom: 7 },
+  classicGuideTitle: {
+    color: "#ffda61",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 7,
+  },
   classicGuideText: { flex: 1, color: "#f4f5ff", fontSize: 15, lineHeight: 22 },
-  classicGuideStep: { flexDirection: "row", alignItems: "flex-start", marginTop: 7 },
+  classicGuideStep: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 7,
+  },
   classicGuideStepNumber: {
     width: 23,
     height: 23,
@@ -718,7 +948,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#6255f5",
   },
-  classicCompleteText: { color: "#fff", fontSize: 17, fontWeight: "900", textAlign: "center" },
+  classicCompleteText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "900",
+    textAlign: "center",
+  },
 });
 
 const navStyles = StyleSheet.create({
@@ -752,4 +987,46 @@ const navStyles = StyleSheet.create({
   },
   icon: { width: 28, height: 28 },
   label: { color: "#a9dcff", fontSize: 12, fontWeight: "700", marginTop: 3 },
+  viewToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#101d3b",
+    borderColor: "#203768",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  viewToggleLabel: {
+    color: "#9db0d6",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  viewToggleTrack: {
+    flexDirection: "row",
+    backgroundColor: "#182a52",
+    borderRadius: 8,
+    padding: 3,
+    gap: 4,
+  },
+  viewToggleSegment: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  viewToggleSegmentActive: {
+    backgroundColor: "#524be3",
+  },
+  viewToggleText: {
+    color: "#8fa3cb",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  viewToggleTextActive: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
 });
