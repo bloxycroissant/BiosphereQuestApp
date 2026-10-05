@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { Animated, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Flashcard, generateFlashcardDeck, GradeLevel } from '../../data/questionGenerators';
 import { MinigameMotion } from './MinigameMotion';
 
