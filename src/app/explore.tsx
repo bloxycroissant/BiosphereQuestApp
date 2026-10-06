@@ -7,6 +7,7 @@ import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe
 import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Href, router, useFocusEffect, usePathname } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -14,7 +15,6 @@ import {
   Animated,
   Easing,
   ImageSourcePropType,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -22,11 +22,11 @@ import {
   Text,
   View,
 } from "react-native";
-import NotebookBookViewer from "./components/notebookbookviewer";
+import InteractiveLessonViewer from "./components/InteractiveLessonViewer";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
-const VIEW_PREF_KEY = "@biosphere_preferred_lesson_view_v1";
+const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
 
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 const homeIcon = require("../../assets/BiosphereQuestAssets/Home Icon.png");
@@ -41,72 +41,94 @@ const tabs = [
   { label: "Profile", route: "/profile", icon: profileIcon },
 ] as const;
 
-const subjectKnowledge: Record<string, string> = {
-  Math: "Build number sense, solve problems, and connect math to real-life decisions.",
-  Matter: "Explore materials, their properties, and how matter changes.",
+const subjectDescriptions: Record<string, string> = {
+  Math: "Master numbers, geometry, and real-world calculation skills.",
+  Matter: "Investigate solids, liquids, gases, and material properties.",
   "Living Things & Environment":
-    "Study life, habitats, adaptations, and healthy ecosystems.",
+    "Discover living habitats, sensory organs, and plant & animal biology.",
   "Force, Motion, & Energy":
-    "Discover how forces change motion and how energy moves.",
+    "Uncover the secrets of pushes, pulls, magnetism, and energy transfers.",
   "Earth & Space":
-    "Understand Earth systems, weather, rocks, and space patterns.",
+    "Study weather systems, natural resources, rocks, and celestial bodies.",
+};
+
+const learnerOutcomes: Record<string, string[]> = {
+  Math: [
+    "Build strong number sense and operational fluency.",
+    "Identify geometric shapes, patterns, and spatial relations.",
+    "Apply mathematical reasoning to solve daily problems.",
+  ],
+  Matter: [
+    "Classify materials by observable physical properties and states.",
+    "Understand heating, cooling, melting, and state changes.",
+    "Learn safe sorting, absorption, and eco-friendly material handling.",
+  ],
+  "Living Things & Environment": [
+    "Identify body organs and their specialized sensory functions.",
+    "Explain how living things interact with and adapt to their habitats.",
+    "Recognize lifecycles, plant structures, and environmental care.",
+  ],
+  "Force, Motion, & Energy": [
+    "Explain how forces start, stop, and alter an object's speed or shape.",
+    "Investigate everyday light, sound, heat, and electrical circuits.",
+    "Discover how simple machines and magnetic forces make work easier.",
+  ],
+  "Earth & Space": [
+    "Observe and record daily weather conditions and safety protocols.",
+    "Differentiate soil, rock, landforms, and freshwater bodies.",
+    "Track cyclical movements of the Sun, Moon, and starry sky.",
+  ],
 };
 
 export default function ExploreScreen(): React.JSX.Element {
   const { completeLesson } = useProgress();
   const [grade, setGrade] = useState(1);
+  const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [selected, setSelected] = useState<{
     subject: Subject;
     lesson: Lesson;
   } | null>(null);
-  const [pendingLesson, setPendingLesson] = useState<{
-    subject: Subject;
-    lesson: Lesson;
-  } | null>(null);
-  const [lessonView, setLessonView] = useState<"notebook" | "classic" | null>(
-    null,
-  );
-  const [isLessonChooserVisible, setIsLessonChooserVisible] = useState(false);
-  const [preferredView, setPreferredView] = useState<
-    "notebook" | "classic" | null
-  >(null);
 
-  useEffect(() => {
-    const loadPreference = async () => {
-      try {
-        const saved = await AsyncStorage.getItem(VIEW_PREF_KEY);
-        if (saved === "notebook" || saved === "classic") {
-          setPreferredView(saved);
-        }
-      } catch (e) {
-        console.error("Error reading lesson view preference", e);
-      }
-    };
-    loadPreference();
-  }, []);
-
-  const updatePreferredView = async (view: "notebook" | "classic") => {
-    setPreferredView(view);
-    try {
-      await AsyncStorage.setItem(VIEW_PREF_KEY, view);
-    } catch (e) {
-      console.error("Error saving lesson view preference", e);
-    }
-  };
+  const [completedLessonKeys, setCompletedLessonKeys] = useState<string[]>([]);
 
   const screenTransition = React.useMemo(() => new Animated.Value(0), []);
   const transitionInProgress = useRef(false);
 
-  const launchLesson = (
-    subject: Subject,
-    lesson: Lesson,
-    view: "notebook" | "classic",
-  ) => {
-    if (transitionInProgress.current) return;
+  const loadCompletedLessons = async (): Promise<void> => {
+    try {
+      const data = await AsyncStorage.getItem(COMPLETED_LESSONS_KEY);
+      if (data) {
+        setCompletedLessonKeys(JSON.parse(data));
+      }
+    } catch (e) {
+      console.error("Failed to load completed lessons", e);
+    }
+  };
+
+  const markLessonCompleted = async (
+    subjectTitle: string,
+    lessonTitle: string,
+  ): Promise<void> => {
+    const key = `${grade}_${subjectTitle}_${lessonTitle}`;
+    if (!completedLessonKeys.includes(key)) {
+      const updated = [...completedLessonKeys, key];
+      setCompletedLessonKeys(updated);
+      try {
+        await AsyncStorage.setItem(
+          COMPLETED_LESSONS_KEY,
+          JSON.stringify(updated),
+        );
+      } catch (e) {
+        console.error("Failed to save completed lesson key", e);
+      }
+    }
+  };
+
+  const openLesson = (subject: Subject, lesson: Lesson): void => {
+    if (transitionInProgress.current || selected) return;
     transitionInProgress.current = true;
     screenTransition.setValue(0);
     setSelected({ subject, lesson });
-    setLessonView(view);
 
     requestAnimationFrame(() => {
       Animated.timing(screenTransition, {
@@ -118,27 +140,6 @@ export default function ExploreScreen(): React.JSX.Element {
         transitionInProgress.current = false;
       });
     });
-  };
-
-  const openLesson = (subject: Subject, lesson: Lesson): void => {
-    if (transitionInProgress.current || selected || pendingLesson) return;
-
-    if (preferredView) {
-      launchLesson(subject, lesson, preferredView);
-    } else {
-      setPendingLesson({ subject, lesson });
-      setIsLessonChooserVisible(true);
-    }
-  };
-
-  const chooseLessonView = (view: "notebook" | "classic"): void => {
-    if (!pendingLesson) return;
-    const currentPending = pendingLesson;
-    setPendingLesson(null);
-    setIsLessonChooserVisible(false);
-
-    void updatePreferredView(view);
-    launchLesson(currentPending.subject, currentPending.lesson, view);
   };
 
   const finishLesson = (xpReward?: number): void => {
@@ -154,9 +155,12 @@ export default function ExploreScreen(): React.JSX.Element {
       if (finished) {
         if (xpReward !== undefined) {
           void completeLesson(15, xpReward);
+          void markLessonCompleted(
+            selected.subject.title,
+            selected.lesson.title,
+          );
         }
         setSelected(null);
-        setLessonView(null);
       }
       transitionInProgress.current = false;
     });
@@ -164,23 +168,14 @@ export default function ExploreScreen(): React.JSX.Element {
 
   const closeLesson = (): void => finishLesson();
 
-  const courseScreenOpacity = screenTransition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const courseScreenScale = screenTransition.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.985],
-  });
-  const notebookScreenOpacity = screenTransition;
-  const notebookScreenScale = screenTransition.interpolate({
+  const lessonScreenOpacity = screenTransition;
+  const lessonScreenScale = screenTransition.interpolate({
     inputRange: [0, 1],
     outputRange: [0.985, 1],
   });
 
   const fetchActiveGrade = async (): Promise<void> => {
     try {
-      // Check parent locks
       const parentData = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       let locks: Record<string, boolean> = {};
       if (parentData) {
@@ -190,7 +185,6 @@ export default function ExploreScreen(): React.JSX.Element {
         }
       }
 
-      // Check user's selected grade from profile / wizard
       const profileData = await AsyncStorage.getItem(STORAGE_KEY);
       let targetGrade = 1;
 
@@ -221,12 +215,14 @@ export default function ExploreScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    fetchActiveGrade();
+    void fetchActiveGrade();
+    void loadCompletedLessons();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      fetchActiveGrade();
+      void fetchActiveGrade();
+      void loadCompletedLessons();
     }, []),
   );
 
@@ -235,346 +231,296 @@ export default function ExploreScreen(): React.JSX.Element {
       closeLesson();
       return;
     }
+    if (activeSubject) {
+      setActiveSubject(null);
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/home" as any);
+      router.replace("/home" as Href);
     }
   };
 
+  const subjects = curriculum[grade] || [];
+
   return (
     <View style={styles.screenContainer}>
-      <Animated.View
-        pointerEvents={selected ? "none" : "auto"}
-        style={[
-          styles.screenLayer,
-          {
-            opacity: courseScreenOpacity,
-            transform: [{ scale: courseScreenScale }],
-          },
-        ]}
-      >
-        <SafeAreaView style={styles.safeArea} edges={["top"]}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-          >
-            <View style={styles.header}>
-              <Pressable onPress={handleBack}>
-                <Text style={styles.back}> Back</Text>
-              </Pressable>
-              <View style={styles.headerTitle}>
-                <Image source={astro} style={styles.headerMascot} />
-                <Text style={styles.title}> My Courses</Text>
-              </View>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.content,
+            activeSubject && { paddingBottom: 30 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Pressable onPress={handleBack}>
+              <Text style={styles.back}>Back</Text>
+            </Pressable>
+            <View style={styles.headerTitle}>
+              <Image source={astro} style={styles.headerMascot} />
+              <Text style={styles.title}>
+                {activeSubject ? activeSubject.title : "My Courses"}
+              </Text>
             </View>
+          </View>
 
-            <View style={styles.search}>
-              <Text style={styles.searchText}>⌕ Search courses...</Text>
+          <View style={styles.activeGradeBanner}>
+            <View>
+              <Text style={styles.activeGradeBadge}>GRADE {grade} SCHOLAR</Text>
+              <Text style={styles.activeGradeSubtitle}>
+                Active Math & Science Curriculum
+              </Text>
             </View>
+            <Pressable
+              style={styles.changeGradeBtn}
+              onPress={() => router.push("/settings" as Href)}
+            >
+              <Text style={styles.changeGradeText}>Change ⚙️</Text>
+            </Pressable>
+          </View>
 
-            {/* Clean Active Grade Status Banner (Manual Tabs Removed) */}
-            <View style={styles.activeGradeBanner}>
-              <View>
-                <Text style={styles.activeGradeBadge}>
-                  GRADE {grade} SCHOLAR
-                </Text>
-                <Text style={styles.activeGradeSubtitle}>
-                  Active Math & Science Curriculum
-                </Text>
-              </View>
-              <Pressable
-                style={styles.changeGradeBtn}
-                onPress={() => router.push("/settings" as any)}
+          {!activeSubject && (
+            <View style={styles.categoriesContainer}>
+              <Text style={styles.sectionHeading}>
+                CHOOSE A LEARNING DOMAIN
+              </Text>
+              {subjects.map((subj, index) => {
+                const completedCount = subj.lessons.filter((lesson) =>
+                  completedLessonKeys.includes(
+                    `${grade}_${subj.title}_${lesson.title}`,
+                  ),
+                ).length;
+
+                return (
+                  <Pressable
+                    key={`${subj.title}-${index}`}
+                    style={styles.categoryCardPressable}
+                    onPress={() => setActiveSubject(subj)}
+                  >
+                    <LinearGradient
+                      colors={[subj.color + "38", subj.color + "12", "#0f1a34"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[
+                        styles.categoryCardGradient,
+                        { borderColor: subj.color },
+                      ]}
+                    >
+                      <View style={styles.categoryCardTop}>
+                        <View
+                          style={[
+                            styles.categoryIconBubble,
+                            {
+                              backgroundColor: subj.color + "28",
+                              borderColor: subj.color + "66",
+                            },
+                          ]}
+                        >
+                          <Text style={styles.categoryIcon}>{subj.icon}</Text>
+                        </View>
+                        <View style={styles.categoryMeta}>
+                          <Text style={styles.categoryTitle}>{subj.title}</Text>
+                          <Text style={styles.categoryLessonCount}>
+                            {completedCount} / {subj.lessons.length} Missions
+                            Completed
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.categoryArrowBadge,
+                            {
+                              backgroundColor: subj.color + "33",
+                              borderColor: subj.color + "66",
+                            },
+                          ]}
+                        >
+                          <Text style={styles.categoryArrow}>Open</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.categoryDescription}>
+                        {subjectDescriptions[subj.title] ||
+                          "Explore essential lessons and interactive quests."}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          {activeSubject && (
+            <View style={styles.missionsContainer}>
+              <LinearGradient
+                colors={[
+                  activeSubject.color + "35",
+                  activeSubject.color + "10",
+                  "#101b36",
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.outcomesCard,
+                  { borderColor: activeSubject.color },
+                ]}
               >
-                <Text style={styles.changeGradeText}>Change ⚙️</Text>
-              </Pressable>
-            </View>
-
-            {/* View Mode Toggle Switch */}
-            <View style={styles.viewToggleContainer}>
-              <Text style={styles.viewToggleLabel}>LESSON FORMAT</Text>
-              <View style={styles.viewToggleTrack}>
-                <Pressable
-                  style={[
-                    styles.viewToggleSegment,
-                    (preferredView ?? "notebook") === "notebook" &&
-                      styles.viewToggleSegmentActive,
-                  ]}
-                  onPress={() => updatePreferredView("notebook")}
-                >
-                  <Text
-                    style={[
-                      styles.viewToggleText,
-                      (preferredView ?? "notebook") === "notebook" &&
-                        styles.viewToggleTextActive,
-                    ]}
-                  >
-                    📖 Notebook
+                <View style={styles.outcomesHeader}>
+                  <Text style={styles.outcomesHeaderIcon}>🎯</Text>
+                  <Text style={styles.outcomesHeaderTitle}>
+                    Learner Outcomes
                   </Text>
-                </Pressable>
+                </View>
+                <Text style={styles.outcomesSub}>
+                  By the end of this domain, students will:
+                </Text>
+                {(
+                  learnerOutcomes[activeSubject.title] || [
+                    "Explore foundational principles.",
+                    "Practice hands-on concepts with instant quizzes.",
+                  ]
+                ).map((outcome, oIdx) => (
+                  <View key={oIdx} style={styles.outcomeRow}>
+                    <Text
+                      style={[
+                        styles.outcomeBullet,
+                        { color: activeSubject.color },
+                      ]}
+                    >
+                      ✦
+                    </Text>
+                    <Text style={styles.outcomeText}>{outcome}</Text>
+                  </View>
+                ))}
+              </LinearGradient>
 
-                <Pressable
-                  style={[
-                    styles.viewToggleSegment,
-                    preferredView === "classic" &&
-                      styles.viewToggleSegmentActive,
-                  ]}
-                  onPress={() => updatePreferredView("classic")}
-                >
-                  <Text
-                    style={[
-                      styles.viewToggleText,
-                      preferredView === "classic" &&
-                        styles.viewToggleTextActive,
-                    ]}
+              <Text style={styles.sectionHeading}>MISSION TRACK</Text>
+
+              {activeSubject.lessons.map((lesson, idx) => {
+                const isCompleted = completedLessonKeys.includes(
+                  `${grade}_${activeSubject.title}_${lesson.title}`,
+                );
+                const isPreviousCompleted =
+                  idx === 0 ||
+                  completedLessonKeys.includes(
+                    `${grade}_${activeSubject.title}_${activeSubject.lessons[idx - 1].title}`,
+                  );
+                const isUnlocked = isPreviousCompleted;
+
+                return (
+                  <Pressable
+                    key={`${activeSubject.title}-${lesson.title}-${idx}`}
+                    style={styles.lessonPressable}
+                    onPress={() => {
+                      if (!isUnlocked) {
+                        Alert.alert(
+                          "Mission Locked",
+                          `Complete Mission ${idx} to unlock "${lesson.title}"!`,
+                        );
+                        return;
+                      }
+                      openLesson(activeSubject, lesson);
+                    }}
                   >
-                    ⚡ Quick Lesson
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+                    <LinearGradient
+                      colors={
+                        isCompleted
+                          ? ["#133334", "#0e222a"]
+                          : isUnlocked
+                            ? [
+                                activeSubject.color + "28",
+                                activeSubject.color + "0d",
+                                "#152445",
+                              ]
+                            : ["#101a31", "#0b1222"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[
+                        styles.lessonCard,
+                        !isUnlocked && styles.lessonCardLocked,
+                        isCompleted && styles.lessonCardCompleted,
+                        isUnlocked &&
+                          !isCompleted && {
+                            borderColor: activeSubject.color + "66",
+                          },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.lessonBadge,
+                          !isUnlocked && styles.lessonBadgeLocked,
+                          isCompleted && styles.lessonBadgeCompleted,
+                          isUnlocked &&
+                            !isCompleted && {
+                              backgroundColor: activeSubject.color,
+                            },
+                        ]}
+                      >
+                        <Text style={styles.lessonBadgeText}>
+                          {isCompleted ? "✓" : isUnlocked ? `${idx + 1}` : "🔒"}
+                        </Text>
+                      </View>
 
-            {/* Curriculum mapped with unique composite keys */}
-            {curriculum[grade]?.map((subject, subjectIndex) => (
-              <SubjectCard
-                key={`${subject.title}-${subjectIndex}`}
-                subject={subject}
-                onLesson={(lesson) => openLesson(subject, lesson)}
-              />
-            ))}
-          </ScrollView>
-          <BottomNavigation />
-        </SafeAreaView>
-      </Animated.View>
+                      <View style={styles.lessonDetails}>
+                        <Text
+                          style={[
+                            styles.lessonCardTitle,
+                            !isUnlocked && styles.lessonCardTitleLocked,
+                          ]}
+                        >
+                          {lesson.title}
+                        </Text>
+                        <Text style={styles.lessonCardSubtitle}>
+                          {isCompleted
+                            ? "Completed (+15 XP earned)"
+                            : isUnlocked
+                              ? `${lesson.difficulty} Mission • Ready to Explore`
+                              : "Locked Mission"}
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.lessonCardArrow,
+                          !isUnlocked && { opacity: 0.3 },
+                        ]}
+                      >
+                        {isUnlocked ? "Play" : "Locked"}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+
+        {!activeSubject && <BottomNavigation />}
+      </SafeAreaView>
 
       {selected && (
         <Animated.View
           style={[
             styles.screenLayer,
             {
-              opacity: notebookScreenOpacity,
-              transform: [{ scale: notebookScreenScale }],
+              opacity: lessonScreenOpacity,
+              transform: [{ scale: lessonScreenScale }],
             },
           ]}
         >
-          {lessonView === "notebook" && (
-            <NotebookBookViewer
+          <View style={styles.fullScreenWrapper}>
+            <InteractiveLessonViewer
               gradeLevel={grade}
               initialSubject={selected.subject}
               initialLesson={selected.lesson}
               onBack={closeLesson}
               onComplete={(xpReward) => finishLesson(xpReward)}
             />
-          )}
-          {lessonView === "classic" && (
-            <ClassicLessonView
-              subject={selected.subject}
-              lesson={selected.lesson}
-              onBack={closeLesson}
-              onComplete={() => finishLesson(40)}
-            />
-          )}
+          </View>
         </Animated.View>
       )}
-
-      <Modal
-        visible={isLessonChooserVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setIsLessonChooserVisible(false);
-          setPendingLesson(null);
-        }}
-      >
-        <View style={styles.chooserBackdrop}>
-          <View style={styles.chooserPanel}>
-            <Text style={styles.chooserTitle}>Choose a lesson view</Text>
-            <Text style={styles.chooserLesson}>
-              {pendingLesson?.lesson.title}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => chooseLessonView("notebook")}
-              style={styles.chooserOption}
-            >
-              <Text style={styles.chooserOptionTitle}>Notebook</Text>
-              <Text style={styles.chooserOptionDescription}>
-                Explore the full lesson, one page at a time.
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => chooseLessonView("classic")}
-              style={styles.chooserOption}
-            >
-              <Text style={styles.chooserOptionTitle}>Quick lesson</Text>
-              <Text style={styles.chooserOptionDescription}>
-                Read the key idea, definition, and example.
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                setIsLessonChooserVisible(false);
-                setPendingLesson(null);
-              }}
-              style={styles.chooserCancel}
-            >
-              <Text style={styles.chooserCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-function ClassicLessonView({
-  subject,
-  lesson,
-  onBack,
-  onComplete,
-}: {
-  subject: Subject;
-  lesson: Lesson;
-  onBack: () => void;
-  onComplete: () => void;
-}): React.JSX.Element {
-  return (
-    <SafeAreaView style={styles.classicSafeArea} edges={["top"]}>
-      <ScrollView
-        contentContainerStyle={styles.classicContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable
-          accessibilityRole="button"
-          onPress={onBack}
-          style={styles.classicBackButton}
-        >
-          <Text style={styles.classicBackText}> Back to courses</Text>
-        </Pressable>
-        <View style={[styles.classicHero, { borderColor: subject.color }]}>
-          <Text style={styles.classicIcon}>{subject.icon}</Text>
-          <Text style={styles.classicTitle}>{lesson.title}</Text>
-          <Text style={styles.classicDifficulty}>
-            {lesson.difficulty} mission
-          </Text>
-        </View>
-        <View style={styles.classicInfo}>
-          <Text style={styles.classicInfoLabel}>About this subject</Text>
-          <Text style={styles.classicInfoText}>
-            {subjectKnowledge[subject.title]}
-          </Text>
-        </View>
-        <View style={styles.classicInfo}>
-          <View style={styles.classicSectionHeader}>
-            <View style={styles.classicSectionNumber}>
-              <Text style={styles.classicSectionNumberText}>1</Text>
-            </View>
-            <View style={styles.classicSectionHeading}>
-              <Text style={styles.classicInfoLabel}>The big idea</Text>
-              <Text style={styles.classicInfoHeading}>What does it mean?</Text>
-            </View>
-          </View>
-          <Text style={styles.classicInfoText}>{lesson.meaning}</Text>
-          <View style={styles.classicGuide}>
-            <Text style={styles.classicGuideTitle}>Keep this in mind</Text>
-            <Text style={styles.classicGuideText}>
-              Look for this idea in the example below.
-            </Text>
-          </View>
-        </View>
-        <View style={styles.classicInfo}>
-          <View style={styles.classicSectionHeader}>
-            <View style={styles.classicSectionNumber}>
-              <Text style={styles.classicSectionNumberText}>2</Text>
-            </View>
-            <View style={styles.classicSectionHeading}>
-              <Text style={styles.classicInfoLabel}>Let’s look</Text>
-              <Text style={styles.classicInfoHeading}>
-                See it in an example
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.classicInfoText}>{lesson.example}</Text>
-          <View style={styles.classicGuide}>
-            <Text style={styles.classicGuideTitle}>Think it through</Text>
-            <View style={styles.classicGuideStep}>
-              <Text style={styles.classicGuideStepNumber}>1</Text>
-              <Text style={styles.classicGuideText}>
-                Read what happens in the example.
-              </Text>
-            </View>
-            <View style={styles.classicGuideStep}>
-              <Text style={styles.classicGuideStepNumber}>2</Text>
-              <Text style={styles.classicGuideText}>
-                Find the part that shows the big idea.
-              </Text>
-            </View>
-            <View style={styles.classicGuideStep}>
-              <Text style={styles.classicGuideStepNumber}>3</Text>
-              <Text style={styles.classicGuideText}>
-                Explain how the two are connected.
-              </Text>
-            </View>
-          </View>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onComplete}
-          style={styles.classicCompleteButton}
-        >
-          <Text style={styles.classicCompleteText}>
-            Complete lesson · +40 XP →
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function SubjectCard({
-  subject,
-  onLesson,
-}: {
-  subject: Subject;
-  onLesson: (lesson: Lesson) => void;
-}): React.JSX.Element {
-  return (
-    <View style={[styles.subject, { borderColor: subject.color }]}>
-      <View style={styles.subjectHeader}>
-        <Text style={styles.subjectIcon}>{subject.icon}</Text>
-        <View style={styles.subjectCopy}>
-          <Text style={styles.subjectTitle}>{subject.title}</Text>
-          <Text style={styles.subjectSub}>
-            {subject.lessons.length} lessons · Grade-ready missions
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.knowledge}>{subjectKnowledge[subject.title]}</Text>
-
-      {/* Unique key composed of subject, title, and index to eliminate duplicate key warning */}
-      {subject.lessons.map((lesson, index) => (
-        <Pressable
-          key={`${subject.title}-${lesson.title}-${index}`}
-          onPress={() => onLesson(lesson)}
-          style={styles.lesson}
-        >
-          <View style={styles.lessonNumber}>
-            <Text style={styles.lessonNumberText}>{index + 1}</Text>
-          </View>
-          <View style={styles.lessonCopy}>
-            <Text style={styles.lessonTitle}>{lesson.title}</Text>
-            <Text style={styles.lessonDifficulty}>
-              {lesson.difficulty} challenge
-            </Text>
-          </View>
-          <Text style={styles.lessonArrow}>›</Text>
-        </Pressable>
-      ))}
     </View>
   );
 }
@@ -648,9 +594,16 @@ function NavigationItem({
 }
 
 const styles = StyleSheet.create({
-  screenContainer: { flex: 1 },
+  screenContainer: { flex: 1, backgroundColor: "#091426" },
   screenLayer: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: "#091426",
+    zIndex: 100,
+    elevation: 10,
+  },
+  fullScreenWrapper: {
+    flex: 1,
+    backgroundColor: "#091426",
   },
   safeArea: { flex: 1, backgroundColor: "#091426" },
   scrollView: {
@@ -672,15 +625,6 @@ const styles = StyleSheet.create({
   headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
   headerMascot: { width: 40, height: 40 },
   title: { color: "#fff", fontWeight: "900", fontSize: 21 },
-  search: {
-    marginTop: 14,
-    backgroundColor: "#30358d",
-    borderColor: "#5c60ee",
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 10,
-  },
-  searchText: { color: "#cbc9f3", fontSize: 12 },
   activeGradeBanner: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -714,245 +658,179 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   changeGradeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" },
-  viewToggleContainer: {
+  sectionHeading: {
+    color: "#8199cb",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  categoriesContainer: {
+    gap: 12,
+  },
+  categoryCardPressable: {
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  categoryCardGradient: {
+    borderWidth: 1.5,
+    borderRadius: 18,
+    padding: 16,
+  },
+  categoryCardTop: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#101d3b",
-    borderColor: "#203768",
+    gap: 12,
+  },
+  categoryIconBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  viewToggleLabel: {
-    color: "#9db0d6",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
+  categoryIcon: {
+    fontSize: 26,
   },
-  viewToggleTrack: {
-    flexDirection: "row",
-    backgroundColor: "#182a52",
-    borderRadius: 8,
-    padding: 3,
-    gap: 4,
+  categoryMeta: {
+    flex: 1,
   },
-  viewToggleSegment: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
+  categoryTitle: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "900",
   },
-  viewToggleSegmentActive: {
-    backgroundColor: "#524be3",
-  },
-  viewToggleText: {
-    color: "#8fa3cb",
+  categoryLessonCount: {
     fontSize: 11,
     fontWeight: "700",
+    marginTop: 2,
   },
-  viewToggleTextActive: {
+  categoryArrowBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryArrow: {
     color: "#ffffff",
+    fontSize: 12,
     fontWeight: "800",
   },
-  subject: {
-    backgroundColor: "#132844",
-    borderWidth: 1,
-    borderRadius: 17,
-    padding: 10,
-    marginBottom: 12,
+  categoryDescription: {
+    color: "#c3d3f5",
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 10,
   },
-  subjectHeader: { flexDirection: "row", alignItems: "center", gap: 9 },
-  subjectIcon: { fontSize: 25 },
-  subjectCopy: { flex: 1 },
-  subjectTitle: { color: "#fff", fontWeight: "900", fontSize: 14 },
-  subjectSub: { color: "#bcc8df", fontSize: 10, marginTop: 2 },
-  knowledge: { color: "#d7e1f2", fontSize: 10, lineHeight: 15, marginTop: 8 },
-  lesson: {
-    backgroundColor: "#243d75",
-    borderRadius: 11,
-    padding: 8,
+  missionsContainer: {
+    gap: 10,
+  },
+  outcomesCard: {
+    borderWidth: 1.5,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 8,
+  },
+  outcomesHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 7,
-  },
-  lessonNumber: {
-    width: 27,
-    height: 27,
-    borderRadius: 15,
-    backgroundColor: "#2b77ca",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  lessonNumberText: { color: "#fff", fontWeight: "900" },
-  lessonCopy: { flex: 1 },
-  lessonTitle: { color: "#fff", fontWeight: "800", fontSize: 12 },
-  lessonDifficulty: { color: "#b9c9e5", fontSize: 9, marginTop: 2 },
-  lessonArrow: { color: "#fff", fontSize: 24 },
-  chooserBackdrop: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 22,
-    backgroundColor: "rgba(4, 10, 28, 0.78)",
-  },
-  chooserPanel: {
-    width: "100%",
-    maxWidth: 440,
-    alignSelf: "center",
-    padding: 20,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#6866ee",
-    backgroundColor: "#17284e",
-  },
-  chooserTitle: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  chooserLesson: {
-    color: "#c7d4ee",
-    fontSize: 14,
-    marginTop: 5,
-    marginBottom: 14,
-  },
-  chooserOption: {
-    padding: 14,
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#555bd2",
-    backgroundColor: "#2c367f",
-  },
-  chooserOptionTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  chooserOptionDescription: {
-    color: "#d8def7",
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-  },
-  chooserCancel: {
-    alignSelf: "flex-end",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 6,
-  },
-  chooserCancelText: { color: "#c9c7fa", fontSize: 14, fontWeight: "700" },
-  classicSafeArea: { flex: 1, backgroundColor: "#0b142d" },
-  classicContent: { flexGrow: 1, padding: 18, paddingBottom: 24 },
-  classicBackButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  classicBackText: { color: "#df91f4", fontSize: 15, fontWeight: "800" },
-  classicHero: {
-    alignItems: "center",
-    padding: 20,
-    marginBottom: 16,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    backgroundColor: "#172e59",
-  },
-  classicIcon: { fontSize: 52, marginBottom: 8 },
-  classicTitle: {
-    color: "#fff",
-    fontSize: 23,
-    lineHeight: 29,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  classicDifficulty: {
-    color: "#81e6b1",
-    fontSize: 15,
-    fontWeight: "800",
-    marginTop: 8,
-  },
-  classicInfo: {
-    padding: 18,
-    marginBottom: 15,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#575ee5",
-    backgroundColor: "#303783",
-  },
-  classicInfoLabel: {
-    color: "#ffda61",
-    fontSize: 13,
-    fontWeight: "900",
     marginBottom: 4,
   },
-  classicInfoHeading: {
-    color: "#fff",
-    fontSize: 19,
-    lineHeight: 25,
-    fontWeight: "900",
-  },
-  classicInfoText: {
-    color: "#f4f5ff",
+  outcomesHeaderIcon: {
     fontSize: 18,
-    lineHeight: 29,
-    marginTop: 12,
   },
-  classicSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  classicSectionNumber: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    borderRadius: 19,
-    backgroundColor: "#6255f5",
-  },
-  classicSectionNumberText: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  classicSectionHeading: { flex: 1 },
-  classicGuide: {
-    padding: 14,
-    marginTop: 16,
-    borderRadius: 14,
-    backgroundColor: "#202b70",
-  },
-  classicGuideTitle: {
-    color: "#ffda61",
+  outcomesHeaderTitle: {
+    color: "#ffffff",
     fontSize: 15,
     fontWeight: "900",
-    marginBottom: 7,
   },
-  classicGuideText: { flex: 1, color: "#f4f5ff", fontSize: 15, lineHeight: 22 },
-  classicGuideStep: {
+  outcomesSub: {
+    color: "#8fa9de",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  outcomeRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginTop: 7,
+    gap: 8,
+    marginTop: 4,
   },
-  classicGuideStepNumber: {
-    width: 23,
-    height: 23,
-    textAlign: "center",
-    textAlignVertical: "center",
-    marginRight: 9,
-    borderRadius: 12,
+  outcomeBullet: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  outcomeText: {
+    color: "#e2eafc",
+    fontSize: 12.5,
+    lineHeight: 18,
+    flex: 1,
+    fontWeight: "600",
+  },
+  lessonPressable: {
+    borderRadius: 14,
     overflow: "hidden",
-    color: "#17284e",
-    backgroundColor: "#ffda61",
+  },
+  lessonCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  lessonCardLocked: {
+    borderColor: "#1d2b4a",
+    opacity: 0.65,
+  },
+  lessonCardCompleted: {
+    borderColor: "#22c55e",
+  },
+  lessonBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#524be3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lessonBadgeLocked: {
+    backgroundColor: "#202c44",
+  },
+  lessonBadgeCompleted: {
+    backgroundColor: "#16806b",
+  },
+  lessonBadgeText: {
+    color: "#ffffff",
     fontSize: 13,
     fontWeight: "900",
   },
-  classicCompleteButton: {
-    minHeight: 58,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: "#6255f5",
+  lessonDetails: {
+    flex: 1,
   },
-  classicCompleteText: {
-    color: "#fff",
-    fontSize: 17,
+  lessonCardTitle: {
+    color: "#ffffff",
+    fontSize: 14,
     fontWeight: "900",
-    textAlign: "center",
+  },
+  lessonCardTitleLocked: {
+    color: "#8b9ec7",
+  },
+  lessonCardSubtitle: {
+    color: "#a4b7dd",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  lessonCardArrow: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
   },
 });
 
