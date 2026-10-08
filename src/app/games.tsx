@@ -185,7 +185,7 @@ const getDifficultyColor = (diff: string) => {
 
 export default function GamesScreen() {
   const params = useLocalSearchParams<{ autoOpenGame?: string }>();
-  const { leaderboardXp, addXp } = useProgress();
+  const { leaderboardXp, addXp, completeGame, recordRecentGame } = useProgress();
   const [difficulty, setDifficulty] = useState("All");
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [activeGameRunning, setActiveGameRunning] = useState(false);
@@ -230,7 +230,6 @@ export default function GamesScreen() {
   const leaderboardPulse = useRef(new Animated.Value(1)).current;
   const memorySubjectModalAnim = useRef(new Animated.Value(0)).current;
 
-  // --- NEW: DYNAMIC STUDY TIME TRACKER ---
   const startTimeRef = useRef(Date.now());
   const timeSavedRef = useRef(false);
 
@@ -256,7 +255,6 @@ export default function GamesScreen() {
       void saveStudyTime();
     };
   }, []);
-  // ---------------------------------------
 
   useEffect(() => {
     fetchInitialData();
@@ -300,17 +298,6 @@ export default function GamesScreen() {
     }
   };
 
-  const recordRecentGame = async (gameKey: string) => {
-    try {
-      const raw = await AsyncStorage.getItem(RECENT_GAMES_KEY);
-      const recents: string[] = raw ? JSON.parse(raw) : [];
-      const updated = [gameKey, ...recents.filter((k) => k !== gameKey)].slice(0, 6);
-      await AsyncStorage.setItem(RECENT_GAMES_KEY, JSON.stringify(updated));
-    } catch (e) {
-      console.error("Failed to save recent game", e);
-    }
-  };
-
   const fetchInitialData = async () => {
     try {
       const gradeData = await AsyncStorage.getItem("explorerGrade");
@@ -334,7 +321,6 @@ export default function GamesScreen() {
     }
   };
 
-  // Intercept the autoOpenGame router parameter from Home Screen
   useEffect(() => {
     if (params.autoOpenGame) {
       const targetKey = String(params.autoOpenGame);
@@ -346,7 +332,7 @@ export default function GamesScreen() {
       if (targetGame) {
         void recordRecentGame(targetGame.key);
         setSelectedGame(targetGame.key);
-        setSelectedTutorialGame(targetGame); // Directly pop the tutorial modal
+        setSelectedTutorialGame(targetGame); 
       }
     }
   }, [params.autoOpenGame]);
@@ -508,7 +494,10 @@ export default function GamesScreen() {
 
   const handleFinishGame = (earnedXp: number = 50) => {
     if (earnedXp > 0) {
-      addXp(earnedXp);
+      const isCodebreaker = selectedGame === 'codebreaker';
+      const isDailyChallenge = params.autoOpenGame === 'quiz';
+      
+      void completeGame(earnedXp, isCodebreaker, isDailyChallenge);
     }
     setActiveGameRunning(false);
     setSelectedGame(null);

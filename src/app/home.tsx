@@ -205,7 +205,6 @@ export default function HomeScreen(): React.JSX.Element {
         firstTwoKeys = ["flashcards", "ninja"];
       }
 
-      // Filter out the recent keys and the "quiz" so the Suggested game is truly random
       const remainingGames = ALL_ARCADE_GAMES.filter(
         (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz"
       );
@@ -326,26 +325,8 @@ export default function HomeScreen(): React.JSX.Element {
         setStudyMinutes(0);
       }
 
-      const lastLessonRaw = await AsyncStorage.getItem(LAST_LESSON_KEY);
-      const completedRaw = await AsyncStorage.getItem(COMPLETED_LESSONS_KEY);
-      let recordsFound = false;
-
-      if (lastLessonRaw) {
-        const parsedLast = JSON.parse(lastLessonRaw);
-        if (parsedLast && parsedLast.lessonTitle) {
-          setLastLesson(parsedLast);
-          recordsFound = true;
-        }
-      }
-
-      if (completedRaw) {
-        const parsedCompleted = JSON.parse(completedRaw);
-        if (Array.isArray(parsedCompleted) && parsedCompleted.length > 0) {
-          recordsFound = true;
-        }
-      }
-
-      setHasCourseRecords(recordsFound);
+      setLastLesson(progress.lastLesson);
+      setHasCourseRecords(progress.completedLessons.length > 0);
     } catch (e) {
       console.error("Failed to load shared progress on home", e);
     }

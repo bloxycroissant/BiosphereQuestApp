@@ -57,7 +57,6 @@ export default function SettingsScreen(): React.JSX.Element {
 
   const syncAuth = async (): Promise<void> => {
     try {
-      // Load current grade
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       const parsed = savedData ? JSON.parse(savedData) : null;
       if (parsed?.gradeYear) {
@@ -139,7 +138,6 @@ export default function SettingsScreen(): React.JSX.Element {
       parsed.gradeYear = `Grade ${newGrade}`;
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
 
-      // Sync metadata to Supabase if authenticated
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -681,6 +679,22 @@ export default function SettingsScreen(): React.JSX.Element {
             </Pressable>
           </View>
         )}
+
+        {/* ABOUT US SECTION */}
+        <Text style={[styles.groupLabel, { marginTop: 20 }]}>ABOUT</Text>
+        <View style={styles.cardGroup}>
+          <Pressable
+            style={styles.rowItem}
+            onPress={() => router.push("/about-us" as any)}
+          >
+            <View>
+              <Text style={styles.rowItemText}>About Us</Text>
+              <Text style={styles.rowItemSub}>
+                Learn more about Biosphere Quest
+              </Text>
+            </View>
+          </Pressable>
+        </View>
 
         {/* DEVELOPER TOOLS */}
         <Text style={[styles.groupLabel, { color: "#ffaa00", marginTop: 20 }]}>

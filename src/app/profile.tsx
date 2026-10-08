@@ -1,24 +1,24 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
-import { achievements } from "@/constants/achievements";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Image,
-    LayoutAnimation,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    UIManager,
-    View,
-    useWindowDimensions,
+  Alert,
+  Animated,
+  Image,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  UIManager,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -37,15 +37,6 @@ interface LocalSession {
   done: boolean;
 }
 
-interface AchievementType {
-  id: number | string;
-  unlocked: boolean;
-  accent: string;
-  icon: string;
-  title: string;
-  xp: number;
-}
-
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -60,7 +51,6 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
-  const astro = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
   const progress = useProgress();
   const [currentView, setCurrentView] = useState<ViewMode>("profile");
@@ -309,35 +299,6 @@ export default function ProfileScreen(): React.JSX.Element {
         setLevelUpText("");
       });
     }, 3500);
-  };
-
-  const addXpWithProgress = (amount: number): void => {
-    let currentXp = xp + amount;
-    let currentLevel = level;
-    let currentNextXp = nextLevelXp;
-    let leveledUp = false;
-    let oldLvl = level;
-
-    while (currentXp >= currentNextXp) {
-      currentXp -= currentNextXp;
-      currentLevel += 1;
-      leveledUp = true;
-      currentNextXp = Math.round(currentNextXp * 1.25 + 25);
-    }
-
-    setXp(currentXp);
-    setLevel(currentLevel);
-    setNextLevelXp(currentNextXp);
-
-    if (leveledUp) {
-      triggerLevelUpAnimation(oldLvl, currentLevel);
-    }
-
-    persistData({
-      xp: currentXp,
-      level: currentLevel,
-      nextLevelXp: currentNextXp,
-    });
   };
 
   const persistData = async (updatedFields: object): Promise<void> => {
@@ -598,7 +559,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
     const newLessons = lessons + 1;
     setLessons(newLessons);
-    addXpWithProgress(25);
+    progress.addXp(25);
     persistData({ sessions: updatedSessions, lessons: newLessons });
   };
 
@@ -722,7 +683,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 onChangeText={setTempUsername}
               />
               <FormInput
-                icon="✉️️"
+                icon="✉"
                 label="Email"
                 value={tempEmail || email || "No email connected"}
                 editable={false}
@@ -1161,14 +1122,164 @@ function FormInput({
 function Badges(): React.JSX.Element {
   const { width } = useWindowDimensions();
   const badgeWidth = Math.floor((width - 48) / 3);
+  const progress = useProgress();
+
+  const [selectedBadge, setSelectedBadge] = useState<any>(null);
+  const badgeModalAnim = useRef(new Animated.Value(0)).current;
+
+  const dynamicAchievements = [
+    {
+      id: "first_steps",
+      title: "First Steps",
+      icon: "🌱",
+      accent: "#4ade80",
+      description: "Reach a total of 150 XP.",
+      unlocked: !!progress.badgeUnlockDates?.["first_steps"],
+      date: progress.badgeUnlockDates?.["first_steps"],
+    },
+    {
+      id: "cadet",
+      title: "Cadet Scholar",
+      icon: "🎓",
+      accent: "#60a5fa",
+      description: "Reach a total of 500 XP.",
+      unlocked: !!progress.badgeUnlockDates?.["cadet"],
+      date: progress.badgeUnlockDates?.["cadet"],
+    },
+    {
+      id: "streak",
+      title: "Streak Master",
+      icon: "🔥",
+      accent: "#f97316",
+      description: "Complete at least 1 lesson or game for 3 consecutive days.",
+      unlocked: !!progress.badgeUnlockDates?.["streak"],
+      date: progress.badgeUnlockDates?.["streak"],
+    },
+    {
+      id: "time",
+      title: "Time Explorer",
+      icon: "⏱️",
+      accent: "#a78bfa",
+      description: "Reach a total of 1 hour of learning time.",
+      unlocked: !!progress.badgeUnlockDates?.["time"],
+      date: progress.badgeUnlockDates?.["time"],
+    },
+    {
+      id: "daily",
+      title: "Daily Challenger",
+      icon: "📅",
+      accent: "#f472b6",
+      description:
+        "Complete the daily challenge or featured adventure for a total of 3 days.",
+      unlocked: !!progress.badgeUnlockDates?.["daily"],
+      date: progress.badgeUnlockDates?.["daily"],
+    },
+    {
+      id: "perfect",
+      title: "Perfect Accuracy",
+      icon: "🎯",
+      accent: "#2dd4bf",
+      description:
+        "Successfully answer all questions in a lesson without making a single mistake.",
+      unlocked: !!progress.badgeUnlockDates?.["perfect"],
+      date: progress.badgeUnlockDates?.["perfect"],
+    },
+    {
+      id: "minigame",
+      title: "Mini Game Master",
+      icon: "🎮",
+      accent: "#fbbf24",
+      description:
+        "Successfully beat the impossible game category or the Codebreaker vault.",
+      unlocked: !!progress.badgeUnlockDates?.["minigame"],
+      date: progress.badgeUnlockDates?.["minigame"],
+    },
+    {
+      id: "speed_math",
+      title: "Speed Demon",
+      icon: "⚡",
+      accent: "#ef4444",
+      description:
+        "Successfully answer any math category subject questions within 45 seconds.",
+      unlocked: !!progress.badgeUnlockDates?.["speed_math"],
+      date: progress.badgeUnlockDates?.["speed_math"],
+    },
+    {
+      id: "speed_sci",
+      title: "Junior Scientist",
+      icon: "🔬",
+      accent: "#14b8a6",
+      description:
+        "Successfully answer any science category subject questions within 45 seconds.",
+      unlocked: !!progress.badgeUnlockDates?.["speed_sci"],
+      date: progress.badgeUnlockDates?.["speed_sci"],
+    },
+    {
+      id: "elite",
+      title: "Scholar Elite",
+      icon: "💎",
+      accent: "#6366f1",
+      description: "Achieve a total of 1000 XP.",
+      unlocked: !!progress.badgeUnlockDates?.["elite"],
+      date: progress.badgeUnlockDates?.["elite"],
+    },
+    {
+      id: "gold",
+      title: "Gold Scholar",
+      icon: "🏆",
+      accent: "#eab308",
+      description: "Achieve a total of 2500 XP.",
+      unlocked: !!progress.badgeUnlockDates?.["gold"],
+      date: progress.badgeUnlockDates?.["gold"],
+    },
+    {
+      id: "master",
+      title: "Master Explorer",
+      icon: "🚀",
+      accent: "#ec4899",
+      description: "Achieve a total of 5000 XP.",
+      unlocked: !!progress.badgeUnlockDates?.["master"],
+      date: progress.badgeUnlockDates?.["master"],
+    },
+  ];
+
+  const openBadgeModal = (badge: any) => {
+    setSelectedBadge(badge);
+    Animated.spring(badgeModalAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 7,
+    }).start();
+  };
+
+  const closeBadgeModal = () => {
+    Animated.timing(badgeModalAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedBadge(null);
+    });
+  };
+
+  const formatUnlockDate = (dateStr: string) => {
+    if (!dateStr) return "Not Yet Unlocked";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
 
   return (
     <View>
       <Text style={styles.section}>🏅 Badges & Achievements</Text>
       <View style={styles.badges}>
-        {achievements?.map((achievement: AchievementType) => (
-          <View
+        {dynamicAchievements.map((achievement) => (
+          <Pressable
             key={achievement.id}
+            onPress={() => openBadgeModal(achievement)}
             style={[
               styles.badge,
               {
@@ -1185,25 +1296,87 @@ function Badges(): React.JSX.Element {
             <Text style={styles.badgeTitle} numberOfLines={2}>
               {achievement.title}
             </Text>
-            <Text style={styles.badgeXp}>+{achievement.xp} XP</Text>
-          </View>
+            {/* The small description text has been completely removed from here! */}
+          </Pressable>
         ))}
       </View>
 
-      <Pressable
-        onPress={() => router.push({ pathname: "/about-us" } as any)}
-        style={styles.aboutCard}
+      <Modal
+        visible={!!selectedBadge}
+        transparent
+        animationType="fade"
+        onRequestClose={closeBadgeModal}
       >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aboutTitle}>About Us</Text>
-          <Text style={{ color: "#8ae2c5", fontSize: 11, marginTop: 2 }}>
-            Biosphere Quest
-          </Text>
+        <View style={styles.badgeModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeBadgeModal}
+          />
+          <Animated.View
+            style={[
+              styles.badgeModalCard,
+              {
+                transform: [{ scale: badgeModalAnim }],
+                borderColor: selectedBadge?.unlocked
+                  ? selectedBadge?.accent
+                  : "#35466e",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.badgeModalIconBubble,
+                {
+                  backgroundColor: selectedBadge?.unlocked
+                    ? `${selectedBadge?.accent}25`
+                    : "#1e2c56",
+                },
+              ]}
+            >
+              <Text style={styles.badgeModalIcon}>
+                {selectedBadge?.unlocked ? selectedBadge?.icon : "🔒"}
+              </Text>
+            </View>
+            <Text style={styles.badgeModalTitle}>{selectedBadge?.title}</Text>
+
+            <View style={styles.badgeModalDivider} />
+
+            <Text style={styles.badgeModalDescTitle}>HOW TO UNLOCK:</Text>
+            <Text style={styles.badgeModalDesc}>
+              {selectedBadge?.description}
+            </Text>
+
+            <View
+              style={[
+                styles.badgeModalDateBox,
+                {
+                  backgroundColor: selectedBadge?.unlocked
+                    ? "#133334"
+                    : "#202c44",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.badgeModalDateText,
+                  { color: selectedBadge?.unlocked ? "#34d399" : "#8b9ec7" },
+                ]}
+              >
+                {selectedBadge?.unlocked
+                  ? `Unlocked on ${formatUnlockDate(selectedBadge?.date)}`
+                  : "Goal not yet reached"}
+              </Text>
+            </View>
+
+            <Pressable
+              style={styles.badgeModalCloseBtn}
+              onPress={closeBadgeModal}
+            >
+              <Text style={styles.badgeModalCloseText}>Close</Text>
+            </Pressable>
+          </Animated.View>
         </View>
-        <View style={styles.viewBadge}>
-          <Text style={styles.viewBadgeText}>View</Text>
-        </View>
-      </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1451,25 +1624,111 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badge: {
-    minHeight: 88,
+    minHeight: 105,
     backgroundColor: "#172849",
     borderWidth: 1.5,
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeIcon: { fontSize: 20, marginBottom: 4 },
+  badgeIcon: { fontSize: 32, marginBottom: 8, lineHeight: 36 },
   badgeTitle: {
     color: "#fff",
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: "800",
     textAlign: "center",
     lineHeight: 12,
-    height: 24,
+    height: 30,
   },
-  badgeXp: { color: "#f3c84f", fontSize: 8.5, fontWeight: "900", marginTop: 3 },
+  badgeModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(4, 10, 28, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  badgeModalCard: {
+    backgroundColor: "#131e38",
+    borderWidth: 2,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  badgeModalIconBubble: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  badgeModalIcon: {
+    fontSize: 38,
+  },
+  badgeModalTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  badgeModalDivider: {
+    width: "80%",
+    height: 1,
+    backgroundColor: "#2a3d6b",
+    marginBottom: 16,
+  },
+  badgeModalDescTitle: {
+    color: "#8a9bbd",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  badgeModalDesc: {
+    color: "#c7d0e8",
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 20,
+  },
+  badgeModalDateBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 20,
+    width: "100%",
+  },
+  badgeModalDateText: {
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  badgeModalCloseBtn: {
+    backgroundColor: "#202c52",
+    borderColor: "#4d6199",
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  badgeModalCloseText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   scheduleHeading: {
     flexDirection: "row",
     alignItems: "center",
@@ -1528,28 +1787,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   openScheduleText: { color: "#fff", fontWeight: "900" },
-  aboutCard: {
-    backgroundColor: "#0f4838",
-    borderColor: "#1f9f79",
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  aboutTitle: { color: "#ffffff", fontSize: 20, fontWeight: "900" },
-  viewBadge: {
-    backgroundColor: "#1b8061",
-    borderColor: "#2ee6a8",
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 5,
-  },
-  viewBadgeText: { color: "#ffffff", fontSize: 12, fontWeight: "900" },
+
   editHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",

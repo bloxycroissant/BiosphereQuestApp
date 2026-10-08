@@ -18,7 +18,12 @@ interface InteractiveLessonViewerProps {
   initialSubject?: Subject;
   initialLesson?: Lesson;
   onBack?: () => void;
-  onComplete: (xpReward: number) => void;
+  onComplete: (
+    xpReward: number,
+    isPerfect?: boolean,
+    isSpeedyMath?: boolean,
+    isSpeedyScience?: boolean,
+  ) => void;
 }
 
 interface QuizQuestion {
@@ -173,7 +178,10 @@ const buildLessonContent = (
   const topics: LessonTopic[] = [
     {
       title: "Foundations & Core Idea",
-      story: lesson.title + " helps explorers understand foundational concepts. " + lesson.meaning,
+      story:
+        lesson.title +
+        " helps explorers understand foundational concepts. " +
+        lesson.meaning,
       howItWorks: isScience
         ? "Scientists look for clues, test what happens when variables change, and connect observations to reliable rules."
         : "Mathematicians look at what quantities are given, break larger values into manageable parts, and apply reliable operations.",
@@ -191,7 +199,10 @@ const buildLessonContent = (
     },
     {
       title: "Connecting the Dots",
-      story: "Now that you understand the rule and saw it work, let's explore why this matters in the broader world of " + subjectTitle + ".",
+      story:
+        "Now that you understand the rule and saw it work, let's explore why this matters in the broader world of " +
+        subjectTitle +
+        ".",
       howItWorks:
         "Everyday problems become easier when you identify which concepts connect together. Once you master this rule, you can unlock more advanced missions!",
       demonstration:
@@ -211,7 +222,9 @@ const buildLessonContent = (
       "Accurate recall of the core rule!",
     ),
     buildQuestion(
-      "Scenario: If a fellow explorer asks what " + lesson.title + " is about, you say:",
+      "Scenario: If a fellow explorer asks what " +
+        lesson.title +
+        " is about, you say:",
       lesson.meaning,
       [
         "It is too complicated to explain in words.",
@@ -220,7 +233,7 @@ const buildLessonContent = (
       "Clear communication of knowledge!",
     ),
     buildQuestion(
-      "Recall the example: \"" + lesson.example + "\". What concept was that?",
+      'Recall the example: "' + lesson.example + '". What concept was that?',
       lesson.title,
       ["A completely unrelated subject.", "An accidental mistake."],
       "Great recognition of worked examples!",
@@ -261,7 +274,11 @@ const buildLessonContent = (
       "Resilient learners always double-check!",
     ),
     buildQuestion(
-      "Why is " + lesson.title + " considered an essential topic for " + subjectTitle + "?",
+      "Why is " +
+        lesson.title +
+        " considered an essential topic for " +
+        subjectTitle +
+        "?",
       "It forms the building blocks for more advanced topics.",
       [
         "It is just filler content to make books longer.",
@@ -351,9 +368,19 @@ export default function InteractiveLessonViewer({
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const pulseScaleAnim = useRef(new Animated.Value(1)).current;
 
-  // DYNAMIC STUDY TIME TRACKER 
   const startTimeRef = useRef(Date.now());
   const timeSavedRef = useRef(false);
+
+  const quizStartTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (
+      (stage === "topic_quiz" || stage === "recap_quiz") &&
+      !quizStartTimeRef.current
+    ) {
+      quizStartTimeRef.current = Date.now();
+    }
+  }, [stage]);
 
   useEffect(() => {
     return () => {
@@ -364,11 +391,16 @@ export default function InteractiveLessonViewer({
         const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
 
         try {
-          const profileRaw = await AsyncStorage.getItem("@biosphere_profile_data_v1");
+          const profileRaw = await AsyncStorage.getItem(
+            "@biosphere_profile_data_v1",
+          );
           if (profileRaw) {
             const profile = JSON.parse(profileRaw);
             profile.studyMinutes = (profile.studyMinutes || 0) + elapsedMinutes;
-            await AsyncStorage.setItem("@biosphere_profile_data_v1", JSON.stringify(profile));
+            await AsyncStorage.setItem(
+              "@biosphere_profile_data_v1",
+              JSON.stringify(profile),
+            );
           }
         } catch (e) {
           console.error("Failed to save study time", e);
@@ -716,8 +748,17 @@ export default function InteractiveLessonViewer({
             {stage === "summary"
               ? "Mission Accomplished!"
               : stage === "recap_quiz"
-                ? "Final Mastery Quiz (" + (recapQuestionIndex + 1) + " of " + recapQuestions.length + ")"
-                : "Topic " + (topicIndex + 1) + " of " + topics.length + ": " + currentTopic.title}
+                ? "Final Mastery Quiz (" +
+                  (recapQuestionIndex + 1) +
+                  " of " +
+                  recapQuestions.length +
+                  ")"
+                : "Topic " +
+                  (topicIndex + 1) +
+                  " of " +
+                  topics.length +
+                  ": " +
+                  currentTopic.title}
           </Text>
         </View>
 
@@ -750,8 +791,14 @@ export default function InteractiveLessonViewer({
             <View style={styles.quizHeaderRow}>
               <Text style={styles.quizHeaderBadge}>
                 {stage === "recap_quiz"
-                  ? "RECAP QUESTION " + (recapQuestionIndex + 1) + " / " + recapQuestions.length
-                  : "CHECKPOINT " + (topicQuestionIndex + 1) + " / " + currentTopic.questions.length}
+                  ? "RECAP QUESTION " +
+                    (recapQuestionIndex + 1) +
+                    " / " +
+                    recapQuestions.length
+                  : "CHECKPOINT " +
+                    (topicQuestionIndex + 1) +
+                    " / " +
+                    currentTopic.questions.length}
               </Text>
               <Text style={styles.quizRewardBadge}>
                 +{stage === "recap_quiz" ? 10 : 15} XP
@@ -855,7 +902,15 @@ export default function InteractiveLessonViewer({
 
             <Pressable
               style={styles.finishMissionBtn}
-              onPress={() => onComplete(totalXpEarned)}
+              onPress={() => {
+                const isPerfect = mistakesCount === 0;
+                const isScience = subject.title.toLowerCase().includes("science") || ["matter", "living", "force", "earth"].some((s) => subject.title.toLowerCase().includes(s));
+                
+                const quizTimeSecs = quizStartTimeRef.current ? (Date.now() - quizStartTimeRef.current) / 1000 : 999;
+                const isSpeedy = quizTimeSecs < 45;
+
+                onComplete(totalXpEarned, isPerfect, isSpeedy && !isScience, isSpeedy && isScience);
+              }}
             >
               <Text style={styles.finishMissionBtnText}>
                 Complete Mission & Return 🚀
@@ -956,8 +1011,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   xpBadgeText: { color: "#ffda61", fontSize: 13, fontWeight: "900" },
-  
-  // NEW PROGRESS BAR STYLES
+
   progressWrapper: {
     marginBottom: 20,
     flexDirection: "row",
@@ -967,7 +1021,7 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     justifyContent: "center",
-    paddingVertical: 10, // Gives the rocket room to overlap the top/bottom
+    paddingVertical: 10, 
   },
   progressTrack: {
     height: 14,
@@ -986,7 +1040,7 @@ const styles = StyleSheet.create({
   },
   rocketContainer: {
     position: "absolute",
-    marginLeft: -14, // Aligns the center of the rocket with the leading edge
+    marginLeft: -14, 
     zIndex: 10,
   },
   rocketIcon: {
@@ -1000,7 +1054,6 @@ const styles = StyleSheet.create({
   moonIcon: {
     fontSize: 24,
   },
-  // END NEW PROGRESS BAR STYLES
 
   shimmerEffect: {
     position: "absolute",

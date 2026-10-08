@@ -89,48 +89,21 @@ const learnerOutcomes: Record<string, string[]> = {
 
 export default function ExploreScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ autoOpenSubject?: string }>();
-  const { completeLesson } = useProgress();
   const [grade, setGrade] = useState(1);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [selected, setSelected] = useState<{
     subject: Subject;
     lesson: Lesson;
   } | null>(null);
-
-  const [completedLessonKeys, setCompletedLessonKeys] = useState<string[]>([]);
+  const {
+    completeLesson,
+    completedLessons: completedLessonKeys,
+    markLessonCompleted,
+    setLastLessonBookmark,
+  } = useProgress();
 
   const screenTransition = React.useMemo(() => new Animated.Value(0), []);
   const transitionInProgress = useRef(false);
-
-  const loadCompletedLessons = async (): Promise<void> => {
-    try {
-      const data = await AsyncStorage.getItem(COMPLETED_LESSONS_KEY);
-      if (data) {
-        setCompletedLessonKeys(JSON.parse(data));
-      }
-    } catch (e) {
-      console.error("Failed to load completed lessons", e);
-    }
-  };
-
-  const markLessonCompleted = async (
-    subjectTitle: string,
-    lessonTitle: string,
-  ): Promise<void> => {
-    const key = grade + "_" + subjectTitle + "_" + lessonTitle;
-    if (!completedLessonKeys.includes(key)) {
-      const updated = [...completedLessonKeys, key];
-      setCompletedLessonKeys(updated);
-      try {
-        await AsyncStorage.setItem(
-          COMPLETED_LESSONS_KEY,
-          JSON.stringify(updated),
-        );
-      } catch (e) {
-        console.error("Failed to save completed lesson key", e);
-      }
-    }
-  };
 
   const openLesson = (subject: Subject, lesson: Lesson): void => {
     if (transitionInProgress.current || selected) return;
@@ -138,16 +111,13 @@ export default function ExploreScreen(): React.JSX.Element {
     screenTransition.setValue(0);
     setSelected({ subject, lesson });
 
-    void AsyncStorage.setItem(
-      LAST_LESSON_KEY,
-      JSON.stringify({
-        grade: grade,
-        subjectTitle: subject.title,
-        lessonTitle: lesson.title,
-        icon: subject.icon,
-        difficulty: lesson.difficulty,
-      }),
-    );
+    void setLastLessonBookmark({
+      grade: grade,
+      subjectTitle: subject.title,
+      lessonTitle: lesson.title,
+      icon: subject.icon,
+      difficulty: lesson.difficulty,
+    });
 
     requestAnimationFrame(() => {
       Animated.timing(screenTransition, {
@@ -175,8 +145,7 @@ export default function ExploreScreen(): React.JSX.Element {
         if (xpReward !== undefined) {
           void completeLesson(15, xpReward);
           void markLessonCompleted(
-            selected.subject.title,
-            selected.lesson.title,
+            grade + "_" + selected.subject.title + "_" + selected.lesson.title,
           );
         }
         setSelected(null);
@@ -237,13 +206,11 @@ export default function ExploreScreen(): React.JSX.Element {
 
   useEffect(() => {
     void fetchActiveGrade();
-    void loadCompletedLessons();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void fetchActiveGrade();
-      void loadCompletedLessons();
     }, []),
   );
 

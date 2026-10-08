@@ -21,7 +21,7 @@ export default function AboutUsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.cancelText}>← Cancel</Text>
+            <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
           <Text style={styles.headerTitle}>About Us</Text>
           <View style={{ width: 50 }} />
