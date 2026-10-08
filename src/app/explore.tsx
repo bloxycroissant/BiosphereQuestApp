@@ -8,7 +8,13 @@ import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Href, router, useFocusEffect, usePathname } from "expo-router";
+import {
+  Href,
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+  usePathname,
+} from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -27,6 +33,7 @@ import InteractiveLessonViewer from "./components/InteractiveLessonViewer";
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
+const LAST_LESSON_KEY = "@biosphere_last_lesson_v1";
 
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 const homeIcon = require("../../assets/BiosphereQuestAssets/Home Icon.png");
@@ -81,6 +88,7 @@ const learnerOutcomes: Record<string, string[]> = {
 };
 
 export default function ExploreScreen(): React.JSX.Element {
+  const params = useLocalSearchParams<{ autoOpenSubject?: string }>();
   const { completeLesson } = useProgress();
   const [grade, setGrade] = useState(1);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -109,7 +117,7 @@ export default function ExploreScreen(): React.JSX.Element {
     subjectTitle: string,
     lessonTitle: string,
   ): Promise<void> => {
-    const key = `${grade}_${subjectTitle}_${lessonTitle}`;
+    const key = grade + "_" + subjectTitle + "_" + lessonTitle;
     if (!completedLessonKeys.includes(key)) {
       const updated = [...completedLessonKeys, key];
       setCompletedLessonKeys(updated);
@@ -129,6 +137,17 @@ export default function ExploreScreen(): React.JSX.Element {
     transitionInProgress.current = true;
     screenTransition.setValue(0);
     setSelected({ subject, lesson });
+
+    void AsyncStorage.setItem(
+      LAST_LESSON_KEY,
+      JSON.stringify({
+        grade: grade,
+        subjectTitle: subject.title,
+        lessonTitle: lesson.title,
+        icon: subject.icon,
+        difficulty: lesson.difficulty,
+      }),
+    );
 
     requestAnimationFrame(() => {
       Animated.timing(screenTransition, {
@@ -200,10 +219,12 @@ export default function ExploreScreen(): React.JSX.Element {
       }
 
       if (!isNaN(targetGrade) && targetGrade >= 1 && targetGrade <= 6) {
-        if (locks[`Grade ${targetGrade}`]) {
+        if (locks["Grade " + targetGrade]) {
           Alert.alert(
             "Grade Locked",
-            `Grade ${targetGrade} curriculum has been locked by parental controls.`,
+            "Grade " +
+              targetGrade +
+              " curriculum has been locked by parental controls.",
           );
         } else {
           setGrade(targetGrade);
@@ -226,6 +247,23 @@ export default function ExploreScreen(): React.JSX.Element {
     }, []),
   );
 
+  const subjects = curriculum[grade] || [];
+
+  useEffect(() => {
+    const subjParam = Array.isArray(params.autoOpenSubject)
+      ? params.autoOpenSubject[0]
+      : params.autoOpenSubject;
+
+    if (subjParam && subjects.length > 0) {
+      const targetSubj = subjects.find(
+        (s) => s.title.toLowerCase() === String(subjParam).toLowerCase(),
+      );
+      if (targetSubj) {
+        setActiveSubject(targetSubj);
+      }
+    }
+  }, [params.autoOpenSubject, subjects]);
+
   const handleBack = (): void => {
     if (selected) {
       closeLesson();
@@ -241,8 +279,6 @@ export default function ExploreScreen(): React.JSX.Element {
       router.replace("/home" as Href);
     }
   };
-
-  const subjects = curriculum[grade] || [];
 
   return (
     <View style={styles.screenContainer}>
@@ -260,99 +296,164 @@ export default function ExploreScreen(): React.JSX.Element {
               <Text style={styles.back}>Back</Text>
             </Pressable>
             <View style={styles.headerTitle}>
-              <Image source={astro} style={styles.headerMascot} />
+              <Image
+                source={astro}
+                style={styles.headerMascot}
+                contentFit="contain"
+              />
               <Text style={styles.title}>
                 {activeSubject ? activeSubject.title : "My Courses"}
               </Text>
             </View>
           </View>
 
-          <View style={styles.activeGradeBanner}>
-            <View>
-              <Text style={styles.activeGradeBadge}>GRADE {grade} SCHOLAR</Text>
-              <Text style={styles.activeGradeSubtitle}>
-                Active Math & Science Curriculum
-              </Text>
-            </View>
-            <Pressable
-              style={styles.changeGradeBtn}
-              onPress={() => router.push("/settings" as Href)}
-            >
-              <Text style={styles.changeGradeText}>Change ⚙️</Text>
-            </Pressable>
-          </View>
-
           {!activeSubject && (
-            <View style={styles.categoriesContainer}>
-              <Text style={styles.sectionHeading}>
-                CHOOSE A LEARNING DOMAIN
-              </Text>
-              {subjects.map((subj, index) => {
-                const completedCount = subj.lessons.filter((lesson) =>
-                  completedLessonKeys.includes(
-                    `${grade}_${subj.title}_${lesson.title}`,
-                  ),
-                ).length;
+            <>
+              <View style={styles.activeGradeBanner}>
+                <View>
+                  <Text style={styles.activeGradeBadge}>
+                    GRADE {grade} SCHOLAR
+                  </Text>
+                  <Text style={styles.activeGradeSubtitle}>
+                    Active Math & Science Curriculum
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.changeGradeBtn}
+                  onPress={() => router.push("/settings" as Href)}
+                >
+                  <Text style={styles.changeGradeText}>Change ⚙️</Text>
+                </Pressable>
+              </View>
 
-                return (
-                  <Pressable
-                    key={`${subj.title}-${index}`}
-                    style={styles.categoryCardPressable}
-                    onPress={() => setActiveSubject(subj)}
-                  >
-                    <LinearGradient
-                      colors={[subj.color + "38", subj.color + "12", "#0f1a34"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[
-                        styles.categoryCardGradient,
-                        { borderColor: subj.color },
-                      ]}
+              <View style={styles.categoriesContainer}>
+                <Text style={styles.sectionHeading}>
+                  CHOOSE A LEARNING DOMAIN
+                </Text>
+                {subjects.map((subj, index) => {
+                  const completedCount = subj.lessons.filter((lesson) =>
+                    completedLessonKeys.includes(
+                      grade + "_" + subj.title + "_" + lesson.title,
+                    ),
+                  ).length;
+
+                  return (
+                    <Pressable
+                      key={subj.title + "-" + index}
+                      style={styles.categoryCardPressable}
+                      onPress={() => setActiveSubject(subj)}
                     >
-                      <View style={styles.categoryCardTop}>
-                        <View
-                          style={[
-                            styles.categoryIconBubble,
-                            {
-                              backgroundColor: subj.color + "28",
-                              borderColor: subj.color + "66",
-                            },
-                          ]}
-                        >
-                          <Text style={styles.categoryIcon}>{subj.icon}</Text>
+                      <LinearGradient
+                        colors={[
+                          subj.color + "38",
+                          subj.color + "12",
+                          "#0f1a34",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[
+                          styles.categoryCardGradient,
+                          { borderColor: subj.color },
+                        ]}
+                      >
+                        <View style={styles.categoryCardTop}>
+                          <View
+                            style={[
+                              styles.categoryIconBubble,
+                              {
+                                backgroundColor: subj.color + "28",
+                                borderColor: subj.color + "66",
+                              },
+                            ]}
+                          >
+                            <Text style={styles.categoryIcon}>{subj.icon}</Text>
+                          </View>
+                          <View style={styles.categoryMeta}>
+                            <Text style={styles.categoryTitle}>
+                              {subj.title}
+                            </Text>
+                            <Text style={styles.categoryLessonCount}>
+                              {completedCount +
+                                " / " +
+                                subj.lessons.length +
+                                " Missions Completed"}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.categoryArrowBadge,
+                              {
+                                backgroundColor: subj.color + "33",
+                                borderColor: subj.color + "66",
+                              },
+                            ]}
+                          >
+                            <Text style={styles.categoryArrow}>Open</Text>
+                          </View>
                         </View>
-                        <View style={styles.categoryMeta}>
-                          <Text style={styles.categoryTitle}>{subj.title}</Text>
-                          <Text style={styles.categoryLessonCount}>
-                            {completedCount} / {subj.lessons.length} Missions
-                            Completed
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.categoryArrowBadge,
-                            {
-                              backgroundColor: subj.color + "33",
-                              borderColor: subj.color + "66",
-                            },
-                          ]}
-                        >
-                          <Text style={styles.categoryArrow}>Open</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.categoryDescription}>
-                        {subjectDescriptions[subj.title] ||
-                          "Explore essential lessons and interactive quests."}
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                );
-              })}
-            </View>
+                        <Text style={styles.categoryDescription}>
+                          {subjectDescriptions[subj.title] ||
+                            "Explore essential lessons and interactive quests."}
+                        </Text>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
           )}
 
           {activeSubject && (
             <View style={styles.missionsContainer}>
+              {/* BIG CONTINUE HERO BUTTON */}
+              {(() => {
+                let nextIdx = activeSubject.lessons.findIndex(
+                  (lesson) =>
+                    !completedLessonKeys.includes(
+                      grade + "_" + activeSubject.title + "_" + lesson.title,
+                    ),
+                );
+                if (nextIdx === -1) nextIdx = 0;
+                const targetLesson = activeSubject.lessons[nextIdx];
+
+                return (
+                  <Pressable
+                    style={styles.heroContinuePressable}
+                    onPress={() => openLesson(activeSubject, targetLesson)}
+                  >
+                    <LinearGradient
+                      colors={[activeSubject.color, activeSubject.color + "99"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.heroContinueGradient}
+                    >
+                      <View style={styles.heroContinueIconBubble}>
+                        <Text style={styles.heroContinueIcon}>🚀</Text>
+                      </View>
+                      <View style={styles.heroContinueMeta}>
+                        <Text style={styles.heroContinueTitle}>
+                          Continue Mission
+                        </Text>
+                        <Text style={styles.heroContinueSubtitle}>
+                          {targetLesson.title}
+                        </Text>
+                      </View>
+                      <View style={styles.heroContinuePlayBtn}>
+                        <Text
+                          style={[
+                            styles.heroContinuePlayText,
+                            { color: activeSubject.color },
+                          ]}
+                        >
+                          Play
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })()}
+
+              {/* LEARNER OUTCOMES */}
               <LinearGradient
                 colors={[
                   activeSubject.color + "35",
@@ -399,24 +500,32 @@ export default function ExploreScreen(): React.JSX.Element {
 
               {activeSubject.lessons.map((lesson, idx) => {
                 const isCompleted = completedLessonKeys.includes(
-                  `${grade}_${activeSubject.title}_${lesson.title}`,
+                  grade + "_" + activeSubject.title + "_" + lesson.title,
                 );
                 const isPreviousCompleted =
                   idx === 0 ||
                   completedLessonKeys.includes(
-                    `${grade}_${activeSubject.title}_${activeSubject.lessons[idx - 1].title}`,
+                    grade +
+                      "_" +
+                      activeSubject.title +
+                      "_" +
+                      activeSubject.lessons[idx - 1].title,
                   );
                 const isUnlocked = isPreviousCompleted;
 
                 return (
                   <Pressable
-                    key={`${activeSubject.title}-${lesson.title}-${idx}`}
+                    key={activeSubject.title + "-" + lesson.title + "-" + idx}
                     style={styles.lessonPressable}
                     onPress={() => {
                       if (!isUnlocked) {
                         Alert.alert(
                           "Mission Locked",
-                          `Complete Mission ${idx} to unlock "${lesson.title}"!`,
+                          "Complete Mission " +
+                            idx +
+                            ' to unlock "' +
+                            lesson.title +
+                            '"!',
                         );
                         return;
                       }
@@ -459,7 +568,11 @@ export default function ExploreScreen(): React.JSX.Element {
                         ]}
                       >
                         <Text style={styles.lessonBadgeText}>
-                          {isCompleted ? "✓" : isUnlocked ? `${idx + 1}` : "🔒"}
+                          {isCompleted
+                            ? "✓"
+                            : isUnlocked
+                              ? "" + (idx + 1)
+                              : "🔒"}
                         </Text>
                       </View>
 
@@ -476,7 +589,8 @@ export default function ExploreScreen(): React.JSX.Element {
                           {isCompleted
                             ? "Completed (+15 XP earned)"
                             : isUnlocked
-                              ? `${lesson.difficulty} Mission • Ready to Explore`
+                              ? lesson.difficulty +
+                                " Mission • Ready to Explore"
                               : "Locked Mission"}
                         </Text>
                       </View>
@@ -620,10 +734,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 10,
+    marginBottom: 20,
   },
-  back: { color: "#e582ff", fontWeight: "800", fontSize: 14 },
-  headerTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
-  headerMascot: { width: 40, height: 40 },
+  back: { color: "#e582ff", fontWeight: "800", fontSize: 16 },
+  headerTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginRight: 24,
+  },
+  headerMascot: { width: 48, height: 48 },
   title: { color: "#fff", fontWeight: "900", fontSize: 21 },
   activeGradeBanner: {
     flexDirection: "row",
@@ -635,7 +756,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginVertical: 14,
+    marginBottom: 16,
   },
   activeGradeBadge: {
     color: "#ffd05a",
@@ -730,11 +851,62 @@ const styles = StyleSheet.create({
   missionsContainer: {
     gap: 10,
   },
+  heroContinuePressable: {
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  heroContinueGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 18,
+    gap: 14,
+  },
+  heroContinueIconBubble: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroContinueIcon: {
+    fontSize: 28,
+  },
+  heroContinueMeta: {
+    flex: 1,
+  },
+  heroContinueTitle: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  heroContinueSubtitle: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  heroContinuePlayBtn: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  heroContinuePlayText: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
   outcomesCard: {
     borderWidth: 1.5,
     borderRadius: 18,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 20,
   },
   outcomesHeader: {
     flexDirection: "row",
@@ -830,8 +1002,10 @@ const styles = StyleSheet.create({
   },
   lessonCardArrow: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
+    width: 55,
+    textAlign: "center",
   },
 });
 

@@ -26,6 +26,7 @@ const target = require("../../assets/BiosphereQuestAssets/target.png");
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 const LAST_LESSON_KEY = "@biosphere_last_lesson_v1";
+const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
 const RECENT_GAMES_KEY = "@biosphere_recent_games_v1";
 
 interface ActiveLessonData {
@@ -78,6 +79,8 @@ export default function HomeScreen(): React.JSX.Element {
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
   const [lastLesson, setLastLesson] = useState<ActiveLessonData | null>(null);
+  const [hasCourseRecords, setHasCourseRecords] = useState(false);
+  const [welcomeSubjects, setWelcomeSubjects] = useState<string[]>([]);
   const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
 
   const nextLevelXp = progress.nextLevelXp || 100;
@@ -104,7 +107,7 @@ export default function HomeScreen(): React.JSX.Element {
         if (checkIsBedtime(controls.bedtimeHour)) {
           setIsLocked(true);
           setLockMessage(
-            `🌙 Bedtime Lock Active!\nYour parent set bedtime for ${controls.bedtimeHour}. Time to rest!`,
+            "🌙 Bedtime Lock Active!\nYour parent set bedtime for " + controls.bedtimeHour + ". Time to rest!",
           );
           return;
         }
@@ -158,7 +161,7 @@ export default function HomeScreen(): React.JSX.Element {
     const formattedOld = String(oldLvl).padStart(2, "0");
     const formattedNew = String(newLvl).padStart(2, "0");
     setLevelUpText(
-      `Congratulations! You leveled up from ${formattedOld} to ${formattedNew}!`,
+      "Congratulations! You leveled up from " + formattedOld + " to " + formattedNew + "!",
     );
 
     setShowLevelUp(true);
@@ -202,9 +205,11 @@ export default function HomeScreen(): React.JSX.Element {
         firstTwoKeys = ["flashcards", "ninja"];
       }
 
+      // Filter out the recent keys and the "quiz" so the Suggested game is truly random
       const remainingGames = ALL_ARCADE_GAMES.filter(
-        (g) => !firstTwoKeys.includes(g.key),
+        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz"
       );
+      
       const randomPicked =
         remainingGames[Math.floor(Math.random() * remainingGames.length)] ||
         remainingGames[0];
@@ -226,7 +231,7 @@ export default function HomeScreen(): React.JSX.Element {
           title: randomPicked.title,
           subtitle: randomPicked.subtitle,
           icon: randomPicked.icon,
-          badge: "Featured",
+          badge: "Suggested",
           isRecent: false,
         },
       ];
@@ -242,6 +247,13 @@ export default function HomeScreen(): React.JSX.Element {
       const guestName = await AsyncStorage.getItem("explorerName");
       const guestUsername = await AsyncStorage.getItem("explorerUsername");
       const guestGrade = await AsyncStorage.getItem("explorerGrade");
+      const initialSubjects = await AsyncStorage.getItem("explorerSubjects");
+
+      if (initialSubjects) {
+        setWelcomeSubjects(JSON.parse(initialSubjects));
+      } else {
+        setWelcomeSubjects([]);
+      }
 
       let resolvedGrade = 1;
 
@@ -315,35 +327,29 @@ export default function HomeScreen(): React.JSX.Element {
       }
 
       const lastLessonRaw = await AsyncStorage.getItem(LAST_LESSON_KEY);
+      const completedRaw = await AsyncStorage.getItem(COMPLETED_LESSONS_KEY);
+      let recordsFound = false;
+
       if (lastLessonRaw) {
         const parsedLast = JSON.parse(lastLessonRaw);
-        if (parsedLast.grade === resolvedGrade) {
+        if (parsedLast && parsedLast.lessonTitle) {
           setLastLesson(parsedLast);
-          return;
+          recordsFound = true;
         }
       }
 
-      const gradeSubjects = curriculum[resolvedGrade] || curriculum[1];
-      if (gradeSubjects && gradeSubjects.length > 0) {
-        const firstSub = gradeSubjects[0];
-        const firstLes = firstSub.lessons[0];
-        setLastLesson({
-          grade: resolvedGrade,
-          subjectTitle: firstSub.title,
-          lessonTitle: firstLes.title,
-          icon: firstSub.icon,
-          difficulty: firstLes.difficulty,
-        });
+      if (completedRaw) {
+        const parsedCompleted = JSON.parse(completedRaw);
+        if (Array.isArray(parsedCompleted) && parsedCompleted.length > 0) {
+          recordsFound = true;
+        }
       }
+
+      setHasCourseRecords(recordsFound);
     } catch (e) {
       console.error("Failed to load shared progress on home", e);
     }
   };
-
-  useEffect(() => {
-    loadSharedProgress();
-    loadArcadeGames();
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -368,6 +374,13 @@ export default function HomeScreen(): React.JSX.Element {
     router.push({
       pathname: "/games",
       params: { autoOpenGame: gameKey },
+    } as any);
+  };
+
+  const handleOpenSubjectFromHome = (subjectTitle: string) => {
+    router.push({
+      pathname: "/explore",
+      params: { autoOpenSubject: subjectTitle },
     } as any);
   };
 
@@ -429,40 +442,104 @@ export default function HomeScreen(): React.JSX.Element {
             </View>
           </View>
 
-          <Text style={styles.section}>Continue Learning</Text>
-          <View style={styles.cards}>
-            <Pressable
-              onPress={() => navigateToRoute("/explore")}
-              style={styles.course}
-            >
-              <Text style={styles.courseIcon}>
-                {lastLesson ? lastLesson.icon : "📖"}
-              </Text>
-              <Text style={styles.courseTitle} numberOfLines={1}>
-                {lastLesson ? lastLesson.lessonTitle : "Start Mission"}
-              </Text>
-              <Text style={styles.courseSub}>
-                {lastLesson
-                  ? `${lastLesson.subjectTitle} • Grade ${lastLesson.grade}`
-                  : `Grade ${userGrade}`}
-              </Text>
-            </Pressable>
+          {!hasCourseRecords ? (
+            <View>
+              <Text style={styles.section}>Start Learning</Text>
+              {welcomeSubjects && welcomeSubjects.length > 0 ? (
+                <View style={styles.cards}>
+                  {(() => {
+                    const gradeSubjs = curriculum[parseInt(userGrade, 10) || 1] || curriculum[1];
+                    let displaySubjs = welcomeSubjects
+                      .map((ws) => gradeSubjs.find((s) => s.title.toLowerCase() === ws.toLowerCase()))
+                      .filter(Boolean) as Subject[];
+                    
+                    if (displaySubjs.length === 1 && gradeSubjs.length > 1) {
+                      const extra = gradeSubjs.find((s) => s.title !== displaySubjs[0].title);
+                      if (extra) displaySubjs.push(extra);
+                    }
+                    if (displaySubjs.length === 0) {
+                      displaySubjs = gradeSubjs.slice(0, 2);
+                    }
 
-            {secondarySubject && (
-              <Pressable
-                onPress={() => navigateToRoute("/explore")}
-                style={styles.course}
-              >
-                <Text style={styles.courseIcon}>{secondarySubject.icon}</Text>
-                <Text style={styles.courseTitle} numberOfLines={1}>
-                  {secondarySubject.lessons[0]?.title || secondarySubject.title}
-                </Text>
-                <Text style={styles.courseSub}>
-                  {secondarySubject.title} • Grade {userGrade}
-                </Text>
-              </Pressable>
-            )}
-          </View>
+                    return displaySubjs.slice(0, 2).map((subjDef, idx) => (
+                      <Pressable
+                        key={idx}
+                        onPress={() => handleOpenSubjectFromHome(subjDef.title)}
+                        style={styles.course}
+                      >
+                        <Text style={styles.courseIcon}>{subjDef.icon}</Text>
+                        <Text style={styles.courseTitle} numberOfLines={1}>{subjDef.title}</Text>
+                        <Text style={styles.courseSub}>Grade {userGrade}</Text>
+                      </Pressable>
+                    ));
+                  })()}
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.startLearningCard}
+                  onPress={() => navigateToRoute("/explore")}
+                >
+                  <View style={styles.startLearningContent}>
+                    <View style={styles.startLearningIconBubble}>
+                      <Text style={styles.startLearningIcon}>🚀</Text>
+                    </View>
+                    <View style={styles.startLearningMeta}>
+                      <Text style={styles.startLearningTitle}>Explore Lessons</Text>
+                      <Text style={styles.startLearningSubtitle}>
+                        Begin your Grade {userGrade} journey with interactive missions!
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.startLearningButton}>
+                    <Text style={styles.startLearningButtonText}>Go to Courses</Text>
+                  </View>
+                </Pressable>
+              )}
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.section}>Continue Learning</Text>
+              <View style={styles.cards}>
+                <Pressable
+                  onPress={() => {
+                    if (lastLesson) {
+                      handleOpenSubjectFromHome(lastLesson.subjectTitle);
+                    } else {
+                      navigateToRoute("/explore");
+                    }
+                  }}
+                  style={styles.course}
+                >
+                  <Text style={styles.courseIcon}>
+                    {lastLesson ? lastLesson.icon : "📖"}
+                  </Text>
+                  <Text style={styles.courseTitle} numberOfLines={1}>
+                    {lastLesson ? lastLesson.lessonTitle : "Start Mission"}
+                  </Text>
+                  <Text style={styles.courseSub}>
+                    {lastLesson
+                      ? `${lastLesson.subjectTitle} • Grade ${lastLesson.grade}`
+                      : `Grade ${userGrade}`}
+                  </Text>
+                </Pressable>
+
+                {secondarySubject && (
+                  <Pressable
+                    onPress={() => handleOpenSubjectFromHome(secondarySubject.title)}
+                    style={styles.course}
+                  >
+                    <Text style={styles.courseIcon}>{secondarySubject.icon}</Text>
+                    <Text style={styles.courseTitle} numberOfLines={1}>
+                      {secondarySubject.lessons[0]?.title || secondarySubject.title}
+                    </Text>
+                    <Text style={styles.courseSub}>
+                      {secondarySubject.title} • Grade {userGrade}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
 
           <Pressable
             style={styles.challenge}
@@ -574,7 +651,7 @@ const styles = StyleSheet.create({
     left: 18,
     right: 18,
     zIndex: 999,
-    backgroundColor: "#464<ae",
+    backgroundColor: "#4642ae",
     borderColor: "#ffdf4e",
     borderWidth: 2,
     borderRadius: 16,
@@ -634,6 +711,55 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 20,
     marginBottom: 9,
+  },
+  startLearningCard: {
+    backgroundColor: "#16234b",
+    borderColor: "#4f46e5",
+    borderWidth: 1.5,
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  startLearningContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  startLearningIconBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#253468",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  startLearningIcon: {
+    fontSize: 24,
+  },
+  startLearningMeta: {
+    flex: 1,
+  },
+  startLearningTitle: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  startLearningSubtitle: {
+    color: "#a5b8de",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  startLearningButton: {
+    backgroundColor: "#4f46e5",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  startLearningButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
   },
   cards: { flexDirection: "row", gap: 10 },
   course: {

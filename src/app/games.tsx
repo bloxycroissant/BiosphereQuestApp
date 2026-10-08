@@ -1,21 +1,34 @@
-import { GradientSafeAreaView } from '@/components/gradient-safe-area';
-import { useProgress } from '@/hooks/use-progress';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAudioPlayer } from 'expo-audio';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CodebreakerGame } from './components/minigames/CodebreakerGame';
-import { FlashcardGame } from './components/minigames/FlashcardGame';
-import { MemoryMatchGame } from './components/minigames/MemoryMatchGame';
-import { NumberNinjaGame } from './components/minigames/NumberNinjaGame';
-import { QuizGame } from './components/minigames/QuizGame';
-import { WhackANumberGame } from './components/minigames/WhackANumberGame';
-import { WordScrambleGame } from './components/minigames/WordScrambleGame';
-import TutorialModal from './components/TutorialModal';
-import { GradeLevel, Subject } from './data/questionGenerators';
+﻿import { GradientSafeAreaView } from "@/components/gradient-safe-area";
+import { useProgress } from "@/hooks/use-progress";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { CodebreakerGame } from "./components/minigames/CodebreakerGame";
+import { FlashcardGame } from "./components/minigames/FlashcardGame";
+import { MemoryMatchGame } from "./components/minigames/MemoryMatchGame";
+import { NumberNinjaGame } from "./components/minigames/NumberNinjaGame";
+import { QuizGame } from "./components/minigames/QuizGame";
+import { WhackANumberGame } from "./components/minigames/WhackANumberGame";
+import { WordScrambleGame } from "./components/minigames/WordScrambleGame";
+import TutorialModal from "./components/TutorialModal";
+import { GradeLevel, Subject } from "./data/questionGenerators";
 
-const PARENT_CONTROLS_KEY = '@biosphere_parent_controls_v1';
-const gameThemeMusic = require('../../assets/BiosphereQuestSoundEffectsandMusic/The Game Show Theme Music - (192 Kbps).mp3');
+const PROFILE_STORAGE_KEY = "@biosphere_profile_data_v1";
+const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
+const RECENT_GAMES_KEY = "@biosphere_recent_games_v1";
+const gameThemeMusic = require("../../assets/BiosphereQuestSoundEffectsandMusic/The Game Show Theme Music - (192 Kbps).mp3");
 
 interface GameItem {
   key: string;
@@ -34,145 +47,161 @@ interface GameItem {
 
 const gameCatalog: GameItem[] = [
   {
-    key: 'flashcards',
-    title: 'Flashcards',
-    subtitle: 'Formulas & definitions',
-    icon: require('../../assets/BiosphereQuestAssets/Flashcards Icon.png'),
-    difficulty: 'Easy',
-    xpText: '+80 XP',
-    badge: '🧠 Smart',
+    key: "flashcards",
+    title: "Flashcards",
+    subtitle: "Formulas & definitions",
+    icon: require("../../assets/BiosphereQuestAssets/Flashcards Icon.png"),
+    difficulty: "Easy",
+    xpText: "+80 XP",
+    badge: "🧠 Smart",
     tutorial: {
-      objective: 'Review essential formulas and terms to strengthen your core knowledge.',
+      objective: "Review essential formulas and terms to strengthen your core knowledge.",
       steps: [
-        'Read the prompt or question carefully.',
-        'Tap the card to flip and reveal the answer.',
-        'Swipe or select your confidence level to proceed.'
+        "Read the prompt or question carefully.",
+        "Tap the card to flip and reveal the answer.",
+        "Swipe or select your confidence level to proceed.",
       ],
     },
   },
   {
-    key: 'scramble',
-    title: 'Word Scramble',
-    subtitle: 'Science terminology',
-    icon: require('../../assets/BiosphereQuestAssets/Word Scramble.png'),
-    difficulty: 'Medium',
-    xpText: '+90 XP',
-    badge: '🔤 Fun',
+    key: "scramble",
+    title: "Word Scramble",
+    subtitle: "Science terminology",
+    icon: require("../../assets/BiosphereQuestAssets/Word Scramble.png"),
+    difficulty: "Medium",
+    xpText: "+90 XP",
+    badge: "🔤 Fun",
     tutorial: {
-      objective: 'Unscramble the letters to correctly spell key science and math terms.',
+      objective: "Unscramble the letters to correctly spell key science and math terms.",
       steps: [
-        'Look at the scrambled letters on screen.',
-        'Tap letters in the correct order to spell the word.',
-        'Submit your answer before the timer runs out!'
+        "Look at the scrambled letters on screen.",
+        "Tap letters in the correct order to spell the word.",
+        "Submit your answer before the timer runs out!",
       ],
     },
   },
   {
-    key: 'memory',
-    title: 'Memory Match',
-    subtitle: 'Flip & pair icons',
-    icon: require('../../assets/BiosphereQuestAssets/Brain Icon.png'),
-    difficulty: 'Medium',
-    xpText: 'Up to +240 XP',
-    badge: '⭐ Match',
+    key: "memory",
+    title: "Memory Match",
+    subtitle: "Flip & pair icons",
+    icon: require("../../assets/BiosphereQuestAssets/Brain Icon.png"),
+    difficulty: "Medium",
+    xpText: "Up to +240 XP",
+    badge: "⭐ Match",
     tutorial: {
-      objective: 'Flip and match pairs of science icons to test your memory skills.',
+      objective: "Flip and match pairs of science icons to test your memory skills.",
       steps: [
-        'Tap a card to flip it over.',
-        'Find its matching pair among the hidden cards.',
-        'Clear all pairs as fast as possible to earn bonus XP.'
+        "Tap a card to flip it over.",
+        "Find its matching pair among the hidden cards.",
+        "Clear all pairs as fast as possible to earn bonus XP.",
       ],
     },
   },
   {
-    key: 'ninja',
-    title: 'Number Ninja',
-    subtitle: 'Rapid arithmetic',
-    icon: require('../../assets/BiosphereQuestAssets/Ninja Icon.png'),
-    difficulty: 'Hard',
-    xpText: '+50 XP/ ans',
-    badge: '⚡ Swift',
+    key: "ninja",
+    title: "Number Ninja",
+    subtitle: "Rapid arithmetic",
+    icon: require("../../assets/BiosphereQuestAssets/Ninja Icon.png"),
+    difficulty: "Hard",
+    xpText: "+50 XP/ ans",
+    badge: "⚡ Swift",
     tutorial: {
-      objective: 'Solve rapid-fire arithmetic problems quickly before time runs out.',
+      objective: "Solve rapid-fire arithmetic problems quickly before time runs out.",
       steps: [
-        'Read the math equation quickly.',
-        'Type or select the correct numerical result.',
-        'Keep your streak alive for maximum XP gains.'
+        "Read the math equation quickly.",
+        "Type or select the correct numerical result.",
+        "Keep your streak alive for maximum XP gains.",
       ],
     },
   },
   {
-    key: 'whack',
-    title: 'Whack-a-Number',
-    subtitle: 'Pop correct target',
-    icon: require('../../assets/BiosphereQuestAssets/Hammer Icon.png'),
-    difficulty: 'Hard',
-    xpText: 'Up to +120 XP',
-    badge: '🎯 Action',
+    key: "whack",
+    title: "Whack-a-Number",
+    subtitle: "Pop correct target",
+    icon: require("../../assets/BiosphereQuestAssets/Hammer Icon.png"),
+    difficulty: "Hard",
+    xpText: "Up to +120 XP",
+    badge: "🎯 Action",
     tutorial: {
-      objective: 'Tap the correct popping numbers matching the prompt as fast as you can.',
+      objective: "Tap the correct popping numbers matching the prompt as fast as you can.",
       steps: [
-        'Read the target instruction at the top.',
-        'Tap the matching numbers as they pop up.',
-        'Avoid tapping incorrect targets!'
+        "Read the target instruction at the top.",
+        "Tap the matching numbers as they pop up.",
+        "Avoid tapping incorrect targets!",
       ],
     },
   },
   {
-    key: 'codebreaker',
-    title: 'Codebreaker',
-    subtitle: 'Defuse the vault',
-    icon: require('../../assets/BiosphereQuestAssets/Bomb Icon.png'),
-    difficulty: 'Impossible',
-    xpText: 'Up to +500 XP',
-    badge: '🔥 Expert',
+    key: "codebreaker",
+    title: "Codebreaker",
+    subtitle: "Defuse the vault",
+    icon: require("../../assets/BiosphereQuestAssets/Bomb Icon.png"),
+    difficulty: "Impossible",
+    xpText: "Up to +500 XP",
+    badge: "🔥 Expert",
     tutorial: {
-      objective: 'Solve the secure combinations to defuse the vault before time expires.',
+      objective: "Solve the secure combinations to defuse the vault before time expires.",
       steps: [
-        'Analyze clues and patterns provided on screen.',
-        'Input the correct digit combination.',
-        'Defuse the vault successfully before time runs out.'
+        "Analyze clues and patterns provided on screen.",
+        "Input the correct digit combination.",
+        "Defuse the vault successfully before time runs out.",
       ],
     },
   },
 ];
 
-const getDifficultyColor = (difficulty: string) => {
-  switch (difficulty) {
-    case 'Easy':
-      return '#39d4ff';
-    case 'Medium':
-      return '#4ade80';
-    case 'Hard':
-      return '#facc15';
-    case 'Impossible':
-      return '#ef4444';
+const quizGameItem: GameItem = {
+  key: "quiz",
+  title: "Math & Science Epic Quiz",
+  subtitle: "5 questions • Earn massive XP",
+  icon: require("../../assets/BiosphereQuestAssets/Brain Icon.png"),
+  difficulty: "Easy",
+  xpText: "+150 XP",
+  badge: "🚀 Epic",
+  tutorial: {
+    objective: "Answer multiple-choice questions correctly to score big XP points.",
+    steps: [
+      "Read each multiple-choice question carefully.",
+      "Select the best answer from the given options.",
+      "Complete all questions to claim your XP reward.",
+    ],
+  },
+};
+
+const getDifficultyColor = (diff: string) => {
+  switch (diff) {
+    case "Easy":
+      return "#39d4ff";
+    case "Medium":
+      return "#4ade80";
+    case "Hard":
+      return "#facc15";
+    case "Impossible":
+      return "#ef4444";
     default:
-      return '#4ade80';
+      return "#4ade80";
   }
 };
 
-export default function GamesScreen({ navigation }: { navigation?: any }) {
+export default function GamesScreen() {
+  const params = useLocalSearchParams<{ autoOpenGame?: string }>();
   const { leaderboardXp, addXp } = useProgress();
-  const [difficulty, setDifficulty] = useState('All');
+  const [difficulty, setDifficulty] = useState("All");
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [activeGameRunning, setActiveGameRunning] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState(1);
   const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(null);
   const [memorySubjectPickerVisible, setMemorySubjectPickerVisible] = useState(false);
-  const [memorySubject, setMemorySubject] = useState<Subject>('Both');
+  const [memorySubject, setMemorySubject] = useState<Subject>("Both");
 
-  // Background Music & Mute States using expo-audio
   const musicPlayer = useAudioPlayer(gameThemeMusic);
   const [isMuted, setIsMuted] = useState(false);
 
-  // New State for custom Grade Locked Pop-up Screen
   const [lockedModalInfo, setLockedModalInfo] = useState<{ visible: boolean; gradeNum: number }>({
     visible: false,
     gradeNum: 1,
   });
 
-  // Parental Control States
   const [studyFirstEnabled, setStudyFirstEnabled] = useState(false);
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
@@ -201,12 +230,38 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   const leaderboardPulse = useRef(new Animated.Value(1)).current;
   const memorySubjectModalAnim = useRef(new Animated.Value(0)).current;
 
-  // Load parent controls rules AND the user's saved grade
+  // --- NEW: DYNAMIC STUDY TIME TRACKER ---
+  const startTimeRef = useRef(Date.now());
+  const timeSavedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      const saveStudyTime = async () => {
+        if (timeSavedRef.current) return;
+        timeSavedRef.current = true;
+        const elapsedMs = Date.now() - startTimeRef.current;
+        const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+
+        try {
+          const profileRaw = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+          if (profileRaw) {
+            const profile = JSON.parse(profileRaw);
+            profile.studyMinutes = (profile.studyMinutes || 0) + elapsedMinutes;
+            await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+          }
+        } catch (e) {
+          console.error("Failed to save study time", e);
+        }
+      };
+      void saveStudyTime();
+    };
+  }, []);
+  // ---------------------------------------
+
   useEffect(() => {
     fetchInitialData();
   }, []);
 
-  // Handle music playback using regular useEffect with unmount cleanup
   useEffect(() => {
     if (musicPlayer) {
       try {
@@ -214,7 +269,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         musicPlayer.volume = isMuted ? 0 : 0.4;
         musicPlayer.play();
       } catch (e) {
-        console.log('Error playing background music', e);
+        console.log("Error playing background music", e);
       }
     }
 
@@ -224,7 +279,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
           musicPlayer.pause();
           musicPlayer.seekTo(0);
         } catch (e) {
-          console.log('Error pausing background music on unmount', e);
+          console.log("Error pausing background music on unmount", e);
         }
       }
     };
@@ -241,20 +296,29 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         setIsMuted(true);
       }
     } catch (error) {
-      console.log('Failed to toggle audio mute', error);
+      console.log("Failed to toggle audio mute", error);
+    }
+  };
+
+  const recordRecentGame = async (gameKey: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(RECENT_GAMES_KEY);
+      const recents: string[] = raw ? JSON.parse(raw) : [];
+      const updated = [gameKey, ...recents.filter((k) => k !== gameKey)].slice(0, 6);
+      await AsyncStorage.setItem(RECENT_GAMES_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save recent game", e);
     }
   };
 
   const fetchInitialData = async () => {
     try {
-      // Fetch the globally saved user grade
-      const gradeData = await AsyncStorage.getItem('explorerGrade');
+      const gradeData = await AsyncStorage.getItem("explorerGrade");
       if (gradeData) {
-        const numericGrade = parseInt(gradeData.replace(/[^0-9]/g, ''), 10) || 1;
+        const numericGrade = parseInt(gradeData.replace(/[^0-9]/g, ""), 10) || 1;
         setSelectedGrade(numericGrade as GradeLevel);
       }
 
-      // Fetch parental controls
       const data = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       if (data) {
         const controls = JSON.parse(data);
@@ -270,27 +334,42 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     }
   };
 
-  // Get matching items based on selected filter
-  const matchedGames = difficulty === 'All' 
-    ? gameCatalog 
-    : gameCatalog.filter(item => item.difficulty === difficulty);
+  // Intercept the autoOpenGame router parameter from Home Screen
+  useEffect(() => {
+    if (params.autoOpenGame) {
+      const targetKey = String(params.autoOpenGame);
+      const targetGame =
+        targetKey === "quiz"
+          ? quizGameItem
+          : gameCatalog.find((g) => g.key === targetKey);
 
-  // Pad items up to a total of 6 slots so the 2x3 grid structure stays completely locked in
+      if (targetGame) {
+        void recordRecentGame(targetGame.key);
+        setSelectedGame(targetGame.key);
+        setSelectedTutorialGame(targetGame); // Directly pop the tutorial modal
+      }
+    }
+  }, [params.autoOpenGame]);
+
+  const matchedGames =
+    difficulty === "All"
+      ? gameCatalog
+      : gameCatalog.filter((item) => item.difficulty === difficulty);
+
   const paddedGames: GameItem[] = [...matchedGames];
   while (paddedGames.length < 6) {
-    paddedGames.push({ 
-      isPlaceholder: true, 
+    paddedGames.push({
+      isPlaceholder: true,
       key: `placeholder-${paddedGames.length}`,
-      title: '',
-      subtitle: '',
+      title: "",
+      subtitle: "",
       icon: null,
-      difficulty: '',
-      xpText: '',
-      badge: '',
+      difficulty: "",
+      xpText: "",
+      badge: "",
     });
   }
 
-  // Explicitly split into 2 rows of 3 columns
   const chunkedGames = [
     paddedGames.slice(0, 3),
     paddedGames.slice(3, 6),
@@ -368,11 +447,13 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
 
     if (studyFirstEnabled) {
       Alert.alert(
-        "Mini-Games Locked", 
-        "Your parent requires you to finish your lessons before unlocking mini-games!"
+        "Mini-Games Locked",
+        "Your parent requires you to finish your lessons before unlocking mini-games!",
       );
       return;
     }
+
+    void recordRecentGame(gameItem.key);
 
     const animKey = gameItem.key as keyof typeof cardAnims;
     const anim = cardAnims[animKey];
@@ -407,7 +488,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       const gradeKey = `Grade ${selectedGrade}`;
       if (gradeLocks[gradeKey]) {
         setLockedModalInfo({ visible: true, gradeNum: selectedGrade });
-      } else if (selectedGame === 'memory') {
+      } else if (selectedGame === "memory") {
         setMemorySubjectPickerVisible(true);
       } else {
         setActiveGameRunning(true);
@@ -419,8 +500,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     closeTutorialWithAnimation();
   };
 
-  const handleMemorySubjectSelect = (subject: Subject) => {
-    setMemorySubject(subject);
+  const handleMemorySubjectSelect = (subj: Subject) => {
+    setMemorySubject(subj);
     setMemorySubjectPickerVisible(false);
     setActiveGameRunning(true);
   };
@@ -434,8 +515,10 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   };
 
   const handleCancel = () => {
-    if (navigation && navigation.goBack) {
-      navigation.goBack();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/home" as any);
     }
   };
 
@@ -454,19 +537,19 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
     } as any;
 
     switch (selectedGame) {
-      case 'quiz':
+      case "quiz":
         return <QuizGame {...commonProps} />;
-      case 'flashcards':
+      case "flashcards":
         return <FlashcardGame {...commonProps} />;
-      case 'scramble':
+      case "scramble":
         return <WordScrambleGame {...commonProps} />;
-      case 'ninja':
+      case "ninja":
         return <NumberNinjaGame {...commonProps} />;
-      case 'memory':
+      case "memory":
         return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
-      case 'whack':
+      case "whack":
         return <WhackANumberGame {...commonProps} />;
-      case 'codebreaker':
+      case "codebreaker":
         return <CodebreakerGame {...commonProps} />;
       default:
         return <QuizGame {...commonProps} />;
@@ -474,15 +557,14 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
   };
 
   return (
-    <GradientSafeAreaView style={styles.safeArea} edges={['top']}>
+    <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.topBar}>
         <Pressable onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>  Back</Text>
+          <Text style={styles.cancelText}>Back</Text>
         </Pressable>
         <View style={styles.topBarRightContainer}>
-          {/* Mute / Unmute Button */}
           <Pressable onPress={toggleMute} style={styles.muteButton}>
-            <Text style={styles.muteIconText}>{isMuted ? '🔇' : '🔊'}</Text>
+            <Text style={styles.muteIconText}>{isMuted ? "🔇" : "🔊"}</Text>
           </Pressable>
           <View style={styles.levelIndicatorBadge}>
             <Text style={styles.levelIndicatorText}>🌟 Grade {selectedGrade}</Text>
@@ -504,38 +586,36 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             ],
           }}
         >
-          {/* Header Row */}
           <View style={styles.headingRow}>
             <View>
               <Text style={styles.title}>🎮 Mini-Game Arcade</Text>
               <Text style={styles.subtitle}>Play, learn & level up your XP!</Text>
             </View>
             <Image
-              source={require('../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png')}
+              source={require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png")}
               style={styles.mascotImage}
               resizeMode="contain"
             />
           </View>
 
-          {/* Featured Card */}
           <Animated.View style={{ transform: [{ scale: cardAnims.quiz }] }}>
             <Pressable
               style={styles.featured}
               onPress={() => {
                 handleGamePress({
-                  key: 'quiz',
-                  title: 'Math & Science Epic Quiz',
-                  subtitle: '5 questions • Earn massive XP',
-                  icon: require('../../assets/BiosphereQuestAssets/Brain Icon.png'),
-                  difficulty: 'Easy',
-                  xpText: '+150 XP',
-                  badge: '🚀 Epic',
+                  key: "quiz",
+                  title: "Math & Science Epic Quiz",
+                  subtitle: "5 questions • Earn massive XP",
+                  icon: require("../../assets/BiosphereQuestAssets/Brain Icon.png"),
+                  difficulty: "Easy",
+                  xpText: "+150 XP",
+                  badge: "🚀 Epic",
                   tutorial: {
-                    objective: 'Answer multiple-choice questions correctly to score big XP points.',
+                    objective: "Answer multiple-choice questions correctly to score big XP points.",
                     steps: [
-                      'Read each multiple-choice question carefully.',
-                      'Select the best answer from the given options.',
-                      'Complete all questions to claim your XP reward.',
+                      "Read each multiple-choice question carefully.",
+                      "Select the best answer from the given options.",
+                      "Complete all questions to claim your XP reward.",
                     ],
                   },
                 });
@@ -559,9 +639,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             </Pressable>
           </Animated.View>
 
-          {/* Filter Pills */}
           <View style={styles.filterRow}>
-            {['All', 'Easy', 'Medium', 'Hard', 'Impossible'].map((item: string) => {
+            {["All", "Easy", "Medium", "Hard", "Impossible"].map((item: string) => {
               const anim = filterAnims[item as keyof typeof filterAnims];
               return (
                 <Animated.View key={item} style={{ transform: [{ scale: anim }] }}>
@@ -578,7 +657,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             })}
           </View>
 
-          {/* Locked Strict 2x3 Grid Container */}
           <Animated.View style={[styles.grid, { transform: [{ scale: gridAnim }] }]}>
             {chunkedGames.map((row, rowIndex) => (
               <View key={`row-${rowIndex}`} style={styles.gridRow}>
@@ -591,14 +669,14 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
                   const anim = cardAnims[item.key as keyof typeof cardAnims] || new Animated.Value(1);
 
                   return (
-                    <Animated.View 
-                      key={item.key} 
+                    <Animated.View
+                      key={item.key}
                       style={[
-                        styles.cardWrapper, 
-                        { 
-                          flex: 1, 
-                          transform: [{ scale: anim }]
-                        }
+                        styles.cardWrapper,
+                        {
+                          flex: 1,
+                          transform: [{ scale: anim }],
+                        },
                       ]}
                     >
                       <Pressable
@@ -636,7 +714,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             ))}
           </Animated.View>
 
-          {/* Leaderboard Section */}
           <Text style={styles.leaderboardMainTitle}>🏆 Weekly Champions</Text>
           <Animated.View
             style={[styles.leaderboardCard, { transform: [{ scale: leaderboardPulse }] }]}
@@ -653,7 +730,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         </Animated.View>
       </ScrollView>
 
-      {/* Tutorial Modal Popup with Animation */}
       {selectedTutorialGame && (
         <Animated.View
           style={[
@@ -670,7 +746,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
               ],
             },
           ]}
-          pointerEvents={selectedTutorialGame ? 'auto' : 'none'}
+          pointerEvents={selectedTutorialGame ? "auto" : "none"}
         >
           <TutorialModal
             game={selectedTutorialGame}
@@ -680,7 +756,6 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
         </Animated.View>
       )}
 
-      {/* Custom Grade Locked Pop-up Screen Modal */}
       {lockedModalInfo.visible && (
         <Animated.View
           style={[
@@ -697,7 +772,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
               ],
             },
           ]}
-          pointerEvents={lockedModalInfo.visible ? 'auto' : 'none'}
+          pointerEvents={lockedModalInfo.visible ? "auto" : "none"}
         >
           <View style={styles.modalBackdropCenter}>
             <View style={styles.lockedCard}>
@@ -728,7 +803,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
       )}
 
       <Modal visible={activeGameRunning} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: '#091426' }}>
+        <View style={{ flex: 1, backgroundColor: "#091426" }}>
           {renderActiveGame()}
         </View>
       </Modal>
@@ -760,8 +835,8 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             <Text style={styles.subjectDescription}>Choose what you want to practice in Memory Match.</Text>
             <View style={styles.subjectChoices}>
               {([
-                { value: 'Science', icon: '🔬', color: '#32d583', copy: 'Explore nature' },
-                { value: 'Math', icon: '📐', color: '#38bdf8', copy: 'Solve & discover' },
+                { value: "Science", icon: "🔬", color: "#32d583", copy: "Explore nature" },
+                { value: "Math", icon: "📐", color: "#38bdf8", copy: "Solve & discover" },
               ] as const).map((choice) => (
                 <Pressable
                   key={choice.value}
@@ -781,7 +856,7 @@ export default function GamesScreen({ navigation }: { navigation?: any }) {
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => handleMemorySubjectSelect('Both')}
+              onPress={() => handleMemorySubjectSelect("Both")}
               style={({ pressed }) => [styles.bothChoice, pressed && styles.choicePressed]}
             >
               <Text style={styles.bothChoiceIcon}>🌟</Text>
@@ -855,218 +930,213 @@ function RankRow({ rank, initials, name, xp, avatarBg }: { rank: string; initial
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#091426' },
+  safeArea: { flex: 1, backgroundColor: "#091426" },
   topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingTop: 6,
     paddingBottom: 2,
   },
   cancelButton: { paddingVertical: 4 },
-  cancelText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  cancelText: { color: "#ffffff", fontSize: 14, fontWeight: "800" },
   topBarRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   muteButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: '#30478a',
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "#30478a",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   muteIconText: {
     fontSize: 14,
   },
   levelIndicatorBadge: {
-    backgroundColor: 'rgba(241, 198, 91, 0.2)',
-    borderColor: '#f1c65b',
+    backgroundColor: "rgba(241, 198, 91, 0.2)",
+    borderColor: "#f1c65b",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  levelIndicatorText: { color: '#f1c65b', fontSize: 11, fontWeight: '900' },
+  levelIndicatorText: { color: "#f1c65b", fontSize: 11, fontWeight: "900" },
   mascotImage: { width: 44, height: 44 },
-  
-  content: { 
-    padding: 12, 
+  content: {
+    padding: 12,
     paddingBottom: 40,
     maxWidth: 600,
-    width: '100%',
-    alignSelf: 'center',
+    width: "100%",
+    alignSelf: "center",
   },
-  
-  headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
-  title: { color: '#fff', fontSize: 21, fontWeight: '900' },
-  subtitle: { color: '#94a3b8', fontSize: 11, fontWeight: '700', marginTop: 1 },
+  headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
+  title: { color: "#fff", fontSize: 21, fontWeight: "900" },
+  subtitle: { color: "#94a3b8", fontSize: 11, fontWeight: "700", marginTop: 1 },
   featured: {
-    backgroundColor: '#1b1d4f',
-    borderColor: '#f1c65b',
+    backgroundColor: "#1b1d4f",
+    borderColor: "#f1c65b",
     borderWidth: 1.5,
     borderRadius: 18,
     padding: 12,
     marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   featureCopy: { flex: 1 },
   featuredTagContainer: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(241, 198, 91, 0.15)',
-    borderColor: '#f1c65b',
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(241, 198, 91, 0.15)",
+    borderColor: "#f1c65b",
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  featureTagText: { color: '#f1c65b', fontWeight: '900', fontSize: 9, letterSpacing: 0.5 },
-  featureTitle: { color: '#fff', fontSize: 17, fontWeight: '900', marginTop: 6, textAlign: 'left' },
-  featureDetails: { color: '#cbd5e1', fontSize: 11, marginTop: 2, fontWeight: '600', textAlign: 'left' },
-  featureXpRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  featureXp: { color: '#f1c65b', fontSize: 11, fontWeight: '800' },
-  featureMetaSeparator: { color: '#64748b', marginHorizontal: 6, fontSize: 11 },
-  featureMeta: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
-  featureTrophyContainer: { paddingLeft: 8, justifyContent: 'center', alignItems: 'center' },
+  featureTagText: { color: "#f1c65b", fontWeight: "900", fontSize: 9, letterSpacing: 0.5 },
+  featureTitle: { color: "#fff", fontSize: 17, fontWeight: "900", marginTop: 6, textAlign: "left" },
+  featureDetails: { color: "#cbd5e1", fontSize: 11, marginTop: 2, fontWeight: "600", textAlign: "left" },
+  featureXpRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  featureXp: { color: "#f1c65b", fontSize: 11, fontWeight: "800" },
+  featureMetaSeparator: { color: "#64748b", marginHorizontal: 6, fontSize: 11 },
+  featureMeta: { color: "#94a3b8", fontSize: 11, fontWeight: "600" },
+  featureTrophyContainer: { paddingLeft: 8, justifyContent: "center", alignItems: "center" },
   trophyEmoji: { fontSize: 36 },
-  filterRow: { flexDirection: 'row', gap: 5, marginTop: 10 },
-  filter: { backgroundColor: '#162247', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: '#293a73' },
-  filterActive: { backgroundColor: '#4f46e5', borderColor: '#818cf8' },
-  filterText: { color: '#94a3b8', fontSize: 10.5, fontWeight: '800' },
-  filterTextActive: { color: '#ffffff' },
-  
-  grid: { 
-    flexDirection: 'column', 
-    gap: 8, 
-    marginTop: 10, 
+  filterRow: { flexDirection: "row", gap: 5, marginTop: 10 },
+  filter: { backgroundColor: "#162247", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: "#293a73" },
+  filterActive: { backgroundColor: "#4f46e5", borderColor: "#818cf8" },
+  filterText: { color: "#94a3b8", fontSize: 10.5, fontWeight: "800" },
+  filterTextActive: { color: "#ffffff" },
+  grid: {
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 10,
   },
   gridRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    width: '100%',
+    width: "100%",
   },
-  cardWrapper: {
-    // Flex wrapper style
-  },
+  cardWrapper: {},
   gameCard: {
-    width: '100%',
+    width: "100%",
     aspectRatio: 0.8,
-    backgroundColor: '#131d3b',
+    backgroundColor: "#131d3b",
     borderWidth: 1.2,
     borderRadius: 16,
     padding: 8,
-    justifyContent: 'space-between',
-    position: 'relative',
-    overflow: 'hidden',
+    justifyContent: "space-between",
+    position: "relative",
+    overflow: "hidden",
   },
   cardBadgeContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     right: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: 8,
     paddingHorizontal: 4,
     paddingVertical: 1,
   },
-  cardBadgeText: { fontSize: 8, fontWeight: '800', color: '#cbd5e1' },
-  cardTopArea: { 
+  cardBadgeText: { fontSize: 8, fontWeight: "800", color: "#cbd5e1" },
+  cardTopArea: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 6,
   },
-  gameIcon: { 
-    width: 38, 
+  gameIcon: {
+    width: 38,
     height: 38,
-    resizeMode: 'contain',
+    resizeMode: "contain",
   },
-  cardTextContainer: { 
-    justifyContent: 'flex-end', 
-    marginBottom: 4, 
+  cardTextContainer: {
+    justifyContent: "flex-end",
+    marginBottom: 4,
   },
-  cardTitle: { 
-    fontSize: 10, 
-    fontWeight: '900', 
-    marginBottom: 1, 
-    textAlign: 'left',
+  cardTitle: {
+    fontSize: 10,
+    fontWeight: "900",
+    marginBottom: 1,
+    textAlign: "left",
   },
-  cardSubtitle: { 
-    color: '#94a3b8', 
-    fontSize: 8.5, 
-    fontWeight: '600', 
-    textAlign: 'left',
+  cardSubtitle: {
+    color: "#94a3b8",
+    fontSize: 8.5,
+    fontWeight: "600",
+    textAlign: "left",
   },
-  cardFooter: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderTopWidth: 1,
     paddingTop: 4,
   },
   lightningIcon: { fontSize: 8 },
-  cardXp: { fontSize: 9, fontWeight: '900' },
-  leaderboardMainTitle: { color: '#fff', fontSize: 14, fontWeight: '900', textAlign: 'center', marginTop: 16, marginBottom: 8 },
+  cardXp: { fontSize: 9, fontWeight: "900" },
+  leaderboardMainTitle: { color: "#fff", fontSize: 14, fontWeight: "900", textAlign: "center", marginTop: 16, marginBottom: 8 },
   leaderboardCard: {
-    backgroundColor: '#14203f',
-    borderColor: '#2e4585',
+    backgroundColor: "#14203f",
+    borderColor: "#2e4585",
     borderWidth: 1.2,
     borderRadius: 16,
     padding: 10,
   },
   podium: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
     marginBottom: 10,
     gap: 6,
   },
-  podiumPlace: { alignItems: 'center', width: '30%' },
+  podiumPlace: { alignItems: "center", width: "30%" },
   avatar: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 3,
   },
-  avatarText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  podiumBar: { width: '100%', alignItems: 'center', justifyContent: 'flex-end', borderRadius: 6, paddingBottom: 6 },
-  rankNumber: { color: '#11152c', fontSize: 18, fontWeight: '900' },
-  podiumName: { color: '#11152c', fontSize: 8, fontWeight: '900', textAlign: 'center', paddingHorizontal: 2 },
-  podiumXp: { color: '#11152c', fontSize: 8, fontWeight: '700' },
+  avatarText: { color: "#fff", fontSize: 9, fontWeight: "900" },
+  podiumBar: { width: "100%", alignItems: "center", justifyContent: "flex-end", borderRadius: 6, paddingBottom: 6 },
+  rankNumber: { color: "#11152c", fontSize: 18, fontWeight: "900" },
+  podiumName: { color: "#11152c", fontSize: 8, fontWeight: "900", textAlign: "center", paddingHorizontal: 2 },
+  podiumXp: { color: "#11152c", fontSize: 8, fontWeight: "700" },
   ranking: {
-    backgroundColor: '#1b2a54',
+    backgroundColor: "#1b2a54",
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: '#2c4382',
+    borderColor: "#2c4382",
   },
-  rankLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rankNumText: { color: '#94a3b8', fontWeight: '800', fontSize: 11, width: 18 },
+  rankLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rankNumText: { color: "#94a3b8", fontWeight: "800", fontSize: 11, width: 18 },
   rankAvatar: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  rankAvatarText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  rankNameText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  rankXp: { color: '#f3ca45', fontWeight: '900', fontSize: 12 },
+  rankAvatarText: { color: "#fff", fontSize: 9, fontWeight: "900" },
+  rankNameText: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  rankXp: { color: "#f3ca45", fontWeight: "900", fontSize: 12 },
   absoluteOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -1075,80 +1145,80 @@ const styles = StyleSheet.create({
   },
   subjectBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(3, 10, 24, 0.82)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(3, 10, 24, 0.82)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 14,
   },
   subjectDialog: {
-    width: '100%',
+    width: "100%",
     maxWidth: 340,
     borderRadius: 20,
     borderWidth: 1.2,
-    borderColor: '#18b9e8',
-    backgroundColor: '#102638',
+    borderColor: "#18b9e8",
+    backgroundColor: "#102638",
     padding: 16,
-    shadowColor: '#17c8f0',
+    shadowColor: "#17c8f0",
     shadowOpacity: 0.22,
     shadowRadius: 16,
     elevation: 9,
   },
-  subjectEyebrow: { color: '#4ade80', textAlign: 'center', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  subjectTitle: { color: '#fff', textAlign: 'center', fontSize: 22, fontWeight: '900', marginTop: 6 },
-  subjectDescription: { color: '#b1c8d6', textAlign: 'center', fontSize: 11, fontWeight: '600', marginTop: 5, marginBottom: 12 },
-  subjectChoices: { flexDirection: 'row', gap: 10 },
+  subjectEyebrow: { color: "#4ade80", textAlign: "center", fontSize: 10, fontWeight: "900", letterSpacing: 1.2 },
+  subjectTitle: { color: "#fff", textAlign: "center", fontSize: 22, fontWeight: "900", marginTop: 6 },
+  subjectDescription: { color: "#b1c8d6", textAlign: "center", fontSize: 11, fontWeight: "600", marginTop: 5, marginBottom: 12 },
+  subjectChoices: { flexDirection: "row", gap: 10 },
   subjectChoice: {
     flex: 1,
     minHeight: 86,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 14,
     borderWidth: 1,
-    backgroundColor: '#142e40',
+    backgroundColor: "#142e40",
     padding: 9,
     shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 3,
   },
   subjectChoiceIcon: { fontSize: 24, marginBottom: 4 },
-  subjectChoiceTitle: { fontSize: 13, fontWeight: '900' },
-  subjectChoiceCopy: { color: '#b1c8d6', fontSize: 9, fontWeight: '700', marginTop: 3, textAlign: 'center' },
+  subjectChoiceTitle: { fontSize: 13, fontWeight: "900" },
+  subjectChoiceCopy: { color: "#b1c8d6", fontSize: 9, fontWeight: "700", marginTop: 3, textAlign: "center" },
   bothChoice: {
     minHeight: 46,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
     paddingHorizontal: 11,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: '#a855f7',
-    backgroundColor: '#292441',
+    borderColor: "#a855f7",
+    backgroundColor: "#292441",
   },
   bothChoiceIcon: { fontSize: 21, marginRight: 10 },
   bothChoiceCopy: { flex: 1 },
-  bothChoiceTitle: { color: '#e9d5ff', fontSize: 12, fontWeight: '900' },
-  bothChoiceSubtitle: { color: '#b9a0d1', fontSize: 9, marginTop: 1 },
-  choiceArrow: { color: '#fff', fontSize: 19, fontWeight: '900' },
+  bothChoiceTitle: { color: "#e9d5ff", fontSize: 12, fontWeight: "900" },
+  bothChoiceSubtitle: { color: "#b9a0d1", fontSize: 9, marginTop: 1 },
+  choiceArrow: { color: "#fff", fontSize: 19, fontWeight: "900" },
   choicePressed: { transform: [{ scale: 0.97 }], opacity: 0.86 },
-  subjectCancel: { alignItems: 'center', paddingVertical: 7, marginTop: 1 },
-  subjectCancelText: { color: '#98afbd', fontSize: 11, fontWeight: '800' },
+  subjectCancel: { alignItems: "center", paddingVertical: 7, marginTop: 1 },
+  subjectCancelText: { color: "#98afbd", fontSize: 11, fontWeight: "800" },
   modalBackdropCenter: {
     flex: 1,
-    backgroundColor: 'rgba(5, 11, 24, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(5, 11, 24, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   lockedCard: {
-    backgroundColor: '#131d3b',
-    borderColor: '#ef4444',
+    backgroundColor: "#131d3b",
+    borderColor: "#ef4444",
     borderWidth: 1.5,
     borderRadius: 22,
     padding: 24,
-    width: '100%',
+    width: "100%",
     maxWidth: 340,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -1158,44 +1228,44 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: '#ef4444',
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    borderColor: "#ef4444",
     borderWidth: 1.2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 14,
   },
   lockedEmoji: {
     fontSize: 28,
   },
   lockedTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 19,
-    fontWeight: '900',
-    textAlign: 'center',
+    fontWeight: "900",
+    textAlign: "center",
     marginBottom: 8,
   },
   lockedDescription: {
-    color: '#94a3b8',
+    color: "#94a3b8",
     fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     lineHeight: 18,
     marginBottom: 20,
   },
   lockedButton: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#818cf8',
+    backgroundColor: "#4f46e5",
+    borderColor: "#818cf8",
     borderWidth: 1,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
   lockedButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
   },
-}); 
+});

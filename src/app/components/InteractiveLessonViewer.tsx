@@ -37,7 +37,7 @@ interface LessonTopic {
 }
 
 const getStorageKey = (grade: number, subj: string, lesson: string) =>
-  `@biosphere_active_lesson_progress_${grade}_${subj}_${lesson}`;
+  "@biosphere_active_lesson_progress_" + grade + "_" + subj + "_" + lesson;
 
 const shuffle = <T,>(array: T[]): T[] => {
   const arr = [...array];
@@ -76,7 +76,7 @@ const buildLessonContent = (
   const t1QuestionCount = Math.floor(Math.random() * 3) + 1;
   const t1Pool = [
     buildQuestion(
-      `What is the primary idea behind ${lesson.title}?`,
+      "What is the primary idea behind " + lesson.title + "?",
       lesson.meaning,
       [
         "It is a random guess without any underlying pattern.",
@@ -85,7 +85,7 @@ const buildLessonContent = (
       "Exactly! That is the core rule of this lesson.",
     ),
     buildQuestion(
-      `Why do we study ${lesson.title}?`,
+      "Why do we study " + lesson.title + "?",
       isScience
         ? "To explain observations and understand natural phenomena."
         : "To calculate amounts accurately and solve quantitative problems.",
@@ -140,7 +140,7 @@ const buildLessonContent = (
   const t3QuestionCount = Math.floor(Math.random() * 3) + 1;
   const t3Pool = [
     buildQuestion(
-      `How can an explorer use ${lesson.title} outside of school?`,
+      "How can an explorer use " + lesson.title + " outside of school?",
       isScience
         ? "To notice patterns, care for nature, and explain everyday changes."
         : "To measure, share items fairly, and budget time or supplies.",
@@ -173,7 +173,7 @@ const buildLessonContent = (
   const topics: LessonTopic[] = [
     {
       title: "Foundations & Core Idea",
-      story: `${lesson.title} helps explorers understand foundational concepts.${lesson.meaning}`,
+      story: lesson.title + " helps explorers understand foundational concepts. " + lesson.meaning,
       howItWorks: isScience
         ? "Scientists look for clues, test what happens when variables change, and connect observations to reliable rules."
         : "Mathematicians look at what quantities are given, break larger values into manageable parts, and apply reliable operations.",
@@ -191,7 +191,7 @@ const buildLessonContent = (
     },
     {
       title: "Connecting the Dots",
-      story: `Now that you understand the rule and saw it work, let's explore why this matters in the broader world of ${subjectTitle}.`,
+      story: "Now that you understand the rule and saw it work, let's explore why this matters in the broader world of " + subjectTitle + ".",
       howItWorks:
         "Everyday problems become easier when you identify which concepts connect together. Once you master this rule, you can unlock more advanced missions!",
       demonstration:
@@ -202,7 +202,7 @@ const buildLessonContent = (
 
   const recapPool: QuizQuestion[] = [
     buildQuestion(
-      `Mastery Check: What is the primary definition of ${lesson.title}?`,
+      "Mastery Check: What is the primary definition of " + lesson.title + "?",
       lesson.meaning,
       [
         "An unproven hypothesis with no evidence.",
@@ -211,8 +211,8 @@ const buildLessonContent = (
       "Accurate recall of the core rule!",
     ),
     buildQuestion(
-      `Scenario: If a fellow explorer asks what ${lesson.title} is about, you say:`,
-      `${lesson.meaning}`,
+      "Scenario: If a fellow explorer asks what " + lesson.title + " is about, you say:",
+      lesson.meaning,
       [
         "It is too complicated to explain in words.",
         "It is just a bunch of random guesses.",
@@ -220,8 +220,8 @@ const buildLessonContent = (
       "Clear communication of knowledge!",
     ),
     buildQuestion(
-      `Recall the example: "${lesson.example}". What concept was that?`,
-      `${lesson.title}`,
+      "Recall the example: \"" + lesson.example + "\". What concept was that?",
+      lesson.title,
       ["A completely unrelated subject.", "An accidental mistake."],
       "Great recognition of worked examples!",
     ),
@@ -235,7 +235,7 @@ const buildLessonContent = (
       "Observant thinking is key!",
     ),
     buildQuestion(
-      `Which of the following is the best example of ${lesson.title}?`,
+      "Which of the following is the best example of " + lesson.title + "?",
       lesson.example,
       [
         "Ignoring all given measurements and rules.",
@@ -261,7 +261,7 @@ const buildLessonContent = (
       "Resilient learners always double-check!",
     ),
     buildQuestion(
-      `Why is ${lesson.title} considered an essential topic for${subjectTitle}?`,
+      "Why is " + lesson.title + " considered an essential topic for " + subjectTitle + "?",
       "It forms the building blocks for more advanced topics.",
       [
         "It is just filler content to make books longer.",
@@ -350,6 +350,33 @@ export default function InteractiveLessonViewer({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const pulseScaleAnim = useRef(new Animated.Value(1)).current;
+
+  // DYNAMIC STUDY TIME TRACKER 
+  const startTimeRef = useRef(Date.now());
+  const timeSavedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      const saveStudyTime = async () => {
+        if (timeSavedRef.current) return;
+        timeSavedRef.current = true;
+        const elapsedMs = Date.now() - startTimeRef.current;
+        const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+
+        try {
+          const profileRaw = await AsyncStorage.getItem("@biosphere_profile_data_v1");
+          if (profileRaw) {
+            const profile = JSON.parse(profileRaw);
+            profile.studyMinutes = (profile.studyMinutes || 0) + elapsedMinutes;
+            await AsyncStorage.setItem("@biosphere_profile_data_v1", JSON.stringify(profile));
+          }
+        } catch (e) {
+          console.error("Failed to save study time", e);
+        }
+      };
+      void saveStudyTime();
+    };
+  }, []);
 
   useEffect(() => {
     const shimmerLoop = Animated.loop(
@@ -464,7 +491,7 @@ export default function InteractiveLessonViewer({
 
     Animated.parallel([
       Animated.spring(progressAnim, {
-        toValue: Math.min(Math.max(percent, 6), 100),
+        toValue: Math.min(Math.max(percent, 5), 100),
         useNativeDriver: false,
         friction: 8,
         tension: 45,
@@ -626,35 +653,57 @@ export default function InteractiveLessonViewer({
             { transform: [{ scale: pulseScaleAnim }] },
           ]}
         >
-          <View style={styles.progressTrack}>
+          <View style={styles.progressTrackWrapper}>
+            <View style={styles.progressTrack}>
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ["0%", "100%"],
+                    }),
+                  },
+                ]}
+              >
+                <Animated.View
+                  style={[
+                    styles.shimmerEffect,
+                    {
+                      transform: [
+                        {
+                          translateX: shimmerAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-80, 320],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+                <View style={styles.sparkleHead} />
+              </Animated.View>
+            </View>
+
+            {/* The Rocket sliding on the bar! */}
             <Animated.View
               style={[
-                styles.progressFill,
+                styles.rocketContainer,
                 {
-                  width: progressAnim.interpolate({
+                  left: progressAnim.interpolate({
                     inputRange: [0, 100],
                     outputRange: ["0%", "100%"],
                   }),
                 },
               ]}
             >
-              <Animated.View
-                style={[
-                  styles.shimmerEffect,
-                  {
-                    transform: [
-                      {
-                        translateX: shimmerAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-80, 320],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              />
-              <View style={styles.sparkleHead} />
+              <Text style={styles.rocketIcon}>🚀</Text>
             </Animated.View>
+          </View>
+
+          {/* The Moon at the finish line! */}
+          <View style={styles.moonContainer}>
+            <Text style={styles.moonIcon}>🌕</Text>
           </View>
         </Animated.View>
 
@@ -667,8 +716,8 @@ export default function InteractiveLessonViewer({
             {stage === "summary"
               ? "Mission Accomplished!"
               : stage === "recap_quiz"
-                ? `Final Mastery Quiz (${recapQuestionIndex + 1} of ${recapQuestions.length})`
-                : `Topic ${topicIndex + 1} of ${topics.length}: ${currentTopic.title}`}
+                ? "Final Mastery Quiz (" + (recapQuestionIndex + 1) + " of " + recapQuestions.length + ")"
+                : "Topic " + (topicIndex + 1) + " of " + topics.length + ": " + currentTopic.title}
           </Text>
         </View>
 
@@ -701,8 +750,8 @@ export default function InteractiveLessonViewer({
             <View style={styles.quizHeaderRow}>
               <Text style={styles.quizHeaderBadge}>
                 {stage === "recap_quiz"
-                  ? `RECAP QUESTION ${recapQuestionIndex + 1} / ${recapQuestions.length}`
-                  : `CHECKPOINT ${topicQuestionIndex + 1} / ${currentTopic.questions.length}`}
+                  ? "RECAP QUESTION " + (recapQuestionIndex + 1) + " / " + recapQuestions.length
+                  : "CHECKPOINT " + (topicQuestionIndex + 1) + " / " + currentTopic.questions.length}
               </Text>
               <Text style={styles.quizRewardBadge}>
                 +{stage === "recap_quiz" ? 10 : 15} XP
@@ -907,8 +956,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   xpBadgeText: { color: "#ffda61", fontSize: 13, fontWeight: "900" },
+  
+  // NEW PROGRESS BAR STYLES
   progressWrapper: {
-    marginBottom: 16,
+    marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  progressTrackWrapper: {
+    flex: 1,
+    position: "relative",
+    justifyContent: "center",
+    paddingVertical: 10, // Gives the rocket room to overlap the top/bottom
   },
   progressTrack: {
     height: 14,
@@ -917,7 +976,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#293e75",
     overflow: "hidden",
-    position: "relative",
   },
   progressFill: {
     height: "100%",
@@ -926,6 +984,24 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
+  rocketContainer: {
+    position: "absolute",
+    marginLeft: -14, // Aligns the center of the rocket with the leading edge
+    zIndex: 10,
+  },
+  rocketIcon: {
+    fontSize: 22,
+  },
+  moonContainer: {
+    marginLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  moonIcon: {
+    fontSize: 24,
+  },
+  // END NEW PROGRESS BAR STYLES
+
   shimmerEffect: {
     position: "absolute",
     top: 0,
