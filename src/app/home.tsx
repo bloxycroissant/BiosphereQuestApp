@@ -1,3 +1,8 @@
+import {
+  curriculum,
+  type Lesson,
+  type Subject,
+} from "@/app/components/curriculum";
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -5,31 +10,57 @@ import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    ImageSourcePropType,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
+  Alert,
+  Animated,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 const target = require("../../assets/BiosphereQuestAssets/target.png");
-const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
+const LAST_LESSON_KEY = "@biosphere_last_lesson_v1";
+const RECENT_GAMES_KEY = "@biosphere_recent_games_v1";
 
-export default function HomeScreen() {
+interface ActiveLessonData {
+  grade: number;
+  subjectTitle: string;
+  lessonTitle: string;
+  icon: string;
+  difficulty: string;
+}
+
+interface MiniGameMeta {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badge: string;
+  isRecent: boolean;
+}
+
+const ALL_ARCADE_GAMES = [
+  { key: "flashcards", title: "Flashcards", subtitle: "Formulas & definitions", icon: "🧠", defaultBadge: "Smart" },
+  { key: "scramble", title: "Word Scramble", subtitle: "Science terminology", icon: "🔤", defaultBadge: "Spelling" },
+  { key: "memory", title: "Memory Match", subtitle: "Flip & pair icons", icon: "⭐", defaultBadge: "Memory" },
+  { key: "ninja", title: "Number Ninja", subtitle: "Rapid arithmetic", icon: "⚡", defaultBadge: "Speed" },
+  { key: "whack", title: "Whack-a-Number", subtitle: "Pop correct target", icon: "🎯", defaultBadge: "Action" },
+  { key: "codebreaker", title: "Codebreaker", subtitle: "Defuse the vault", icon: "🔥", defaultBadge: "Vault" },
+];
+
+export default function HomeScreen(): React.JSX.Element {
   const progress = useProgress();
   const appear = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(-120)).current;
 
   const [userName, setUserName] = useState("Explorer");
-  const [userGrade, setUserGrade] = useState("");
+  const [userGrade, setUserGrade] = useState("1");
 
   const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(0);
@@ -45,6 +76,9 @@ export default function HomeScreen() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
+
+  const [lastLesson, setLastLesson] = useState<ActiveLessonData | null>(null);
+  const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
 
   const nextLevelXp = progress.nextLevelXp || 100;
   const width =
@@ -105,28 +139,8 @@ export default function HomeScreen() {
     try {
       router.push(path as any);
     } catch (err) {
-      console.warn("Standard router push failed, trying absolute path...", err);
-      try {
-        router.replace(path as any);
-      } catch (innerErr) {
-        Alert.alert(
-          "Route Notice",
-          `Could not find route path: ${path}. Please ensure the file exists in src/app/`,
-        );
-      }
+      router.replace(path as any);
     }
-  };
-
-  const handleGradePress = (gradeCategory: string) => {
-    if (gradeLocks[gradeCategory]) {
-      Alert.alert(
-        "Content Locked",
-        `Your parent has locked access for ${gradeCategory}. Returning to login.`,
-        [{ text: "OK", onPress: () => router.replace("/") }],
-      );
-      return;
-    }
-    navigateToRoute("/explore");
   };
 
   useEffect(() => {
@@ -169,17 +183,72 @@ export default function HomeScreen() {
     }, 3500);
   };
 
+  const loadArcadeGames = async () => {
+    try {
+      const recentRaw = await AsyncStorage.getItem(RECENT_GAMES_KEY);
+      const recentKeys: string[] = recentRaw ? JSON.parse(recentRaw) : [];
+
+      const availableRecents = recentKeys.filter((k) =>
+        ALL_ARCADE_GAMES.some((g) => g.key === k),
+      );
+
+      let firstTwoKeys: string[] = [];
+      if (availableRecents.length >= 2) {
+        firstTwoKeys = [availableRecents[0], availableRecents[1]];
+      } else if (availableRecents.length === 1) {
+        const fallback = ALL_ARCADE_GAMES.find((g) => g.key !== availableRecents[0]);
+        firstTwoKeys = [availableRecents[0], fallback ? fallback.key : "ninja"];
+      } else {
+        firstTwoKeys = ["flashcards", "ninja"];
+      }
+
+      const remainingGames = ALL_ARCADE_GAMES.filter(
+        (g) => !firstTwoKeys.includes(g.key),
+      );
+      const randomPicked =
+        remainingGames[Math.floor(Math.random() * remainingGames.length)] ||
+        remainingGames[0];
+
+      const finalList: MiniGameMeta[] = [
+        ...firstTwoKeys.map((key) => {
+          const item = ALL_ARCADE_GAMES.find((g) => g.key === key)!;
+          return {
+            key: item.key,
+            title: item.title,
+            subtitle: item.subtitle,
+            icon: item.icon,
+            badge: "Recent",
+            isRecent: true,
+          };
+        }),
+        {
+          key: randomPicked.key,
+          title: randomPicked.title,
+          subtitle: randomPicked.subtitle,
+          icon: randomPicked.icon,
+          badge: "Featured",
+          isRecent: false,
+        },
+      ];
+
+      setDisplayGames(finalList);
+    } catch (e) {
+      console.error("Failed to load arcade games", e);
+    }
+  };
+
   const loadSharedProgress = async () => {
     try {
       const guestName = await AsyncStorage.getItem("explorerName");
       const guestUsername = await AsyncStorage.getItem("explorerUsername");
       const guestGrade = await AsyncStorage.getItem("explorerGrade");
 
+      let resolvedGrade = 1;
+
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       if (savedData) {
         const parsed = JSON.parse(savedData);
 
-        // Prioritize updated profile username -> profile name -> guest keys
         if (parsed.username && parsed.username.trim()) {
           setUserName(parsed.username.trim());
         } else if (parsed.name && parsed.name.trim()) {
@@ -192,10 +261,15 @@ export default function HomeScreen() {
 
         if (parsed.gradeYear) {
           const match = String(parsed.gradeYear).match(/\d+/);
-          if (match) setUserGrade(match[0]);
+          if (match) {
+            setUserGrade(match[0]);
+            resolvedGrade = parseInt(match[0], 10);
+          }
         } else if (guestGrade) {
           const match = String(guestGrade).match(/\d+/);
-          setUserGrade(match ? match[0] : guestGrade);
+          const val = match ? match[0] : guestGrade;
+          setUserGrade(val);
+          resolvedGrade = parseInt(val, 10);
         }
 
         const restoredXp = normalizeXpValue(parsed.xp);
@@ -204,7 +278,7 @@ export default function HomeScreen() {
           : Math.floor(restoredXp / 100) + 1;
         const previousLevel = prevLevelRef.current;
 
-        setLevel((currentLvl) => {
+        setLevel(() => {
           if (previousLevel !== null && newLvl > previousLevel) {
             triggerLevelUpAnimation(previousLevel, newLvl);
           }
@@ -227,7 +301,9 @@ export default function HomeScreen() {
 
         if (guestGrade) {
           const match = String(guestGrade).match(/\d+/);
-          setUserGrade(match ? match[0] : guestGrade);
+          const val = match ? match[0] : guestGrade;
+          setUserGrade(val);
+          resolvedGrade = parseInt(val, 10);
         }
 
         setLevel(0);
@@ -237,6 +313,28 @@ export default function HomeScreen() {
         setXp(0);
         setStudyMinutes(0);
       }
+
+      const lastLessonRaw = await AsyncStorage.getItem(LAST_LESSON_KEY);
+      if (lastLessonRaw) {
+        const parsedLast = JSON.parse(lastLessonRaw);
+        if (parsedLast.grade === resolvedGrade) {
+          setLastLesson(parsedLast);
+          return;
+        }
+      }
+
+      const gradeSubjects = curriculum[resolvedGrade] || curriculum[1];
+      if (gradeSubjects && gradeSubjects.length > 0) {
+        const firstSub = gradeSubjects[0];
+        const firstLes = firstSub.lessons[0];
+        setLastLesson({
+          grade: resolvedGrade,
+          subjectTitle: firstSub.title,
+          lessonTitle: firstLes.title,
+          icon: firstSub.icon,
+          difficulty: firstLes.difficulty,
+        });
+      }
     } catch (e) {
       console.error("Failed to load shared progress on home", e);
     }
@@ -244,11 +342,13 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadSharedProgress();
+    loadArcadeGames();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadSharedProgress();
+      loadArcadeGames();
     }, []),
   );
 
@@ -260,6 +360,16 @@ export default function HomeScreen() {
       friction: 8,
     }).start();
   }, [appear]);
+
+  const activeGradeSubjects = curriculum[parseInt(userGrade, 10) || 1] || [];
+  const secondarySubject = activeGradeSubjects[1] || activeGradeSubjects[0];
+
+  const launchMiniGame = (gameKey: string) => {
+    router.push({
+      pathname: "/games",
+      params: { autoOpenGame: gameKey },
+    } as any);
+  };
 
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -277,7 +387,6 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
       >
         <View style={styles.header}>
           <View style={styles.greeting}>
@@ -323,36 +432,53 @@ export default function HomeScreen() {
           <Text style={styles.section}>Continue Learning</Text>
           <View style={styles.cards}>
             <Pressable
-              onPress={() => handleGradePress("Grade 3")}
+              onPress={() => navigateToRoute("/explore")}
               style={styles.course}
             >
-              <Text style={styles.courseIcon}>📚</Text>
-              <Text style={styles.courseTitle}>Fractions</Text>
-              <Text style={styles.courseSub}>Grade 3</Text>
+              <Text style={styles.courseIcon}>
+                {lastLesson ? lastLesson.icon : "📖"}
+              </Text>
+              <Text style={styles.courseTitle} numberOfLines={1}>
+                {lastLesson ? lastLesson.lessonTitle : "Start Mission"}
+              </Text>
+              <Text style={styles.courseSub}>
+                {lastLesson
+                  ? `${lastLesson.subjectTitle} • Grade ${lastLesson.grade}`
+                  : `Grade ${userGrade}`}
+              </Text>
             </Pressable>
 
-            <Pressable
-              onPress={() => handleGradePress("Grade 1")}
-              style={styles.course}
-            >
-              <Text style={styles.courseIcon}>🔢</Text>
-              <Text style={styles.courseTitle}>Counting Numbers</Text>
-              <Text style={styles.courseSub}>Grade 1</Text>
-            </Pressable>
+            {secondarySubject && (
+              <Pressable
+                onPress={() => navigateToRoute("/explore")}
+                style={styles.course}
+              >
+                <Text style={styles.courseIcon}>{secondarySubject.icon}</Text>
+                <Text style={styles.courseTitle} numberOfLines={1}>
+                  {secondarySubject.lessons[0]?.title || secondarySubject.title}
+                </Text>
+                <Text style={styles.courseSub}>
+                  {secondarySubject.title} • Grade {userGrade}
+                </Text>
+              </Pressable>
+            )}
           </View>
 
-          <View style={styles.challenge}>
-            <View>
+          <Pressable
+            style={styles.challenge}
+            onPress={() => launchMiniGame("quiz")}
+          >
+            <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.challengeTag}>DAILY CHALLENGE</Text>
               <Text style={styles.challengeTitle}>Science & Math Quiz</Text>
               <Text style={styles.challengeSub}>
-                5 questions • +150 XP • ~3 min
+                5 questions • +150 XP • Tap to Start!
               </Text>
             </View>
             <Image source={target} style={styles.target} contentFit="contain" />
-          </View>
+          </Pressable>
 
-          <Text style={styles.section}>Study time</Text>
+          <Text style={styles.section}>Study Time</Text>
           <View style={styles.study}>
             <Text style={styles.studyValue}>
               {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m
@@ -362,23 +488,42 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <Text style={styles.section}>Browse by Grade</Text>
-          <GradeCard
-            title="Elementary"
-            grades="Grade 1-3"
-            icon={astro}
-            colors={["#875b20", "#172849"]}
-            tags={["1 + 1 Basic Math", "Science"]}
-            onPress={() => handleGradePress("Elementary")}
-          />
-          <GradeCard
-            title="Intermediate"
-            grades="Grade 4-6"
-            icon={astro}
-            colors={["#27749b", "#172849"]}
-            tags={["Earth Science", "Pre-Algebra"]}
-            onPress={() => handleGradePress("Intermediate")}
-          />
+          <Text style={styles.section}>Arcade Challenges</Text>
+          <View style={styles.arcadeStack}>
+            {displayGames.map((game) => (
+              <Pressable
+                key={game.key}
+                style={[
+                  styles.arcadeGameRow,
+                  game.isRecent ? styles.recentGameBorder : styles.featuredGameBorder,
+                ]}
+                onPress={() => launchMiniGame(game.key)}
+              >
+                <View style={styles.arcadeIconBubble}>
+                  <Text style={styles.arcadeIconText}>{game.icon}</Text>
+                </View>
+                <View style={styles.arcadeGameMeta}>
+                  <View style={styles.arcadeTitleLine}>
+                    <Text style={styles.arcadeGameTitle}>{game.title}</Text>
+                    <View
+                      style={[
+                        styles.gameBadgePill,
+                        game.isRecent ? styles.badgeRecent : styles.badgeFeatured,
+                      ]}
+                    >
+                      <Text style={styles.gameBadgePillText}>{game.badge}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.arcadeGameDesc} numberOfLines={1}>
+                    {game.subtitle}
+                  </Text>
+                </View>
+                <View style={styles.arcadePlayButton}>
+                  <Text style={styles.arcadePlayText}>Play</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </Animated.View>
       </ScrollView>
 
@@ -386,12 +531,10 @@ export default function HomeScreen() {
         <View style={styles.lockOverlay}>
           <Pressable
             style={styles.lockBackdropButton}
-          onPress={() => {
-            setIsLocked(false);
-            router.replace("/");
-          }}
-            accessibilityRole="button"
-            accessibilityLabel="Return to the welcome screen"
+            onPress={() => {
+              setIsLocked(false);
+              router.replace("/");
+            }}
           />
           <View style={styles.lockContentContainer} pointerEvents="box-none">
             <View style={styles.lockCopy} pointerEvents="none">
@@ -411,8 +554,6 @@ export default function HomeScreen() {
                   params: { openParentControls: "true" },
                 } as any);
               }}
-              accessibilityRole="button"
-              accessibilityLabel="Open Parental Controls"
             >
               <Text style={styles.parentControlsButtonText}>
                 Parental Controls
@@ -425,52 +566,6 @@ export default function HomeScreen() {
   );
 }
 
-function GradeCard({
-  title,
-  grades,
-  icon,
-  colors,
-  tags,
-  onPress,
-}: {
-  title: string;
-  grades: string;
-  icon: ImageSourcePropType;
-  colors: [string, string];
-  tags: string[];
-  onPress: () => void;
-}) {
-  return (
-    <View
-      style={[
-        styles.gradeCard,
-        { borderColor: colors[0], backgroundColor: colors[1] },
-      ]}
-    >
-      <View style={styles.gradeHeader}>
-        <Image source={icon} style={styles.gradeIcon} contentFit="contain" />
-        <View style={styles.gradeCopy}>
-          <Text style={styles.gradeTitle}>{title}</Text>
-          <Text style={styles.gradeLabel}>{grades}</Text>
-        </View>
-        <Pressable
-          onPress={onPress}
-          style={[styles.viewButton, { borderColor: colors[0] }]}
-        >
-          <Text style={styles.viewText}>View</Text>
-        </Pressable>
-      </View>
-      <View style={styles.tags}>
-        {tags.map((tag) => (
-          <Text key={tag} style={[styles.tag, { borderColor: colors[0] }]}>
-            {tag}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#091426" },
   levelUpBanner: {
@@ -479,7 +574,7 @@ const styles = StyleSheet.create({
     left: 18,
     right: 18,
     zIndex: 999,
-    backgroundColor: "#4642ae",
+    backgroundColor: "#464<ae",
     borderColor: "#ffdf4e",
     borderWidth: 2,
     borderRadius: 16,
@@ -551,8 +646,8 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   courseIcon: { color: "#f1bd48", fontSize: 27, fontWeight: "900" },
-  courseTitle: { color: "#fff", fontWeight: "900", marginTop: 4 },
-  courseSub: { color: "#bac7e0", fontSize: 10 },
+  courseTitle: { color: "#fff", fontWeight: "900", marginTop: 4, fontSize: 13 },
+  courseSub: { color: "#bac7e0", fontSize: 10, marginTop: 2 },
   challenge: {
     backgroundColor: "#4642ae",
     borderColor: "#c2cf34",
@@ -577,28 +672,80 @@ const styles = StyleSheet.create({
   },
   studyValue: { color: "#7ce1ff", fontWeight: "900", fontSize: 22 },
   studyCopy: { color: "#c0cbe0", fontSize: 11, marginTop: 4 },
-  gradeCard: { borderWidth: 1, borderRadius: 18, padding: 10, marginTop: 9 },
-  gradeHeader: { flexDirection: "row", alignItems: "center" },
-  gradeIcon: { width: 44, height: 44 },
-  gradeCopy: { flex: 1, marginLeft: 7 },
-  gradeTitle: { color: "#fff", fontSize: 19, fontWeight: "900" },
-  gradeLabel: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  viewButton: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 5,
+  arcadeStack: {
+    gap: 10,
+    marginTop: 4,
   },
-  viewText: { color: "#fff", fontWeight: "900", fontSize: 11 },
-  tags: { flexDirection: "row", gap: 7, marginTop: 7 },
-  tag: {
-    color: "#fff",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  arcadeGameRow: {
+    backgroundColor: "#131d3b",
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  recentGameBorder: {
+    borderColor: "#3b82f6",
+  },
+  featuredGameBorder: {
+    borderColor: "#f59e0b",
+  },
+  arcadeIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#1e2c56",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  arcadeIconText: {
+    fontSize: 22,
+  },
+  arcadeGameMeta: {
+    flex: 1,
+  },
+  arcadeTitleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  arcadeGameTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  gameBadgePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgeRecent: {
+    backgroundColor: "#1d4ed8",
+  },
+  badgeFeatured: {
+    backgroundColor: "#b45309",
+  },
+  gameBadgePillText: {
+    color: "#ffffff",
     fontSize: 9,
-    fontWeight: "800",
+    fontWeight: "900",
+  },
+  arcadeGameDesc: {
+    color: "#94a3b8",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  arcadePlayButton: {
+    backgroundColor: "#4f46e5",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  arcadePlayText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
   },
   lockOverlay: {
     flex: 1,

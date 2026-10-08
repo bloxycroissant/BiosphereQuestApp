@@ -703,6 +703,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   categoryLessonCount: {
+    color: "#dfd6c9",
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2,
