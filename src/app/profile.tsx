@@ -47,10 +47,11 @@ export default function ProfileScreen(): React.JSX.Element {
     Platform.OS === "android" &&
     UIManager.setLayoutAnimationEnabledExperimental
   ) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+    UIManager.setLayoutAnimationEnabledExperimental?.(true);
   }
 
   const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
+  const stellaMascot = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
   const progress = useProgress();
   const [currentView, setCurrentView] = useState<ViewMode>("profile");
@@ -164,7 +165,6 @@ export default function ProfileScreen(): React.JSX.Element {
         : [];
       const localBadges = progress.badgeUnlockDates || {};
 
-      // Fetch existing cloud row so we merge local + cloud safely
       const { data: cloudRow } = await supabase
         .from("profiles")
         .select("*")
@@ -233,7 +233,6 @@ export default function ProfileScreen(): React.JSX.Element {
       const resolvedGradeYear =
         localProfile.gradeYear || cloudRow?.grade_year || "Grade 1";
 
-      // Update local state & AsyncStorage if cloud had higher/restored values
       setName(resolvedName);
       setUsername(resolvedUsername);
       setGradeYear(resolvedGradeYear);
@@ -278,7 +277,6 @@ export default function ProfileScreen(): React.JSX.Element {
         );
       }
 
-      // Push merged snapshot up to Supabase
       await supabase.from("profiles").upsert({
         id: user.id,
         full_name: resolvedUsername || resolvedName,
@@ -343,7 +341,6 @@ export default function ProfileScreen(): React.JSX.Element {
         parsed.email = activeEmail;
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
 
-        // Sync all lessons, badges, XP, study time, and profile info with Supabase
         await syncFullProfileToCloud();
       } else {
         setIsLoggedIn(false);
@@ -536,7 +533,6 @@ export default function ProfileScreen(): React.JSX.Element {
         setGradeYear("Grade 1");
       }
 
-      // NOTE: 30-day wipe removed so Total XP, Badges, Level, and Courses never reset!
       if (parsed.email) {
         setEmail(parsed.email);
         setTempEmail(parsed.email);
@@ -720,7 +716,6 @@ export default function ProfileScreen(): React.JSX.Element {
       xp: newXp,
     });
 
-    // Sync +25 XP to the weekly leaderboard and update cloud profile
     void (async () => {
       try {
         await supabase.rpc("sync_user_xp", {
@@ -1166,6 +1161,13 @@ export default function ProfileScreen(): React.JSX.Element {
               </Text>
               {email ? <Text style={styles.email}>{email}</Text> : null}
             </View>
+
+            {/* Stella Mascot aligned directly with Username, Full Name and Email on the right */}
+            <Image
+              source={stellaMascot}
+              style={styles.stellaMascot}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.subHeaderRow}>
@@ -1647,6 +1649,11 @@ function Stat({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#091426" },
+  stellaMascot: {
+    width: 60,
+    height: 60,
+    marginLeft: 8,
+  },
   levelUpBanner: {
     position: "absolute",
     top: 15,
