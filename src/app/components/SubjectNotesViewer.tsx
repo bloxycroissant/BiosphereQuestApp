@@ -568,6 +568,7 @@ export default function SubjectNotesViewer({
                 {...({ "data-word-key": wordKey } as any)}
                 onPress={() => toggleWordHighlight(wordKey)}
                 style={[
+                  styles.clickableWordText,
                   highlightColor
                     ? { backgroundColor: highlightColor, borderRadius: 2 }
                     : null,
@@ -884,16 +885,20 @@ export default function SubjectNotesViewer({
             })}
           </View>
 
-          <Pressable
-            style={styles.tapZoneLeft}
-            onPress={() => turnPage("prev")}
-            disabled={currentPage === 0}
-          />
-          <Pressable
-            style={styles.tapZoneRight}
-            onPress={() => turnPage("next")}
-            disabled={currentPage === totalPages - 1}
-          />
+          {!selectedHighlighter && (
+            <>
+              <Pressable
+                style={styles.tapZoneLeft}
+                onPress={() => turnPage("prev")}
+                disabled={currentPage === 0}
+              />
+              <Pressable
+                style={styles.tapZoneRight}
+                onPress={() => turnPage("next")}
+                disabled={currentPage === totalPages - 1}
+              />
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -1096,6 +1101,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 16,
     marginBottom: 8,
+  },
+  clickableWordText: {
+    zIndex: 15,
   },
   bodyText: {
     color: "#475569",
