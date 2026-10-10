@@ -24,10 +24,10 @@ interface GradeLevel {
 
 const subjectsList: string[] = [
   "Math",
-  "Patterns",
   "Matter",
-  "Force",
-  "Geometry",
+  "Living Things & Environment",
+  "Force, Motion, & Energy",
+  "Earth & Space",
 ];
 
 const gradeLevels: GradeLevel[] = [
@@ -47,7 +47,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [selectedGrade, setSelectedGrade] = useState(3);
-  const [selectedSubjects, setSelectedSubjects] = useState(["Math"]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]); // Starts empty now!
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -164,8 +164,12 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   };
 
   const handleLaunch = async (): Promise<void> => {
-    if (selectedSubjects.length === 0) {
-      Alert.alert("Hold on!", "Please pick at least one mission topic.");
+    // --- NEW VALIDATION: Must pick at least 2 subjects ---
+    if (selectedSubjects.length < 2) {
+      Alert.alert(
+        "Choose Your Path!", 
+        "Please select at least 2 subjects to begin your adventure."
+      );
       return;
     }
 
@@ -372,7 +376,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
               <View style={styles.stepContainer}>
                 <Text style={styles.title}>Pick your missions</Text>
                 <Text style={styles.subtitle}>
-                  What topics do you want to master first?
+                  Choose at least 2 topics you want to master first.
                 </Text>
 
                 <View style={styles.grid}>
@@ -415,9 +419,14 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                 >
                   <Pressable
                     onPress={handleLaunch}
-                    style={styles.primaryLaunch}
+                    style={[
+                      styles.primaryLaunch,
+                      selectedSubjects.length < 2 && { opacity: 0.5 } // Visual feedback if not enough selected
+                    ]}
                   >
-                    <Text style={styles.primaryText}>🚀 Launch App</Text>
+                    <Text style={styles.primaryText}>
+                      {selectedSubjects.length < 2 ? `Pick ${2 - selectedSubjects.length} more...` : "🚀 Launch App"}
+                    </Text>
                   </Pressable>
                 </Animated.View>
               </View>

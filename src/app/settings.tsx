@@ -311,6 +311,18 @@ export default function SettingsScreen(): React.JSX.Element {
       };
 
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(resetData));
+      await AsyncStorage.removeItem("@biosphere_completed_lessons_v1");
+      await AsyncStorage.removeItem("@biosphere_recent_lessons");
+      await AsyncStorage.removeItem("@biosphere_last_lesson_v1");
+
+      // Also wipe cloud progress in Supabase if logged in
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.rpc("reset_user_progress");
+      }
+
       setResetModalVisible(false);
       handleBack();
     } catch (e) {
@@ -582,7 +594,7 @@ export default function SettingsScreen(): React.JSX.Element {
               <Pressable
                 style={[
                   styles.rowItem,
-                  { borderTopWidth: 1, borderTopColor: "# <0> <5c" },
+                  { borderTopWidth: 1, borderTopColor: "#202c5c" },
                 ]}
                 onPress={handleLogout}
               >

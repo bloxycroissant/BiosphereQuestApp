@@ -38,7 +38,7 @@ interface LocalSession {
 }
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
 
 export default function ProfileScreen(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -78,6 +78,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [level, setLevel] = useState(0);
   const [nextLevelXp, setNextLevelXp] = useState(100);
   const [lastResetDate, setLastResetDate] = useState(Date.now());
+  const [cloudBadges, setCloudBadges] = useState<Record<string, string>>({});
 
   const [name, setName] = useState("");
   const [gradeYear, setGradeYear] = useState("");
@@ -99,6 +100,215 @@ export default function ProfileScreen(): React.JSX.Element {
   const [tempGradeYear, setTempGradeYear] = useState(gradeYear);
   const [tempWebsite, setTempWebsite] = useState(website);
   const [tempProfileImage, setTempProfileImage] = useState(profileImage);
+
+  const rawSessions: Array<{ id: string | number; [key: string]: any }> = ((
+    progress as any
+  )?.sessions ?? [
+    {
+      id: "1",
+      day: "Mon",
+      title: "Ecology Basics",
+      time: "10:00 AM",
+      duration: "45 mins",
+      done: false,
+    },
+    {
+      id: "2",
+      day: "Wed",
+      title: "Ecosystems & Biomes",
+      time: "12:00 PM",
+      duration: "1 hr",
+      done: false,
+    },
+  ]) as Array<{ id: string | number; [key: string]: any }>;
+
+  const [sessions, setSessions] = useState<LocalSession[]>(
+    rawSessions.map((s) => ({
+      id: String(s.id),
+      day: String(s.day || "Mon"),
+      title: String(s.title || ""),
+      time: String(s.time || ""),
+      duration: String(s.duration || "30 mins"),
+      category: String(s.category || "Science"),
+      description: String(s.description || ""),
+      reminder: String(s.reminder || "10 mins before"),
+      done: Boolean(s.done),
+    })),
+  );
+
+  const [newTitle, setNewTitle] = useState("");
+  const [newDay, setNewDay] = useState("Mon");
+  const [newTime, setNewTime] = useState("9:00 AM");
+  const [newHours, setNewHours] = useState("");
+  const [newMinutes, setNewMinutes] = useState("30");
+  const [newCategory, setNewCategory] = useState("Science");
+  const [newDescription, setNewDescription] = useState("");
+  const [newReminder, setNewReminder] = useState("10 mins before");
+
+  // --- FULL CLOUD BACKUP & RESTORE FOR REGISTERED USERS ---
+  const syncFullProfileToCloud = async (): Promise<void> => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const savedProfileRaw = await AsyncStorage.getItem(STORAGE_KEY);
+      const completedLessonsRaw = await AsyncStorage.getItem(
+        COMPLETED_LESSONS_KEY,
+      );
+
+      const localProfile = savedProfileRaw ? JSON.parse(savedProfileRaw) : {};
+      const localCompleted: string[] = completedLessonsRaw
+        ? JSON.parse(completedLessonsRaw)
+        : [];
+      const localBadges = progress.badgeUnlockDates || {};
+
+      // Fetch existing cloud row so we merge local + cloud safely
+      const { data: cloudRow } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const localXpVal = normalizeXpValue(localProfile.xp ?? xp);
+      const mergedXp = Math.max(localXpVal, cloudRow?.total_xp || 0);
+      const mergedLevel = Math.floor(mergedXp / 100) + 1;
+      const mergedNextLevelXp = mergedLevel * 100;
+
+      const mergedStudyMinutes = Math.max(
+        localProfile.studyMinutes || 0,
+        cloudRow?.study_minutes || 0,
+      );
+      const mergedStreak = Math.max(
+        localProfile.streak ?? streak,
+        cloudRow?.streak || 0,
+      );
+
+      const cloudLessons: string[] = Array.isArray(cloudRow?.completed_lessons)
+        ? cloudRow.completed_lessons
+        : [];
+      const mergedCompletedLessons = Array.from(
+        new Set([...cloudLessons, ...localCompleted]),
+      );
+
+      const mergedLessonsCount = Math.max(
+        localProfile.lessons ?? lessons,
+        cloudRow?.lessons_count || 0,
+        mergedCompletedLessons.length,
+      );
+
+      const mergedBadges: Record<string, string> = {
+        ...(cloudRow?.badges || {}),
+        ...localBadges,
+      };
+      setCloudBadges(mergedBadges);
+
+      const cloudDetails = cloudRow?.profile_data || {};
+      const mergedBio =
+        localProfile.bio ||
+        cloudDetails.bio ||
+        "Ready to learn Science and Math!";
+      const mergedSchool = localProfile.school || cloudDetails.school || "";
+      const mergedPhone = localProfile.phone || cloudDetails.phone || "";
+      const mergedWebsite = localProfile.website || cloudDetails.website || "";
+      const mergedSessions =
+        Array.isArray(localProfile.sessions) && localProfile.sessions.length > 0
+          ? localProfile.sessions
+          : Array.isArray(cloudDetails.sessions) &&
+              cloudDetails.sessions.length > 0
+            ? cloudDetails.sessions
+            : sessions;
+
+      const resolvedName =
+        localProfile.name ||
+        user.user_metadata?.full_name ||
+        cloudRow?.full_name ||
+        "Explorer";
+      const resolvedUsername =
+        localProfile.username ||
+        user.user_metadata?.username ||
+        cloudRow?.username ||
+        resolvedName;
+      const resolvedGradeYear =
+        localProfile.gradeYear || cloudRow?.grade_year || "Grade 1";
+
+      // Update local state & AsyncStorage if cloud had higher/restored values
+      setName(resolvedName);
+      setUsername(resolvedUsername);
+      setGradeYear(resolvedGradeYear);
+      setXp(mergedXp);
+      setLevel(mergedLevel);
+      setNextLevelXp(mergedNextLevelXp);
+      setStreak(mergedStreak);
+      setLessons(mergedLessonsCount);
+      setBio(mergedBio);
+      setSchool(mergedSchool);
+      setPhone(mergedPhone);
+      setWebsite(mergedWebsite);
+      setSessions(mergedSessions);
+
+      const updatedLocalProfile = {
+        ...localProfile,
+        name: resolvedName,
+        username: resolvedUsername,
+        email: user.email || localProfile.email || "",
+        gradeYear: resolvedGradeYear,
+        xp: mergedXp,
+        level: mergedLevel,
+        nextLevelXp: mergedNextLevelXp,
+        streak: mergedStreak,
+        lessons: mergedLessonsCount,
+        studyMinutes: mergedStudyMinutes,
+        bio: mergedBio,
+        school: mergedSchool,
+        phone: mergedPhone,
+        website: mergedWebsite,
+        sessions: mergedSessions,
+      };
+
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(updatedLocalProfile),
+      );
+      if (mergedCompletedLessons.length > 0) {
+        await AsyncStorage.setItem(
+          COMPLETED_LESSONS_KEY,
+          JSON.stringify(mergedCompletedLessons),
+        );
+      }
+
+      // Push merged snapshot up to Supabase
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: resolvedUsername || resolvedName,
+        username: resolvedUsername,
+        grade_year: resolvedGradeYear,
+        total_xp: mergedXp,
+        weekly_xp:
+          cloudRow && (cloudRow.total_xp > 0 || cloudRow.weekly_xp > 0)
+            ? cloudRow.weekly_xp
+            : mergedXp,
+        streak: mergedStreak,
+        lessons_count: mergedLessonsCount,
+        study_minutes: mergedStudyMinutes,
+        completed_lessons: mergedCompletedLessons,
+        badges: mergedBadges,
+        profile_data: {
+          bio: mergedBio,
+          school: mergedSchool,
+          phone: mergedPhone,
+          website: mergedWebsite,
+          sessions: mergedSessions,
+          profileImage: localProfile.profileImage ?? profileImage,
+        },
+        is_bot: false,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("Failed to sync full profile to Supabase:", err);
+    }
+  };
 
   const checkAuthStatus = async (): Promise<void> => {
     try {
@@ -132,6 +342,9 @@ export default function ProfileScreen(): React.JSX.Element {
 
         parsed.email = activeEmail;
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+
+        // Sync all lessons, badges, XP, study time, and profile info with Supabase
+        await syncFullProfileToCloud();
       } else {
         setIsLoggedIn(false);
         setEmail("");
@@ -144,7 +357,7 @@ export default function ProfileScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    checkAuthStatus();
+    void checkAuthStatus();
 
     const {
       data: { subscription },
@@ -154,6 +367,7 @@ export default function ProfileScreen(): React.JSX.Element {
         const sessionEmail = session.user.email || "";
         setEmail(sessionEmail);
         setTempEmail(sessionEmail);
+        void syncFullProfileToCloud();
       } else {
         setIsLoggedIn(false);
         setEmail("");
@@ -166,53 +380,9 @@ export default function ProfileScreen(): React.JSX.Element {
 
   useFocusEffect(
     useCallback(() => {
-      checkAuthStatus();
+      void loadSavedData().then(() => checkAuthStatus());
     }, []),
   );
-
-  const rawSessions: Array<{ id: string | number; [key: string]: any }> = ((
-    progress as any
-  )?.sessions ?? [
-    {
-      id: "1",
-      day: "Mon",
-      title: "Ecology Basics",
-      time: "10:00 AM",
-      duration: "45 mins",
-      done: false,
-    },
-    {
-      id: "2",
-      day: "Wed",
-      title: "Ecosystems & Biomes",
-      time: "12:00 PM",
-      duration: "1 hr",
-      done: false,
-    },
-  ]) as Array<{ id: string | number; [key: string]: any }>;
-
-  const [sessions, setSessions] = useState(
-    rawSessions.map((s) => ({
-      id: String(s.id),
-      day: String(s.day || "Mon"),
-      title: String(s.title || ""),
-      time: String(s.time || ""),
-      duration: String(s.duration || "30 mins"),
-      category: String(s.category || "Science"),
-      description: String(s.description || ""),
-      reminder: String(s.reminder || "10 mins before"),
-      done: Boolean(s.done),
-    })),
-  );
-
-  const [newTitle, setNewTitle] = useState("");
-  const [newDay, setNewDay] = useState("Mon");
-  const [newTime, setNewTime] = useState("9:00 AM");
-  const [newHours, setNewHours] = useState("");
-  const [newMinutes, setNewMinutes] = useState("30");
-  const [newCategory, setNewCategory] = useState("Science");
-  const [newDescription, setNewDescription] = useState("");
-  const [newReminder, setNewReminder] = useState("10 mins before");
 
   const animateViewChange = (nextView: ViewMode): void => {
     if (nextView === "addSchedule") {
@@ -303,7 +473,11 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const persistData = async (updatedFields: object): Promise<void> => {
     try {
+      const savedRaw = await AsyncStorage.getItem(STORAGE_KEY);
+      const existing = savedRaw ? JSON.parse(savedRaw) : {};
+
       const currentData = {
+        ...existing,
         name,
         username,
         email,
@@ -362,33 +536,7 @@ export default function ProfileScreen(): React.JSX.Element {
         setGradeYear("Grade 1");
       }
 
-      const now = Date.now();
-      const storedResetDate = parsed.lastResetDate || now;
-
-      const baselineXp = 0;
-      const baselineLevel = 0;
-      const baselineNextXp = 100;
-
-      if (now - storedResetDate >= THIRTY_DAYS_MS) {
-        setStreak(0);
-        setLessons(0);
-        setXp(baselineXp);
-        setLevel(baselineLevel);
-        setNextLevelXp(baselineNextXp);
-        setLastResetDate(now);
-        persistData({
-          streak: 0,
-          lessons: 0,
-          xp: baselineXp,
-          level: baselineLevel,
-          nextLevelXp: baselineNextXp,
-          studyMinutes: 0,
-          lastResetDate: now,
-        });
-        return;
-      }
-
-      if (parsed.username) setUsername(parsed.username);
+      // NOTE: 30-day wipe removed so Total XP, Badges, Level, and Courses never reset!
       if (parsed.email) {
         setEmail(parsed.email);
         setTempEmail(parsed.email);
@@ -404,7 +552,7 @@ export default function ProfileScreen(): React.JSX.Element {
       if (parsed.streak !== undefined) setStreak(parsed.streak);
       if (parsed.lessons !== undefined) setLessons(parsed.lessons);
 
-      const restoredXp = normalizeXpValue(parsed.xp ?? baselineXp);
+      const restoredXp = normalizeXpValue(parsed.xp ?? 0);
       setXp(restoredXp);
 
       if (Number.isFinite(parsed.nextLevelXp)) {
@@ -418,6 +566,10 @@ export default function ProfileScreen(): React.JSX.Element {
       const newLvl = Number.isFinite(parsed.level)
         ? parsed.level
         : Math.floor(restoredXp / 100) + 1;
+
+      if (prevLevel !== null && newLvl > prevLevel) {
+        triggerLevelUpAnimation(prevLevel, newLvl);
+      }
       setLevel(newLvl);
       setPrevLevel(newLvl);
     } catch (e) {
@@ -426,14 +578,8 @@ export default function ProfileScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    loadSavedData();
+    void loadSavedData();
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadSavedData();
-    }, []),
-  );
 
   const handleEditProfilePress = async (): Promise<void> => {
     const {
@@ -514,6 +660,11 @@ export default function ProfileScreen(): React.JSX.Element {
       await AsyncStorage.setItem("explorerName", updatedName);
       await AsyncStorage.setItem("explorerUsername", updatedUsername);
 
+      const gradeMatch = tempGradeYear.match(/\d+/);
+      if (gradeMatch) {
+        await AsyncStorage.setItem("explorerGrade", gradeMatch[0]);
+      }
+
       try {
         const {
           data: { user },
@@ -526,6 +677,7 @@ export default function ProfileScreen(): React.JSX.Element {
             },
           });
         }
+        await syncFullProfileToCloud();
       } catch (e) {
         console.error("Supabase user sync error:", e);
       }
@@ -558,9 +710,29 @@ export default function ProfileScreen(): React.JSX.Element {
     setSessions(updatedSessions);
 
     const newLessons = lessons + 1;
+    const newXp = xp + 25;
     setLessons(newLessons);
+    setXp(newXp);
     progress.addXp(25);
-    persistData({ sessions: updatedSessions, lessons: newLessons });
+    void persistData({
+      sessions: updatedSessions,
+      lessons: newLessons,
+      xp: newXp,
+    });
+
+    // Sync +25 XP to the weekly leaderboard and update cloud profile
+    void (async () => {
+      try {
+        await supabase.rpc("sync_user_xp", {
+          p_name: username || name || "Explorer",
+          p_total_xp: xp,
+          p_earned_xp: 25,
+        });
+        await syncFullProfileToCloud();
+      } catch (e) {
+        console.error("Failed to sync session XP to Supabase:", e);
+      }
+    })();
   };
 
   const addSession = (): void => {
@@ -574,7 +746,7 @@ export default function ProfileScreen(): React.JSX.Element {
         friction: 3,
         useNativeDriver: true,
       }),
-    ]).start(() => {
+    ]).start(async () => {
       if (!newTitle.trim()) {
         Alert.alert("Incomplete Form", "Please enter a session title/topic.");
         return;
@@ -609,7 +781,8 @@ export default function ProfileScreen(): React.JSX.Element {
       setNewDescription("");
       animateViewChange("profile");
       setSection("schedule");
-      persistData({ sessions: updatedSessions });
+      await persistData({ sessions: updatedSessions });
+      await syncFullProfileToCloud();
     });
   };
 
@@ -1070,7 +1243,7 @@ export default function ProfileScreen(): React.JSX.Element {
             }}
           >
             {section === "badges" ? (
-              <Badges />
+              <Badges cloudBadges={cloudBadges} currentTotalXp={xp} />
             ) : (
               <SchedulePreview
                 sessions={sessions}
@@ -1119,13 +1292,28 @@ function FormInput({
   );
 }
 
-function Badges(): React.JSX.Element {
+function Badges({
+  cloudBadges,
+  currentTotalXp,
+}: {
+  cloudBadges?: Record<string, string>;
+  currentTotalXp: number;
+}): React.JSX.Element {
   const { width } = useWindowDimensions();
   const badgeWidth = Math.floor((width - 48) / 3);
   const progress = useProgress();
 
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
   const badgeModalAnim = useRef(new Animated.Value(0)).current;
+
+  const getUnlockDate = (id: string, xpThreshold?: number) => {
+    const savedDate = progress.badgeUnlockDates?.[id] || cloudBadges?.[id];
+    if (savedDate) return savedDate;
+    if (xpThreshold && currentTotalXp >= xpThreshold) {
+      return new Date().toISOString();
+    }
+    return undefined;
+  };
 
   const dynamicAchievements = [
     {
@@ -1134,8 +1322,8 @@ function Badges(): React.JSX.Element {
       icon: "🌱",
       accent: "#4ade80",
       description: "Reach a total of 150 XP.",
-      unlocked: !!progress.badgeUnlockDates?.["first_steps"],
-      date: progress.badgeUnlockDates?.["first_steps"],
+      unlocked: !!getUnlockDate("first_steps", 150),
+      date: getUnlockDate("first_steps", 150),
     },
     {
       id: "cadet",
@@ -1143,8 +1331,8 @@ function Badges(): React.JSX.Element {
       icon: "🎓",
       accent: "#60a5fa",
       description: "Reach a total of 500 XP.",
-      unlocked: !!progress.badgeUnlockDates?.["cadet"],
-      date: progress.badgeUnlockDates?.["cadet"],
+      unlocked: !!getUnlockDate("cadet", 500),
+      date: getUnlockDate("cadet", 500),
     },
     {
       id: "streak",
@@ -1152,8 +1340,8 @@ function Badges(): React.JSX.Element {
       icon: "🔥",
       accent: "#f97316",
       description: "Complete at least 1 lesson or game for 3 consecutive days.",
-      unlocked: !!progress.badgeUnlockDates?.["streak"],
-      date: progress.badgeUnlockDates?.["streak"],
+      unlocked: !!getUnlockDate("streak"),
+      date: getUnlockDate("streak"),
     },
     {
       id: "time",
@@ -1161,8 +1349,8 @@ function Badges(): React.JSX.Element {
       icon: "⏱️",
       accent: "#a78bfa",
       description: "Reach a total of 1 hour of learning time.",
-      unlocked: !!progress.badgeUnlockDates?.["time"],
-      date: progress.badgeUnlockDates?.["time"],
+      unlocked: !!getUnlockDate("time"),
+      date: getUnlockDate("time"),
     },
     {
       id: "daily",
@@ -1171,8 +1359,8 @@ function Badges(): React.JSX.Element {
       accent: "#f472b6",
       description:
         "Complete the daily challenge or featured adventure for a total of 3 days.",
-      unlocked: !!progress.badgeUnlockDates?.["daily"],
-      date: progress.badgeUnlockDates?.["daily"],
+      unlocked: !!getUnlockDate("daily"),
+      date: getUnlockDate("daily"),
     },
     {
       id: "perfect",
@@ -1181,8 +1369,8 @@ function Badges(): React.JSX.Element {
       accent: "#2dd4bf",
       description:
         "Successfully answer all questions in a lesson without making a single mistake.",
-      unlocked: !!progress.badgeUnlockDates?.["perfect"],
-      date: progress.badgeUnlockDates?.["perfect"],
+      unlocked: !!getUnlockDate("perfect"),
+      date: getUnlockDate("perfect"),
     },
     {
       id: "minigame",
@@ -1191,8 +1379,8 @@ function Badges(): React.JSX.Element {
       accent: "#fbbf24",
       description:
         "Successfully beat the impossible game category or the Codebreaker vault.",
-      unlocked: !!progress.badgeUnlockDates?.["minigame"],
-      date: progress.badgeUnlockDates?.["minigame"],
+      unlocked: !!getUnlockDate("minigame"),
+      date: getUnlockDate("minigame"),
     },
     {
       id: "speed_math",
@@ -1201,8 +1389,8 @@ function Badges(): React.JSX.Element {
       accent: "#ef4444",
       description:
         "Successfully answer any math category subject questions within 45 seconds.",
-      unlocked: !!progress.badgeUnlockDates?.["speed_math"],
-      date: progress.badgeUnlockDates?.["speed_math"],
+      unlocked: !!getUnlockDate("speed_math"),
+      date: getUnlockDate("speed_math"),
     },
     {
       id: "speed_sci",
@@ -1211,8 +1399,8 @@ function Badges(): React.JSX.Element {
       accent: "#14b8a6",
       description:
         "Successfully answer any science category subject questions within 45 seconds.",
-      unlocked: !!progress.badgeUnlockDates?.["speed_sci"],
-      date: progress.badgeUnlockDates?.["speed_sci"],
+      unlocked: !!getUnlockDate("speed_sci"),
+      date: getUnlockDate("speed_sci"),
     },
     {
       id: "elite",
@@ -1220,8 +1408,8 @@ function Badges(): React.JSX.Element {
       icon: "💎",
       accent: "#6366f1",
       description: "Achieve a total of 1000 XP.",
-      unlocked: !!progress.badgeUnlockDates?.["elite"],
-      date: progress.badgeUnlockDates?.["elite"],
+      unlocked: !!getUnlockDate("elite", 1000),
+      date: getUnlockDate("elite", 1000),
     },
     {
       id: "gold",
@@ -1229,8 +1417,8 @@ function Badges(): React.JSX.Element {
       icon: "🏆",
       accent: "#eab308",
       description: "Achieve a total of 2500 XP.",
-      unlocked: !!progress.badgeUnlockDates?.["gold"],
-      date: progress.badgeUnlockDates?.["gold"],
+      unlocked: !!getUnlockDate("gold", 2500),
+      date: getUnlockDate("gold", 2500),
     },
     {
       id: "master",
@@ -1238,8 +1426,8 @@ function Badges(): React.JSX.Element {
       icon: "🚀",
       accent: "#ec4899",
       description: "Achieve a total of 5000 XP.",
-      unlocked: !!progress.badgeUnlockDates?.["master"],
-      date: progress.badgeUnlockDates?.["master"],
+      unlocked: !!getUnlockDate("master", 5000),
+      date: getUnlockDate("master", 5000),
     },
   ];
 
@@ -1296,7 +1484,6 @@ function Badges(): React.JSX.Element {
             <Text style={styles.badgeTitle} numberOfLines={2}>
               {achievement.title}
             </Text>
-            {/* The small description text has been completely removed from here! */}
           </Pressable>
         ))}
       </View>

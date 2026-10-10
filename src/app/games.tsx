@@ -1,9 +1,10 @@
 ﻿import { GradientSafeAreaView } from "@/components/gradient-safe-area";
-import { useProgress } from "@/hooks/use-progress";
+import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
+import { supabase } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAudioPlayer } from "expo-audio";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -44,6 +45,30 @@ interface GameItem {
   };
   isPlaceholder?: boolean;
 }
+
+interface MiniGameMeta {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badge: string;
+  isRecent: boolean;
+}
+
+interface LeaderboardEntry {
+  id: string;
+  full_name: string;
+  weekly_xp: number;
+}
+
+const ALL_ARCADE_GAMES = [
+  { key: "flashcards", title: "Flashcards", subtitle: "Formulas & definitions", icon: "🧠", defaultBadge: "Smart" },
+  { key: "scramble", title: "Word Scramble", subtitle: "Science terminology", icon: "🔤", defaultBadge: "Spelling" },
+  { key: "memory", title: "Memory Match", subtitle: "Flip & pair icons", icon: "⭐", defaultBadge: "Memory" },
+  { key: "ninja", title: "Number Ninja", subtitle: "Rapid arithmetic", icon: "⚡", defaultBadge: "Speed" },
+  { key: "whack", title: "Whack-a-Number", subtitle: "Pop correct target", icon: "🎯", defaultBadge: "Action" },
+  { key: "codebreaker", title: "Codebreaker", subtitle: "Defuse the vault", icon: "🔥", defaultBadge: "Vault" },
+];
 
 const gameCatalog: GameItem[] = [
   {
@@ -170,17 +195,21 @@ const quizGameItem: GameItem = {
 
 const getDifficultyColor = (diff: string) => {
   switch (diff) {
-    case "Easy":
-      return "#39d4ff";
-    case "Medium":
-      return "#4ade80";
-    case "Hard":
-      return "#facc15";
-    case "Impossible":
-      return "#ef4444";
-    default:
-      return "#4ade80";
+    case "Easy": return "#39d4ff";
+    case "Medium": return "#4ade80";
+    case "Hard": return "#facc15";
+    case "Impossible": return "#ef4444";
+    default: return "#4ade80";
   }
+};
+
+const getInitials = (name?: string) => {
+  if (!name || name === "---") return "–";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length > 1 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
 };
 
 export default function GamesScreen() {
@@ -194,6 +223,10 @@ export default function GamesScreen() {
   const [memorySubjectPickerVisible, setMemorySubjectPickerVisible] = useState(false);
   const [memorySubject, setMemorySubject] = useState<Subject>("Both");
 
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
+
   const musicPlayer = useAudioPlayer(gameThemeMusic);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -206,21 +239,14 @@ export default function GamesScreen() {
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
   const filterAnims = useRef({
-    All: new Animated.Value(1),
-    Easy: new Animated.Value(1),
-    Medium: new Animated.Value(1),
-    Hard: new Animated.Value(1),
-    Impossible: new Animated.Value(1),
+    All: new Animated.Value(1), Easy: new Animated.Value(1),
+    Medium: new Animated.Value(1), Hard: new Animated.Value(1), Impossible: new Animated.Value(1),
   }).current;
 
   const cardAnims = useRef({
-    quiz: new Animated.Value(1),
-    flashcards: new Animated.Value(1),
-    scramble: new Animated.Value(1),
-    memory: new Animated.Value(1),
-    ninja: new Animated.Value(1),
-    whack: new Animated.Value(1),
-    codebreaker: new Animated.Value(1),
+    quiz: new Animated.Value(1), flashcards: new Animated.Value(1),
+    scramble: new Animated.Value(1), memory: new Animated.Value(1),
+    ninja: new Animated.Value(1), whack: new Animated.Value(1), codebreaker: new Animated.Value(1),
   }).current;
 
   const tutorialAnim = useRef(new Animated.Value(0)).current;
@@ -264,7 +290,7 @@ export default function GamesScreen() {
     if (musicPlayer) {
       try {
         musicPlayer.loop = true;
-        musicPlayer.volume = isMuted ? 0 : 0.4;
+        musicPlayer.volume = isMuted ? 0 : 0.15;
         musicPlayer.play();
       } catch (e) {
         console.log("Error playing background music", e);
@@ -287,7 +313,7 @@ export default function GamesScreen() {
     if (!musicPlayer) return;
     try {
       if (isMuted) {
-        musicPlayer.volume = 0.4;
+        musicPlayer.volume = 0.15;
         setIsMuted(false);
       } else {
         musicPlayer.volume = 0;
@@ -321,6 +347,101 @@ export default function GamesScreen() {
     }
   };
 
+  // Helper to read current player's local XP & username
+  const getLocalPlayerStats = async () => {
+    const profileRaw = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+    const guestUsername = await AsyncStorage.getItem("explorerUsername");
+    const guestName = await AsyncStorage.getItem("explorerName");
+
+    let localXp = normalizeXpValue(leaderboardXp);
+    let localName = (guestUsername || guestName || "Explorer").trim();
+
+    if (profileRaw) {
+      const parsed = JSON.parse(profileRaw);
+      localXp = Math.max(localXp, normalizeXpValue(parsed.xp));
+      localName = (parsed.username || parsed.name || localName).trim();
+    }
+
+    return { localName, localXp };
+  };
+
+  // --- SYNC XP TO SUPABASE ---
+  const syncXpToSupabase = async (earnedXp: number) => {
+    if (earnedXp <= 0) return;
+    try {
+      const { localName, localXp } = await getLocalPlayerStats();
+      await supabase.rpc("sync_user_xp", {
+        p_name: localName,
+        p_xp: localXp + earnedXp,
+      });
+    } catch (err) {
+      console.error("Failed to sync XP to Supabase:", err);
+    }
+  };
+
+  // --- FETCH LIVE LEADERBOARD & COEXIST WITH BOTS ---
+  const fetchLeaderboard = async () => {
+    try {
+      setLoadingLeaderboard(true);
+
+      // 1. Get local player stats (e.g. your 1545 XP) and sync to Supabase
+      const { localName, localXp } = await getLocalPlayerStats();
+      await supabase.rpc("sync_user_xp", {
+        p_name: localName,
+        p_xp: localXp,
+      });
+
+      // 2. Fetch the top 5 profiles from Supabase (Real Users + Bots)
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, weekly_xp")
+        .order("weekly_xp", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const cloudList: LeaderboardEntry[] = (data || []).map((row: any, idx: number) => ({
+        id: String(row.id ?? idx),
+        full_name: row.full_name?.trim() || "Explorer",
+        weekly_xp: Number(row.weekly_xp) || 0,
+      }));
+
+      // 3. Ensure current player coexists in the list with their latest XP
+      const alreadyInList = cloudList.some(
+        (p) => p.full_name.toLowerCase() === localName.toLowerCase()
+      );
+
+      let combinedList = [...cloudList];
+      if (!alreadyInList) {
+        combinedList.push({
+          id: "local-player",
+          full_name: localName,
+          weekly_xp: localXp,
+        });
+      } else {
+        combinedList = combinedList.map((p) =>
+          p.full_name.toLowerCase() === localName.toLowerCase()
+            ? { ...p, weekly_xp: Math.max(p.weekly_xp, localXp) }
+            : p
+        );
+      }
+
+      combinedList.sort((a, b) => b.weekly_xp - a.weekly_xp);
+      setLeaderboardData(combinedList.slice(0, 5));
+    } catch (e) {
+      console.error("Error fetching leaderboard from Supabase:", e);
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadArcadeGames();
+      void fetchLeaderboard();
+    }, [leaderboardXp]),
+  );
+
   useEffect(() => {
     if (params.autoOpenGame) {
       const targetKey = String(params.autoOpenGame);
@@ -332,7 +453,7 @@ export default function GamesScreen() {
       if (targetGame) {
         void recordRecentGame(targetGame.key);
         setSelectedGame(targetGame.key);
-        setSelectedTutorialGame(targetGame); 
+        setSelectedTutorialGame(targetGame);
       }
     }
   }, [params.autoOpenGame]);
@@ -359,6 +480,13 @@ export default function GamesScreen() {
   const chunkedGames = [
     paddedGames.slice(0, 3),
     paddedGames.slice(3, 6),
+  ];
+
+  // Ensure podium always has 3 entries
+  const podiumEntries: LeaderboardEntry[] = [
+    leaderboardData[0] || { id: "empty-1", full_name: "---", weekly_xp: 0 },
+    leaderboardData[1] || { id: "empty-2", full_name: "---", weekly_xp: 0 },
+    leaderboardData[2] || { id: "empty-3", full_name: "---", weekly_xp: 0 },
   ];
 
   useEffect(() => {
@@ -492,12 +620,14 @@ export default function GamesScreen() {
     setActiveGameRunning(true);
   };
 
-  const handleFinishGame = (earnedXp: number = 50) => {
+  const handleFinishGame = async (earnedXp: number = 50) => {
     if (earnedXp > 0) {
-      const isCodebreaker = selectedGame === 'codebreaker';
-      const isDailyChallenge = params.autoOpenGame === 'quiz';
-      
+      const isCodebreaker = selectedGame === "codebreaker";
+      const isDailyChallenge = params.autoOpenGame === "quiz";
+
       void completeGame(earnedXp, isCodebreaker, isDailyChallenge);
+      await syncXpToSupabase(earnedXp);
+      void fetchLeaderboard();
     }
     setActiveGameRunning(false);
     setSelectedGame(null);
@@ -511,6 +641,61 @@ export default function GamesScreen() {
     }
   };
 
+  const loadArcadeGames = async () => {
+    try {
+      const recentRaw = await AsyncStorage.getItem(RECENT_GAMES_KEY);
+      const recentKeys: string[] = recentRaw ? JSON.parse(recentRaw) : [];
+
+      const availableRecents = recentKeys.filter((k) =>
+        ALL_ARCADE_GAMES.some((g) => g.key === k),
+      );
+
+      let firstTwoKeys: string[] = [];
+      if (availableRecents.length >= 2) {
+        firstTwoKeys = [availableRecents[0], availableRecents[1]];
+      } else if (availableRecents.length === 1) {
+        const fallback = ALL_ARCADE_GAMES.find((g) => g.key !== availableRecents[0]);
+        firstTwoKeys = [availableRecents[0], fallback ? fallback.key : "ninja"];
+      } else {
+        firstTwoKeys = ["flashcards", "ninja"];
+      }
+
+      const remainingGames = ALL_ARCADE_GAMES.filter(
+        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz"
+      );
+
+      const randomPicked =
+        remainingGames[Math.floor(Math.random() * remainingGames.length)] ||
+        remainingGames[0];
+
+      const finalList: MiniGameMeta[] = [
+        ...firstTwoKeys.map((key) => {
+          const item = ALL_ARCADE_GAMES.find((g) => g.key === key)!;
+          return {
+            key: item.key,
+            title: item.title,
+            subtitle: item.subtitle,
+            icon: item.icon,
+            badge: "Recent",
+            isRecent: true,
+          };
+        }),
+        {
+          key: randomPicked.key,
+          title: randomPicked.title,
+          subtitle: randomPicked.subtitle,
+          icon: randomPicked.icon,
+          badge: "Suggested",
+          isRecent: false,
+        },
+      ];
+
+      setDisplayGames(finalList);
+    } catch (e) {
+      console.error("Failed to load arcade games", e);
+    }
+  };
+
   const renderActiveGame = () => {
     const commonProps = {
       grade: selectedGrade,
@@ -521,27 +706,22 @@ export default function GamesScreen() {
       onFinish: handleFinishGame,
       onComplete: handleFinishGame,
       onSuccess: (earnedXp: number) => {
-        if (earnedXp > 0) addXp(earnedXp);
+        if (earnedXp > 0) {
+          addXp(earnedXp);
+          void syncXpToSupabase(earnedXp);
+        }
       },
     } as any;
 
     switch (selectedGame) {
-      case "quiz":
-        return <QuizGame {...commonProps} />;
-      case "flashcards":
-        return <FlashcardGame {...commonProps} />;
-      case "scramble":
-        return <WordScrambleGame {...commonProps} />;
-      case "ninja":
-        return <NumberNinjaGame {...commonProps} />;
-      case "memory":
-        return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
-      case "whack":
-        return <WhackANumberGame {...commonProps} />;
-      case "codebreaker":
-        return <CodebreakerGame {...commonProps} />;
-      default:
-        return <QuizGame {...commonProps} />;
+      case "quiz": return <QuizGame {...commonProps} />;
+      case "flashcards": return <FlashcardGame {...commonProps} />;
+      case "scramble": return <WordScrambleGame {...commonProps} />;
+      case "ninja": return <NumberNinjaGame {...commonProps} />;
+      case "memory": return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
+      case "whack": return <WhackANumberGame {...commonProps} />;
+      case "codebreaker": return <CodebreakerGame {...commonProps} />;
+      default: return <QuizGame {...commonProps} />;
     }
   };
 
@@ -707,14 +887,54 @@ export default function GamesScreen() {
           <Animated.View
             style={[styles.leaderboardCard, { transform: [{ scale: leaderboardPulse }] }]}
           >
-            <View style={styles.podium}>
-              <PodiumPlace rank="2" name="Priya S." xp="0 XP" color="#c9c9c9" height={64} initials="PS" avatarBg="#3b82f6" />
-              <PodiumPlace rank="1" name="Jordan K." xp="0 XP" color="#fff24c" height={80} initials="JK" avatarBg="#3b82f6" />
-              <PodiumPlace rank="3" name="Croissant" xp="0 XP" color="#ed9538" height={52} initials="BC" avatarBg="#3b82f6" />
-            </View>
+            {!loadingLeaderboard ? (
+              <>
+                <View style={styles.podium}>
+                  <PodiumPlace
+                    rank="2"
+                    name={podiumEntries[1].full_name}
+                    xp={`${podiumEntries[1].weekly_xp} XP`}
+                    color="#c9c9c9"
+                    height={64}
+                    initials={getInitials(podiumEntries[1].full_name)}
+                    avatarBg="#3b82f6"
+                  />
+                  <PodiumPlace
+                    rank="1"
+                    name={podiumEntries[0].full_name}
+                    xp={`${podiumEntries[0].weekly_xp} XP`}
+                    color="#fff24c"
+                    height={80}
+                    initials={getInitials(podiumEntries[0].full_name)}
+                    avatarBg="#3b82f6"
+                  />
+                  <PodiumPlace
+                    rank="3"
+                    name={podiumEntries[2].full_name}
+                    xp={`${podiumEntries[2].weekly_xp} XP`}
+                    color="#ed9538"
+                    height={52}
+                    initials={getInitials(podiumEntries[2].full_name)}
+                    avatarBg="#3b82f6"
+                  />
+                </View>
 
-            <RankRow rank="#4" initials="MR" name="Marco Rossi" xp="0 XP" avatarBg="#e69b35" />
-            <RankRow rank="#5" initials="MS" name="Maricris Santos" xp="0 XP" avatarBg="#e69b35" />
+                {leaderboardData.slice(3, 5).map((player, index) => (
+                  <RankRow
+                    key={player.id || index}
+                    rank={`#${index + 4}`}
+                    initials={getInitials(player.full_name)}
+                    name={player.full_name}
+                    xp={`${player.weekly_xp} XP`}
+                    avatarBg="#e69b35"
+                  />
+                ))}
+              </>
+            ) : (
+              <Text style={{ color: "#94a3b8", textAlign: "center", padding: 20 }}>
+                Loading Champions...
+              </Text>
+            )}
           </Animated.View>
         </Animated.View>
       </ScrollView>
