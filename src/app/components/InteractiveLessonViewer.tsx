@@ -992,7 +992,7 @@ export default function InteractiveLessonViewer({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#0b142d" },
+  safeArea: { flex: 1, backgroundColor: "#1d204a" },
   container: { padding: 18, paddingBottom: 40 },
   topHeader: {
     flexDirection: "row",
