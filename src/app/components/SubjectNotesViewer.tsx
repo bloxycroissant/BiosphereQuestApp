@@ -457,6 +457,12 @@ export default function SubjectNotesViewer({
 
   const pageTurnAudio = useAudioPlayer(pageTurnSoundFile);
 
+  const selectedHighlighterRef = useRef<string | null>(null);
+  selectedHighlighterRef.current = selectedHighlighter;
+
+  const currentPageRef = useRef<number>(currentPage);
+  currentPageRef.current = currentPage;
+
   const getSwatchAnim = (id: string) => {
     if (!swatchAnimValues[id]) {
       swatchAnimValues[id] = new Animated.Value(1);
@@ -487,58 +493,46 @@ export default function SubjectNotesViewer({
     ]).start();
   };
 
-  const pagesData = useMemo(() => {
-    const list: Array<{ pageIndex: number; title: string; sectionLabel: string }> = [];
-    list.push({ pageIndex: 0, title: "Intro", sectionLabel: "Overview" });
-
-    subject.lessons.forEach((lesson, index) => {
-      const p1 = 1 + index * 4;
-      list.push({ pageIndex: p1, title: lesson.title, sectionLabel: `Ch ${index + 1}` });
-      list.push({ pageIndex: p1 + 1, title: "Visual Map", sectionLabel: `Map ${index + 1}` });
-      list.push({ pageIndex: p1 + 2, title: "Worked Example", sectionLabel: `Ex ${index + 1}` });
-      list.push({ pageIndex: p1 + 3, title: "Practice", sectionLabel: `Quiz ${index + 1}` });
-    });
-    return list;
-  }, [subject]);
-
   const stickyTabs = useMemo(() => {
     const tabs: Array<{ pageIndex: number; label: string; color: string }> = [];
     const colors = ["#FF5252", "#FF7043", "#FFA726", "#66BB6A", "#26A69A", "#42A5F5", "#AB47BC"];
 
-    pagesData.forEach((item, idx) => {
-      if (idx === 0 || item.title === "Practice" || idx % 3 === 0) {
-        tabs.push({
-          pageIndex: item.pageIndex,
-          label: item.sectionLabel,
-          color: colors[tabs.length % colors.length],
-        });
-      }
+    subject.lessons.forEach((_, index) => {
+      const startPageIndex = 1 + index * 4;
+      tabs.push({
+        pageIndex: startPageIndex,
+        label: `Ch ${index + 1}`,
+        color: colors[index % colors.length],
+      });
     });
-    return tabs.slice(0, 7);
-  }, [pagesData]);
+
+    return tabs;
+  }, [subject]);
 
   const applyHighlightKey = (wordKey: string) => {
+    const activeColor = selectedHighlighterRef.current;
     setWordHighlights((prev) => {
-      if (!selectedHighlighter) {
+      if (!activeColor) {
         if (!prev[wordKey]) return prev;
         const copy = { ...prev };
         delete copy[wordKey];
         return copy;
       }
-      if (prev[wordKey] === selectedHighlighter) return prev;
-      return { ...prev, [wordKey]: selectedHighlighter };
+      if (prev[wordKey] === activeColor) return prev;
+      return { ...prev, [wordKey]: activeColor };
     });
   };
 
   const toggleWordHighlight = (wordKey: string) => {
+    const activeColor = selectedHighlighterRef.current;
     setWordHighlights((prev) => {
       const copy = { ...prev };
-      if (!selectedHighlighter) {
+      if (!activeColor) {
         delete copy[wordKey];
-      } else if (copy[wordKey] === selectedHighlighter) {
+      } else if (copy[wordKey] === activeColor) {
         delete copy[wordKey];
       } else {
-        copy[wordKey] = selectedHighlighter;
+        copy[wordKey] = activeColor;
       }
       return copy;
     });
@@ -546,15 +540,33 @@ export default function SubjectNotesViewer({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const key = (evt.target as any)?._attributePayload?.["data-word-key"];
-        if (key) applyHighlightKey(key);
+      onStartShouldSetPanResponder: (_, gestureState) => {
+        return !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 10;
       },
-      onPanResponderMove: (evt) => {
-        const key = (evt.target as any)?._attributePayload?.["data-word-key"];
-        if (key) applyHighlightKey(key);
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 15;
+      },
+      onPanResponderGrant: (evt) => {
+        if (selectedHighlighterRef.current) {
+          const key = (evt.target as any)?._attributePayload?.["data-word-key"];
+          if (key) applyHighlightKey(key);
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (selectedHighlighterRef.current) {
+          const key = (evt.target as any)?._attributePayload?.["data-word-key"];
+          if (key) applyHighlightKey(key);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (!selectedHighlighterRef.current) {
+          const SWIPE_THRESHOLD = 30;
+          if (gestureState.dx < -SWIPE_THRESHOLD) {
+            turnPage("next");
+          } else if (gestureState.dx > SWIPE_THRESHOLD) {
+            turnPage("prev");
+          }
+        }
       },
     })
   ).current;
@@ -607,7 +619,7 @@ export default function SubjectNotesViewer({
         <Text style={styles.sectionHeading}>👋 Welcome Explorer!</Text>
         {renderParagraphs(`This notebook contains all the core definitions, visual maps, and practice guides for ${subject.title}.`, "intro-1")}
         <Text style={styles.sectionHeading}>📖 How to use this book</Text>
-        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Select 'Off' to erase highlights. Use the animated sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
+        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Select 'Off' to erase highlights or swipe left/right across pages to turn them. Use the sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
       </ScrollView>,
     );
 
@@ -694,7 +706,7 @@ export default function SubjectNotesViewer({
   const totalPages = pages.length;
 
   const jumpToPage = (newPage: number) => {
-    if (newPage < 0 || newPage >= totalPages || newPage === currentPage) return;
+    if (newPage < 0 || newPage >= totalPages || newPage === currentPageRef.current) return;
 
     if (pageTurnAudio) {
       try {
@@ -712,7 +724,7 @@ export default function SubjectNotesViewer({
       Animated.spring(tabAnim, { toValue: 0, friction: 5, useNativeDriver: true }),
     ]).start();
 
-    if (newPage > currentPage) {
+    if (newPage > currentPageRef.current) {
       Animated.timing(flipAnim, {
         toValue: -1,
         duration: 250,
@@ -733,7 +745,8 @@ export default function SubjectNotesViewer({
   };
 
   const turnPage = (direction: "next" | "prev") => {
-    const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
+    const cur = currentPageRef.current;
+    const newPage = direction === "next" ? cur + 1 : cur - 1;
     jumpToPage(newPage);
   };
 
@@ -868,7 +881,9 @@ export default function SubjectNotesViewer({
 
           <View style={styles.stickyTabsContainer} pointerEvents="box-none">
             {stickyTabs.map((tab, idx) => {
-              const isActive = currentPage === tab.pageIndex;
+              const isActive =
+                currentPage >= tab.pageIndex &&
+                (idx === stickyTabs.length - 1 || currentPage < stickyTabs[idx + 1].pageIndex);
               const animVal = getStickyTabAnim(tab.pageIndex);
 
               return (
@@ -1182,16 +1197,16 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     bottom: 0,
-    left: 36,
-    width: "20%",
-    zIndex: 10,
+    left: 0,
+    width: "25%",
+    zIndex: 30,
   },
   tapZoneRight: {
     position: "absolute",
     top: 0,
     bottom: 0,
     right: 0,
-    width: "20%",
-    zIndex: 10,
+    width: "25%",
+    zIndex: 30,
   },
 });
