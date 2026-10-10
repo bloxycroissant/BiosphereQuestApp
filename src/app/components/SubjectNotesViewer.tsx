@@ -4,9 +4,10 @@ import React, { useMemo, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { type Lesson, type Subject } from "./curriculum";
 import { notebookCurriculum } from "./subjectdata";
@@ -344,6 +345,7 @@ function LessonVisual({ data }: { data: LessonVisualData }) {
     </View>
   );
 }
+
 const getGradeStudyGuidance = (gradeLevel: number, isScience: boolean) => {
   if (gradeLevel <= 2) {
     return isScience
@@ -432,7 +434,12 @@ export default function SubjectNotesViewer({
     const generatedPages = [];
 
     generatedPages.push(
-      <View key="intro" style={styles.pageContent}>
+      <ScrollView
+        key="intro"
+        style={styles.pageContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.pageTitle}>{subject.title} Guide</Text>
         <Text style={styles.pageSubtitle}>
           Grade {gradeLevel} Explorer's Notebook
@@ -448,7 +455,7 @@ export default function SubjectNotesViewer({
           Tap the right edge of the page to flip forward, and the left edge to
           flip backward. Take your time and read carefully!
         </Text>
-      </View>,
+      </ScrollView>,
     );
 
     subject.lessons.forEach((lesson, index) => {
@@ -456,7 +463,12 @@ export default function SubjectNotesViewer({
       const visualData = getLessonVisualData(lesson, expansion.isScience);
 
       generatedPages.push(
-        <View key={`lesson-${index}-p1`} style={styles.pageContent}>
+        <ScrollView
+          key={`lesson-${index}-p1`}
+          style={styles.pageContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 1</Text>
           <Text style={styles.pageTitle}>{lesson.title}</Text>
           <View style={styles.divider} />
@@ -464,11 +476,16 @@ export default function SubjectNotesViewer({
           {renderParagraphs(expansion.definition)}
           <Text style={styles.sectionHeading}>🧠 How to think about it</Text>
           {renderParagraphs(expansion.explanation)}
-        </View>,
+        </ScrollView>,
       );
 
       generatedPages.push(
-        <View key={`lesson-${index}-p2`} style={styles.pageContent}>
+        <ScrollView
+          key={`lesson-${index}-p2`}
+          style={styles.pageContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 2</Text>
           <Text style={styles.pageTitle}>Visual Concept Map</Text>
           <View style={styles.divider} />
@@ -477,11 +494,16 @@ export default function SubjectNotesViewer({
             of {lesson.title.toLowerCase()}.
           </Text>
           <LessonVisual data={visualData} />
-        </View>,
+        </ScrollView>,
       );
 
       generatedPages.push(
-        <View key={`lesson-${index}-p3`} style={styles.pageContent}>
+        <ScrollView
+          key={`lesson-${index}-p3`}
+          style={styles.pageContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 3</Text>
           <Text style={styles.pageTitle}>Worked Example</Text>
           <View style={styles.divider} />
@@ -495,11 +517,16 @@ export default function SubjectNotesViewer({
           {renderParagraphs(expansion.computation)}
           <Text style={styles.sectionHeading}>💡 Why this matters</Text>
           {renderParagraphs(expansion.exampleExplanation)}
-        </View>,
+        </ScrollView>,
       );
 
       generatedPages.push(
-        <View key={`lesson-${index}-p4`} style={styles.pageContent}>
+        <ScrollView
+          key={`lesson-${index}-p4`}
+          style={styles.pageContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 4</Text>
           <Text style={styles.pageTitle}>Practice & Apply</Text>
           <View style={styles.divider} />
@@ -511,7 +538,7 @@ export default function SubjectNotesViewer({
             Arcade. A strong explanation names the idea, points to a useful
             detail, and tells how that detail matches the definition!
           </Text>
-        </View>,
+        </ScrollView>,
       );
     });
 
@@ -680,6 +707,7 @@ const styles = StyleSheet.create({
 
   pageContentWrapper: { flex: 1, justifyContent: "space-between" },
   pageContent: { flex: 1 },
+  scrollContentContainer: { paddingBottom: 20 },
   pageTitle: {
     color: "#1e293b",
     fontSize: 24,
@@ -767,8 +795,8 @@ const styles = StyleSheet.create({
 
   paginationFooter: {
     alignItems: "center",
-    marginTop: 40,
-    paddingTop: 16,
+    marginTop: 10,
+    paddingTop: 12,
     borderTopWidth: 2,
     borderTopColor: "#e2d8c5",
   },
