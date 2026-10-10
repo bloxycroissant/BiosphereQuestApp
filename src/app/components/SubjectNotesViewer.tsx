@@ -2,12 +2,11 @@ import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe
 import { useAudioPlayer } from "expo-audio";
 import React, { useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 import { type Lesson, type Subject } from "./curriculum";
 import { notebookCurriculum } from "./subjectdata";
