@@ -518,18 +518,24 @@ export default function SubjectNotesViewer({
   }, [pagesData]);
 
   const applyHighlightKey = (wordKey: string) => {
-    if (!selectedHighlighter) return;
     setWordHighlights((prev) => {
+      if (!selectedHighlighter) {
+        if (!prev[wordKey]) return prev;
+        const copy = { ...prev };
+        delete copy[wordKey];
+        return copy;
+      }
       if (prev[wordKey] === selectedHighlighter) return prev;
       return { ...prev, [wordKey]: selectedHighlighter };
     });
   };
 
   const toggleWordHighlight = (wordKey: string) => {
-    if (!selectedHighlighter) return;
     setWordHighlights((prev) => {
       const copy = { ...prev };
-      if (copy[wordKey] === selectedHighlighter) {
+      if (!selectedHighlighter) {
+        delete copy[wordKey];
+      } else if (copy[wordKey] === selectedHighlighter) {
         delete copy[wordKey];
       } else {
         copy[wordKey] = selectedHighlighter;
@@ -540,8 +546,8 @@ export default function SubjectNotesViewer({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !!selectedHighlighter,
-      onMoveShouldSetPanResponder: () => !!selectedHighlighter,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const key = (evt.target as any)?._attributePayload?.["data-word-key"];
         if (key) applyHighlightKey(key);
@@ -601,7 +607,7 @@ export default function SubjectNotesViewer({
         <Text style={styles.sectionHeading}>👋 Welcome Explorer!</Text>
         {renderParagraphs(`This notebook contains all the core definitions, visual maps, and practice guides for ${subject.title}.`, "intro-1")}
         <Text style={styles.sectionHeading}>📖 How to use this book</Text>
-        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Use the animated sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
+        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Select 'Off' to erase highlights. Use the animated sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
       </ScrollView>,
     );
 
