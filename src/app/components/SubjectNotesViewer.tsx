@@ -3,6 +3,7 @@ import { useAudioPlayer } from "expo-audio";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Animated,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,6 +30,31 @@ interface LessonVisualData {
   summary: string;
   steps: LessonVisualStep[];
 }
+
+interface BookmarkOption {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+const BOOKMARK_DESIGNS: BookmarkOption[] = [
+  { id: "ribbon", name: "Classic Ribbon", icon: "🔖", color: "#FF5252" },
+  { id: "star", name: "Golden Star", icon: "⭐", color: "#FFD700" },
+  { id: "badge", name: "Explorer Badge", icon: "🛡️", color: "#4879E7" },
+  { id: "emerald", name: "Emerald Tag", icon: "💎", color: "#2ECC71" },
+];
+
+const HIGHLIGHTER_PALETTE = [
+  { id: "yellow", color: "rgba(255, 255, 186, 0.85)", name: "Butter Yellow" },
+  { id: "pink", color: "rgba(255, 209, 220, 0.85)", name: "Soft Pink" },
+  { id: "peach", color: "rgba(255, 223, 186, 0.85)", name: "Pastel Peach" },
+  { id: "green", color: "rgba(186, 255, 201, 0.85)", name: "Mint Green" },
+  { id: "blue", color: "rgba(186, 225, 255, 0.85)", name: "Sky Blue" },
+  { id: "lavender", color: "rgba(232, 170, 255, 0.85)", name: "Lavender" },
+];
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const getLessonVisualData = (
   lesson: Lesson,
@@ -413,22 +439,148 @@ const buildLessonExpansion = (
   };
 };
 
-const renderParagraphs = (text: string) => {
-  return text.split("\n\n").map((paragraph, index) => (
-    <Text key={index} style={[styles.bodyText, index > 0 && { marginTop: 10 }]}>
-      {paragraph}
-    </Text>
-  ));
-};
-
 export default function SubjectNotesViewer({
   subject,
   gradeLevel,
   onClose,
 }: SubjectNotesViewerProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(0);
+  const [selectedHighlighter, setSelectedHighlighter] = useState<string | null>(null);
+  const [wordHighlights, setWordHighlights] = useState<Record<string, string>>({});
+  const [bookmarkedPages, setBookmarkedPages] = useState<Record<number, BookmarkOption>>({});
+  const [currentBookmarkDesign, setCurrentBookmarkDesign] = useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
+
   const flipAnim = useRef(new Animated.Value(0)).current;
+  const bookmarkDropAnim = useRef(new Animated.Value(0)).current;
+  const swatchAnimValues = useRef<Record<string, Animated.Value>>({}).current;
+  const stickyTabAnimValues = useRef<Record<number, Animated.Value>>({}).current;
+
   const pageTurnAudio = useAudioPlayer(pageTurnSoundFile);
+
+  const getSwatchAnim = (id: string) => {
+    if (!swatchAnimValues[id]) {
+      swatchAnimValues[id] = new Animated.Value(1);
+    }
+    return swatchAnimValues[id];
+  };
+
+  const getStickyTabAnim = (pageIdx: number) => {
+    if (!stickyTabAnimValues[pageIdx]) {
+      stickyTabAnimValues[pageIdx] = new Animated.Value(0);
+    }
+    return stickyTabAnimValues[pageIdx];
+  };
+
+  const handleSelectHighlighter = (color: string | null, swatchId: string) => {
+    setSelectedHighlighter(color);
+    Animated.sequence([
+      Animated.timing(getSwatchAnim(swatchId), {
+        toValue: 1.25,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(getSwatchAnim(swatchId), {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const pagesData = useMemo(() => {
+    const list: Array<{ pageIndex: number; title: string; sectionLabel: string }> = [];
+    list.push({ pageIndex: 0, title: "Intro", sectionLabel: "Overview" });
+
+    subject.lessons.forEach((lesson, index) => {
+      const p1 = 1 + index * 4;
+      list.push({ pageIndex: p1, title: lesson.title, sectionLabel: `Ch ${index + 1}` });
+      list.push({ pageIndex: p1 + 1, title: "Visual Map", sectionLabel: `Map ${index + 1}` });
+      list.push({ pageIndex: p1 + 2, title: "Worked Example", sectionLabel: `Ex ${index + 1}` });
+      list.push({ pageIndex: p1 + 3, title: "Practice", sectionLabel: `Quiz ${index + 1}` });
+    });
+    return list;
+  }, [subject]);
+
+  const stickyTabs = useMemo(() => {
+    const tabs: Array<{ pageIndex: number; label: string; color: string }> = [];
+    const colors = ["#FF5252", "#FF7043", "#FFA726", "#66BB6A", "#26A69A", "#42A5F5", "#AB47BC"];
+
+    pagesData.forEach((item, idx) => {
+      if (idx === 0 || item.title === "Practice" || idx % 3 === 0) {
+        tabs.push({
+          pageIndex: item.pageIndex,
+          label: item.sectionLabel,
+          color: colors[tabs.length % colors.length],
+        });
+      }
+    });
+    return tabs.slice(0, 7);
+  }, [pagesData]);
+
+  const applyHighlightKey = (wordKey: string) => {
+    if (!selectedHighlighter) return;
+    setWordHighlights((prev) => {
+      if (prev[wordKey] === selectedHighlighter) return prev;
+      return { ...prev, [wordKey]: selectedHighlighter };
+    });
+  };
+
+  const toggleWordHighlight = (wordKey: string) => {
+    if (!selectedHighlighter) return;
+    setWordHighlights((prev) => {
+      const copy = { ...prev };
+      if (copy[wordKey] === selectedHighlighter) {
+        delete copy[wordKey];
+      } else {
+        copy[wordKey] = selectedHighlighter;
+      }
+      return copy;
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !!selectedHighlighter,
+      onMoveShouldSetPanResponder: () => !!selectedHighlighter,
+      onPanResponderGrant: (evt) => {
+        const key = (evt.target as any)?._attributePayload?.["data-word-key"];
+        if (key) applyHighlightKey(key);
+      },
+      onPanResponderMove: (evt) => {
+        const key = (evt.target as any)?._attributePayload?.["data-word-key"];
+        if (key) applyHighlightKey(key);
+      },
+    })
+  ).current;
+
+  const renderParagraphs = (text: string, prefix: string) => {
+    return text.split("\n\n").map((paragraph, pIdx) => {
+      const words = paragraph.split(" ");
+      return (
+        <Text key={pIdx} style={[styles.bodyText, pIdx > 0 && { marginTop: 10 }]}>
+          {words.map((word, wIdx) => {
+            const wordKey = `${currentPage}-${prefix}-${pIdx}-${wIdx}`;
+            const highlightColor = wordHighlights[wordKey];
+
+            return (
+              <Text
+                key={wIdx}
+                {...({ "data-word-key": wordKey } as any)}
+                onPress={() => toggleWordHighlight(wordKey)}
+                style={[
+                  highlightColor
+                    ? { backgroundColor: highlightColor, borderRadius: 2 }
+                    : null,
+                ]}
+              >
+                {word}{" "}
+              </Text>
+            );
+          })}
+        </Text>
+      );
+    });
+  };
 
   const pages = useMemo(() => {
     const generatedPages = [];
@@ -446,15 +598,9 @@ export default function SubjectNotesViewer({
         </Text>
         <View style={styles.divider} />
         <Text style={styles.sectionHeading}>👋 Welcome Explorer!</Text>
-        <Text style={styles.bodyText}>
-          This notebook contains all the core definitions, visual maps, and
-          practice guides for {subject.title}.
-        </Text>
+        {renderParagraphs(`This notebook contains all the core definitions, visual maps, and practice guides for ${subject.title}.`, "intro-1")}
         <Text style={styles.sectionHeading}>📖 How to use this book</Text>
-        <Text style={styles.bodyText}>
-          Tap the right edge of the page to flip forward, and the left edge to
-          flip backward. Take your time and read carefully!
-        </Text>
+        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Use the animated sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
       </ScrollView>,
     );
 
@@ -473,9 +619,9 @@ export default function SubjectNotesViewer({
           <Text style={styles.pageTitle}>{lesson.title}</Text>
           <View style={styles.divider} />
           <Text style={styles.sectionHeading}>📖 Concept & Definition</Text>
-          {renderParagraphs(expansion.definition)}
+          {renderParagraphs(expansion.definition, `l${index}-p1`)}
           <Text style={styles.sectionHeading}>🧠 How to think about it</Text>
-          {renderParagraphs(expansion.explanation)}
+          {renderParagraphs(expansion.explanation, `l${index}-p2`)}
         </ScrollView>,
       );
 
@@ -489,10 +635,7 @@ export default function SubjectNotesViewer({
           <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 2</Text>
           <Text style={styles.pageTitle}>Visual Concept Map</Text>
           <View style={styles.divider} />
-          <Text style={styles.bodyText}>
-            Follow the concept map from top to bottom. Each step shows one part
-            of {lesson.title.toLowerCase()}.
-          </Text>
+          {renderParagraphs(`Follow the concept map from top to bottom. Each step shows one part of ${lesson.title.toLowerCase()}.`, `l${index}-map`)}
           <LessonVisual data={visualData} />
         </ScrollView>,
       );
@@ -508,15 +651,15 @@ export default function SubjectNotesViewer({
           <Text style={styles.pageTitle}>Worked Example</Text>
           <View style={styles.divider} />
           <Text style={styles.sectionHeading}>⭐ Real-World Example</Text>
-          <Text style={styles.bodyText}>{expansion.example}</Text>
+          {renderParagraphs(expansion.example, `l${index}-ex`)}
           <Text style={styles.sectionHeading}>
             {expansion.isScience
               ? "🔬 Observe and Explain"
               : "🧮 Computation Workspace"}
           </Text>
-          {renderParagraphs(expansion.computation)}
+          {renderParagraphs(expansion.computation, `l${index}-comp`)}
           <Text style={styles.sectionHeading}>💡 Why this matters</Text>
-          {renderParagraphs(expansion.exampleExplanation)}
+          {renderParagraphs(expansion.exampleExplanation, `l${index}-why`)}
         </ScrollView>,
       );
 
@@ -531,25 +674,20 @@ export default function SubjectNotesViewer({
           <Text style={styles.pageTitle}>Practice & Apply</Text>
           <View style={styles.divider} />
           <Text style={styles.sectionHeading}>🎯 Guided Practice</Text>
-          <Text style={styles.bodyText}>{expansion.practice}</Text>
+          {renderParagraphs(expansion.practice, `l${index}-prac`)}
           <Text style={styles.sectionHeading}>🚀 Explorer's Mission Tip</Text>
-          <Text style={styles.bodyText}>
-            Keep this relationship in mind as you try new situations in the
-            Arcade. A strong explanation names the idea, points to a useful
-            detail, and tells how that detail matches the definition!
-          </Text>
+          {renderParagraphs("Keep this relationship in mind as you try new situations in the Arcade. A strong explanation names the idea, points to a useful detail, and tells how that detail matches the definition!", `l${index}-tip`)}
         </ScrollView>,
       );
     });
 
     return generatedPages;
-  }, [subject, gradeLevel]);
+  }, [subject, gradeLevel, selectedHighlighter, wordHighlights, currentPage]);
 
   const totalPages = pages.length;
 
-  const turnPage = (direction: "next" | "prev") => {
-    const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
-    if (newPage < 0 || newPage >= totalPages) return;
+  const jumpToPage = (newPage: number) => {
+    if (newPage < 0 || newPage >= totalPages || newPage === currentPage) return;
 
     if (pageTurnAudio) {
       try {
@@ -561,7 +699,13 @@ export default function SubjectNotesViewer({
       }
     }
 
-    if (direction === "next") {
+    const tabAnim = getStickyTabAnim(newPage);
+    Animated.sequence([
+      Animated.timing(tabAnim, { toValue: -12, duration: 100, useNativeDriver: true }),
+      Animated.spring(tabAnim, { toValue: 0, friction: 5, useNativeDriver: true }),
+    ]).start();
+
+    if (newPage > currentPage) {
       Animated.timing(flipAnim, {
         toValue: -1,
         duration: 250,
@@ -581,10 +725,36 @@ export default function SubjectNotesViewer({
     }
   };
 
+  const turnPage = (direction: "next" | "prev") => {
+    const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
+    jumpToPage(newPage);
+  };
+
+  const toggleBookmark = () => {
+    setBookmarkedPages((prev) => {
+      const next = { ...prev };
+      if (next[currentPage]) {
+        delete next[currentPage];
+      } else {
+        next[currentPage] = currentBookmarkDesign;
+        bookmarkDropAnim.setValue(-60);
+        Animated.spring(bookmarkDropAnim, {
+          toValue: 0,
+          friction: 6,
+          tension: 100,
+          useNativeDriver: true,
+        }).start();
+      }
+      return next;
+    });
+  };
+
   const rotateY = flipAnim.interpolate({
     inputRange: [-1, 0],
     outputRange: ["-90deg", "0deg"],
   });
+
+  const activeBookmark = bookmarkedPages[currentPage];
 
   return (
     <SafeAreaView style={styles.fullScreenWrapper} edges={["top"]}>
@@ -595,10 +765,59 @@ export default function SubjectNotesViewer({
         <Text style={[styles.headerTitle, { color: subject.color }]}>
           {subject.icon} {subject.title} Notes
         </Text>
+        <Pressable onPress={toggleBookmark} style={styles.bookmarkToggleBtn}>
+          <Text style={styles.bookmarkToggleText}>
+            {activeBookmark ? `${activeBookmark.icon} Bookmarked` : "🔖 Add Bookmark"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.toolbarRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
+          <Text style={styles.toolbarLabel}>Highlighter:</Text>
+          <AnimatedPressable
+            style={[
+              styles.colorSwatch,
+              !selectedHighlighter && styles.swatchSelected,
+              { transform: [{ scale: getSwatchAnim("off") }] },
+            ]}
+            onPress={() => handleSelectHighlighter(null, "off")}
+          >
+            <Text style={{ fontSize: 9, color: "#fff" }}>Off</Text>
+          </AnimatedPressable>
+          {HIGHLIGHTER_PALETTE.map((item) => (
+            <AnimatedPressable
+              key={item.id}
+              style={[
+                styles.colorSwatch,
+                { backgroundColor: item.color },
+                selectedHighlighter === item.color && styles.swatchSelected,
+                { transform: [{ scale: getSwatchAnim(item.id) }] },
+              ]}
+              onPress={() => handleSelectHighlighter(item.color, item.id)}
+            />
+          ))}
+
+          <View style={styles.toolbarDivider} />
+
+          <Text style={styles.toolbarLabel}>Bookmark Design:</Text>
+          {BOOKMARK_DESIGNS.map((design) => (
+            <Pressable
+              key={design.id}
+              style={[
+                styles.designBadge,
+                currentBookmarkDesign.id === design.id && styles.designBadgeSelected,
+              ]}
+              onPress={() => setCurrentBookmarkDesign(design)}
+            >
+              <Text style={{ fontSize: 13 }}>{design.icon}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       <View style={styles.notebookWrapper}>
-        <View style={styles.notebookPage}>
+        <View style={styles.notebookPage} {...panResponder.panHandlers}>
           <View style={styles.bindingContainer}>
             {[...Array(18)].map((_, i) => (
               <View key={i} style={styles.bindingGroup}>
@@ -607,6 +826,20 @@ export default function SubjectNotesViewer({
               </View>
             ))}
           </View>
+
+          {activeBookmark && (
+            <Animated.View
+              style={[
+                styles.bookmarkRibbonLarge,
+                {
+                  backgroundColor: activeBookmark.color,
+                  transform: [{ translateY: bookmarkDropAnim }],
+                },
+              ]}
+            >
+              <Text style={styles.bookmarkIconTextLarge}>{activeBookmark.icon}</Text>
+            </Animated.View>
+          )}
 
           <Animated.View
             style={[
@@ -625,6 +858,31 @@ export default function SubjectNotesViewer({
               </Text>
             </View>
           </Animated.View>
+
+          <View style={styles.stickyTabsContainer} pointerEvents="box-none">
+            {stickyTabs.map((tab, idx) => {
+              const isActive = currentPage === tab.pageIndex;
+              const animVal = getStickyTabAnim(tab.pageIndex);
+
+              return (
+                <AnimatedPressable
+                  key={`sticky-${idx}`}
+                  style={[
+                    styles.stickyArrowFlag,
+                    { backgroundColor: tab.color },
+                    isActive && styles.stickyArrowFlagActive,
+                    { transform: [{ translateX: animVal }] },
+                  ]}
+                  onPress={() => jumpToPage(tab.pageIndex)}
+                >
+                  <Text style={styles.stickyFlagText} numberOfLines={1}>
+                    {tab.label}
+                  </Text>
+                  <View style={[styles.arrowTip, { borderLeftColor: tab.color }]} />
+                </AnimatedPressable>
+              );
+            })}
+          </View>
 
           <Pressable
             style={styles.tapZoneLeft}
@@ -650,14 +908,51 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 16,
+    paddingBottom: 8,
   },
   backBtn: { paddingVertical: 6, paddingRight: 10 },
   backText: { color: "#e582ff", fontWeight: "900", fontSize: 15 },
   headerTitle: { fontSize: 16, fontWeight: "900" },
+  bookmarkToggleBtn: {
+    backgroundColor: "#1e293b",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  bookmarkToggleText: { color: "#f8fafc", fontSize: 12, fontWeight: "800" },
+
+  toolbarRow: {
+    backgroundColor: "#0f172a",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b",
+  },
+  toolbarScroll: { flexDirection: "row", alignItems: "center", gap: 8 },
+  toolbarLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "700" },
+  toolbarDivider: { width: 1, height: 16, backgroundColor: "#334155", marginHorizontal: 4 },
+  colorSwatch: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: "#475569",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  swatchSelected: { borderColor: "#ffffff", borderWidth: 2 },
+  designBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "#1e293b",
+  },
+  designBadgeSelected: { backgroundColor: "#334155", borderWidth: 1, borderColor: "#e2e8f0" },
+
   notebookWrapper: { 
     flex: 1, 
     padding: 18, 
+    paddingRight: 64, 
     paddingBottom: 40 
   },
   notebookPage: {
@@ -703,6 +998,73 @@ const styles = StyleSheet.create({
     backgroundColor: "#a19d94",
     borderRadius: 2,
     zIndex: 2,
+  },
+
+  bookmarkRibbonLarge: {
+    position: "absolute",
+    top: -6,
+    right: 32,
+    width: 38,
+    height: 64,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingBottom: 6,
+    zIndex: 20,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  bookmarkIconTextLarge: { fontSize: 20 },
+
+  stickyTabsContainer: {
+    position: "absolute",
+    right: -52,
+    top: 30,
+    bottom: 30,
+    width: 56,
+    justifyContent: "space-around",
+    alignItems: "flex-start",
+    zIndex: 25,
+  },
+  stickyArrowFlag: {
+    width: 64,
+    height: 30,
+    opacity: 0.9,
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingLeft: 4,
+    position: "relative",
+    elevation: 4,
+  },
+  stickyArrowFlagActive: {
+    opacity: 1.0,
+    width: 74,
+    right: 10,
+    elevation: 8,
+  },
+  stickyFlagText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  arrowTip: {
+    position: "absolute",
+    right: -12,
+    top: 0,
+    width: 0,
+    height: 0,
+    borderTopWidth: 15,
+    borderBottomWidth: 15,
+    borderLeftWidth: 12,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
   },
 
   pageContentWrapper: { flex: 1, justifyContent: "space-between" },
@@ -807,7 +1169,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 36,
-    width: "25%",
+    width: "20%",
     zIndex: 10,
   },
   tapZoneRight: {
@@ -815,7 +1177,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: "25%",
+    width: "20%",
     zIndex: 10,
   },
 });
