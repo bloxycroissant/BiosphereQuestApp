@@ -29,11 +29,10 @@ import {
   View,
 } from "react-native";
 import InteractiveLessonViewer from "./components/InteractiveLessonViewer";
+import SubjectNotesViewer from "./components/SubjectNotesViewer";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
-const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
-const LAST_LESSON_KEY = "@biosphere_last_lesson_v1";
 
 const astro = require("../../assets/BiosphereQuestAssets/Astro (Biosphere Quest Mascot).png");
 const homeIcon = require("../../assets/BiosphereQuestAssets/Home Icon.png");
@@ -91,6 +90,7 @@ export default function ExploreScreen(): React.JSX.Element {
   const params = useLocalSearchParams<{ autoOpenSubject?: string }>();
   const [grade, setGrade] = useState(1);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
+  const [showNotes, setShowNotes] = useState(false);
   const [selected, setSelected] = useState<{
     subject: Subject;
     lesson: Lesson;
@@ -463,6 +463,29 @@ export default function ExploreScreen(): React.JSX.Element {
                 ))}
               </LinearGradient>
 
+              {/* --- STUDY MATERIALS BUTTON --- */}
+              <Text style={styles.sectionHeading}>STUDY MATERIALS</Text>
+              <Pressable
+                style={styles.openNotesCard}
+                onPress={() => setShowNotes(true)}
+              >
+                <LinearGradient
+                  colors={[activeSubject.color + "25", activeSubject.color + "08"]}
+                  style={[styles.openNotesGradient, { borderColor: activeSubject.color }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={styles.openNotesIconBubble}>
+                    <Text style={styles.openNotesIcon}>📓</Text>
+                  </View>
+                  <View style={styles.openNotesMeta}>
+                    <Text style={styles.openNotesTitle}>Comprehensive Notes</Text>
+                    <Text style={styles.openNotesSub}>Read complete reference guide</Text>
+                  </View>
+                  <Text style={[styles.openNotesArrow, { color: activeSubject.color }]}>Read</Text>
+                </LinearGradient>
+              </Pressable>
+
               <Text style={styles.sectionHeading}>MISSION TRACK</Text>
 
               {activeSubject.lessons.map((lesson, idx) => {
@@ -581,6 +604,18 @@ export default function ExploreScreen(): React.JSX.Element {
         {!activeSubject && <BottomNavigation />}
       </SafeAreaView>
 
+      {/* --- SINGLE PAGE NOTEBOOK VIEWER --- */}
+      {showNotes && activeSubject && (
+        <Animated.View style={styles.screenLayer}>
+          <SubjectNotesViewer
+            subject={activeSubject}
+            gradeLevel={grade}
+            onClose={() => setShowNotes(false)}
+          />
+        </Animated.View>
+      )}
+
+      {/* --- INTERACTIVE LESSON VIEWER --- */}
       {selected && (
         <Animated.View
           style={[
@@ -974,6 +1009,32 @@ const styles = StyleSheet.create({
     width: 55,
     textAlign: "center",
   },
+  openNotesCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  openNotesGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    gap: 14,
+  },
+  openNotesIconBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  openNotesIcon: { fontSize: 24 },
+  openNotesMeta: { flex: 1 },
+  openNotesTitle: { color: "#ffffff", fontSize: 16, fontWeight: "900" },
+  openNotesSub: { color: "#a4b7dd", fontSize: 11, fontWeight: "600", marginTop: 2 },
+  openNotesArrow: { fontSize: 14, fontWeight: "900", width: 50, textAlign: "center" },
 });
 
 const navStyles = StyleSheet.create({
@@ -1007,46 +1068,4 @@ const navStyles = StyleSheet.create({
   },
   icon: { width: 28, height: 28 },
   label: { color: "#a9dcff", fontSize: 12, fontWeight: "700", marginTop: 3 },
-  viewToggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#101d3b",
-    borderColor: "#203768",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 14,
-  },
-  viewToggleLabel: {
-    color: "#9db0d6",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  viewToggleTrack: {
-    flexDirection: "row",
-    backgroundColor: "#182a52",
-    borderRadius: 8,
-    padding: 3,
-    gap: 4,
-  },
-  viewToggleSegment: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  viewToggleSegmentActive: {
-    backgroundColor: "#524be3",
-  },
-  viewToggleText: {
-    color: "#8fa3cb",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  viewToggleTextActive: {
-    color: "#ffffff",
-    fontWeight: "800",
-  },
 });
