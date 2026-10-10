@@ -1,16 +1,12 @@
-import {
-  curriculum,
-  type Lesson,
-  type Subject,
-} from "@/app/components/curriculum";
+import { curriculum, type Subject } from "@/app/components/curriculum";
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Modal,
   Pressable,
@@ -35,6 +31,7 @@ interface ActiveLessonData {
   lessonTitle: string;
   icon: string;
   difficulty: string;
+  color?: string;
 }
 
 interface MiniGameMeta {
@@ -47,12 +44,48 @@ interface MiniGameMeta {
 }
 
 const ALL_ARCADE_GAMES = [
-  { key: "flashcards", title: "Flashcards", subtitle: "Formulas & definitions", icon: "🧠", defaultBadge: "Smart" },
-  { key: "scramble", title: "Word Scramble", subtitle: "Science terminology", icon: "🔤", defaultBadge: "Spelling" },
-  { key: "memory", title: "Memory Match", subtitle: "Flip & pair icons", icon: "⭐", defaultBadge: "Memory" },
-  { key: "ninja", title: "Number Ninja", subtitle: "Rapid arithmetic", icon: "⚡", defaultBadge: "Speed" },
-  { key: "whack", title: "Whack-a-Number", subtitle: "Pop correct target", icon: "🎯", defaultBadge: "Action" },
-  { key: "codebreaker", title: "Codebreaker", subtitle: "Defuse the vault", icon: "🔥", defaultBadge: "Vault" },
+  {
+    key: "flashcards",
+    title: "Flashcards",
+    subtitle: "Formulas & definitions",
+    icon: "🧠",
+    defaultBadge: "Smart",
+  },
+  {
+    key: "scramble",
+    title: "Word Scramble",
+    subtitle: "Science terminology",
+    icon: "🔤",
+    defaultBadge: "Spelling",
+  },
+  {
+    key: "memory",
+    title: "Memory Match",
+    subtitle: "Flip & pair icons",
+    icon: "⭐",
+    defaultBadge: "Memory",
+  },
+  {
+    key: "ninja",
+    title: "Number Ninja",
+    subtitle: "Rapid arithmetic",
+    icon: "⚡",
+    defaultBadge: "Speed",
+  },
+  {
+    key: "whack",
+    title: "Whack-a-Number",
+    subtitle: "Pop correct target",
+    icon: "🎯",
+    defaultBadge: "Action",
+  },
+  {
+    key: "codebreaker",
+    title: "Codebreaker",
+    subtitle: "Defuse the vault",
+    icon: "🔥",
+    defaultBadge: "Vault",
+  },
 ];
 
 export default function HomeScreen(): React.JSX.Element {
@@ -79,6 +112,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
   const [lastLesson, setLastLesson] = useState<ActiveLessonData | null>(null);
+  const [recentLessons, setRecentLessons] = useState<ActiveLessonData[]>([]);
   const [hasCourseRecords, setHasCourseRecords] = useState(false);
   const [welcomeSubjects, setWelcomeSubjects] = useState<string[]>([]);
   const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
@@ -107,7 +141,9 @@ export default function HomeScreen(): React.JSX.Element {
         if (checkIsBedtime(controls.bedtimeHour)) {
           setIsLocked(true);
           setLockMessage(
-            "🌙 Bedtime Lock Active!\nYour parent set bedtime for " + controls.bedtimeHour + ". Time to rest!",
+            "🌙 Bedtime Lock Active!\nYour parent set bedtime for " +
+              controls.bedtimeHour +
+              ". Time to rest!",
           );
           return;
         }
@@ -161,7 +197,11 @@ export default function HomeScreen(): React.JSX.Element {
     const formattedOld = String(oldLvl).padStart(2, "0");
     const formattedNew = String(newLvl).padStart(2, "0");
     setLevelUpText(
-      "Congratulations! You leveled up from " + formattedOld + " to " + formattedNew + "!",
+      "Congratulations! You leveled up from " +
+        formattedOld +
+        " to " +
+        formattedNew +
+        "!",
     );
 
     setShowLevelUp(true);
@@ -199,16 +239,18 @@ export default function HomeScreen(): React.JSX.Element {
       if (availableRecents.length >= 2) {
         firstTwoKeys = [availableRecents[0], availableRecents[1]];
       } else if (availableRecents.length === 1) {
-        const fallback = ALL_ARCADE_GAMES.find((g) => g.key !== availableRecents[0]);
+        const fallback = ALL_ARCADE_GAMES.find(
+          (g) => g.key !== availableRecents[0],
+        );
         firstTwoKeys = [availableRecents[0], fallback ? fallback.key : "ninja"];
       } else {
         firstTwoKeys = ["flashcards", "ninja"];
       }
 
       const remainingGames = ALL_ARCADE_GAMES.filter(
-        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz"
+        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz",
       );
-      
+
       const randomPicked =
         remainingGames[Math.floor(Math.random() * remainingGames.length)] ||
         remainingGames[0];
@@ -327,6 +369,24 @@ export default function HomeScreen(): React.JSX.Element {
 
       setLastLesson(progress.lastLesson);
       setHasCourseRecords(progress.completedLessons.length > 0);
+
+      // --- FETCH RECENT LESSONS ARRAY ---
+      const recentStr = await AsyncStorage.getItem("@biosphere_recent_lessons");
+      if (recentStr) {
+        setRecentLessons(JSON.parse(recentStr));
+      } else if (progress.lastLesson) {
+        // Fallback: Check if there's a lastLesson set from welcome screen to use as starting point
+        const gradeSubjs = curriculum[resolvedGrade] || [];
+        const matched = gradeSubjs.find(
+          (s) => s.title === progress.lastLesson?.subjectTitle,
+        );
+        setRecentLessons([
+          {
+            ...progress.lastLesson,
+            color: matched?.color || "#4f46e5",
+          } as ActiveLessonData,
+        ]);
+      }
     } catch (e) {
       console.error("Failed to load shared progress on home", e);
     }
@@ -349,7 +409,6 @@ export default function HomeScreen(): React.JSX.Element {
   }, [appear]);
 
   const activeGradeSubjects = curriculum[parseInt(userGrade, 10) || 1] || [];
-  const secondarySubject = activeGradeSubjects[1] || activeGradeSubjects[0];
 
   const launchMiniGame = (gameKey: string) => {
     router.push({
@@ -425,99 +484,130 @@ export default function HomeScreen(): React.JSX.Element {
 
           {!hasCourseRecords ? (
             <View>
-              <Text style={styles.section}>Start Learning</Text>
-              {welcomeSubjects && welcomeSubjects.length > 0 ? (
-                <View style={styles.cards}>
-                  {(() => {
-                    const gradeSubjs = curriculum[parseInt(userGrade, 10) || 1] || curriculum[1];
-                    let displaySubjs = welcomeSubjects
-                      .map((ws) => gradeSubjs.find((s) => s.title.toLowerCase() === ws.toLowerCase()))
-                      .filter(Boolean) as Subject[];
-                    
-                    if (displaySubjs.length === 1 && gradeSubjs.length > 1) {
-                      const extra = gradeSubjs.find((s) => s.title !== displaySubjs[0].title);
-                      if (extra) displaySubjs.push(extra);
-                    }
-                    if (displaySubjs.length === 0) {
-                      displaySubjs = gradeSubjs.slice(0, 2);
-                    }
+              {/* DYNAMIC HEADER: New Explorer */}
+              <Text style={styles.sectionTitle}>
+                Start Your First Lesson 🚀
+              </Text>
 
-                    return displaySubjs.slice(0, 2).map((subjDef, idx) => (
-                      <Pressable
-                        key={idx}
-                        onPress={() => handleOpenSubjectFromHome(subjDef.title)}
-                        style={styles.course}
+              <View style={styles.recentLessonsStack}>
+                {(() => {
+                  const gradeSubjs =
+                    curriculum[parseInt(userGrade, 10) || 1] || curriculum[1];
+
+                  let displaySubjs = welcomeSubjects
+                    .map((ws) =>
+                      gradeSubjs.find(
+                        (s) => s.title.toLowerCase() === ws.toLowerCase(),
+                      ),
+                    )
+                    .filter(Boolean) as Subject[];
+
+                  if (displaySubjs.length >= 3) {
+                    displaySubjs = displaySubjs
+                      .sort(() => 0.5 - Math.random())
+                      .slice(0, 2);
+                  }
+
+                  return displaySubjs.map((subjDef, idx) => (
+                    <Pressable
+                      key={idx}
+                      style={styles.recentLessonCard}
+                      onPress={() => handleOpenSubjectFromHome(subjDef.title)}
+                    >
+                      <LinearGradient
+                        colors={[
+                          subjDef.color || "#4f46e5",
+                          (subjDef.color || "#4f46e5") + "99",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.recentLessonGradient}
                       >
-                        <Text style={styles.courseIcon}>{subjDef.icon}</Text>
-                        <Text style={styles.courseTitle} numberOfLines={1}>{subjDef.title}</Text>
-                        <Text style={styles.courseSub}>Grade {userGrade}</Text>
-                      </Pressable>
-                    ));
-                  })()}
-                </View>
-              ) : (
-                <Pressable
-                  style={styles.startLearningCard}
-                  onPress={() => navigateToRoute("/explore")}
-                >
-                  <View style={styles.startLearningContent}>
-                    <View style={styles.startLearningIconBubble}>
-                      <Text style={styles.startLearningIcon}>🚀</Text>
-                    </View>
-                    <View style={styles.startLearningMeta}>
-                      <Text style={styles.startLearningTitle}>Explore Lessons</Text>
-                      <Text style={styles.startLearningSubtitle}>
-                        Begin your Grade {userGrade} journey with interactive missions!
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.startLearningButton}>
-                    <Text style={styles.startLearningButtonText}>Go to Courses</Text>
-                  </View>
-                </Pressable>
-              )}
+                        <View style={styles.recentLessonIconBubble}>
+                          <Text style={styles.recentLessonIcon}>
+                            {subjDef.icon}
+                          </Text>
+                        </View>
+                        <View style={styles.recentLessonMeta}>
+                          <Text style={styles.recentLessonTitle}>
+                            Grade {userGrade} Course
+                          </Text>
+                          <Text
+                            style={styles.recentLessonSubtitle}
+                            numberOfLines={1}
+                          >
+                            {subjDef.title}
+                          </Text>
+                        </View>
+                        <View style={styles.recentLessonPlayBtn}>
+                          <Text
+                            style={[
+                              styles.recentLessonPlayText,
+                              { color: subjDef.color || "#4f46e5" },
+                            ]}
+                          >
+                            Start
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  ));
+                })()}
+              </View>
             </View>
           ) : (
             <View>
+              {/* DYNAMIC HEADER: Returning Explorer */}
               <Text style={styles.section}>Continue Learning</Text>
-              <View style={styles.cards}>
-                <Pressable
-                  onPress={() => {
-                    if (lastLesson) {
-                      handleOpenSubjectFromHome(lastLesson.subjectTitle);
-                    } else {
-                      navigateToRoute("/explore");
-                    }
-                  }}
-                  style={styles.course}
-                >
-                  <Text style={styles.courseIcon}>
-                    {lastLesson ? lastLesson.icon : "📖"}
-                  </Text>
-                  <Text style={styles.courseTitle} numberOfLines={1}>
-                    {lastLesson ? lastLesson.lessonTitle : "Start Mission"}
-                  </Text>
-                  <Text style={styles.courseSub}>
-                    {lastLesson
-                      ? `${lastLesson.subjectTitle} • Grade ${lastLesson.grade}`
-                      : `Grade ${userGrade}`}
-                  </Text>
-                </Pressable>
 
-                {secondarySubject && (
+              {/* NEW VERTICAL RECENT LESSON STACK */}
+              <View style={styles.recentLessonsStack}>
+                {recentLessons.map((lesson, index) => (
                   <Pressable
-                    onPress={() => handleOpenSubjectFromHome(secondarySubject.title)}
-                    style={styles.course}
+                    key={index}
+                    style={styles.recentLessonCard}
+                    onPress={() =>
+                      handleOpenSubjectFromHome(lesson.subjectTitle)
+                    }
                   >
-                    <Text style={styles.courseIcon}>{secondarySubject.icon}</Text>
-                    <Text style={styles.courseTitle} numberOfLines={1}>
-                      {secondarySubject.lessons[0]?.title || secondarySubject.title}
-                    </Text>
-                    <Text style={styles.courseSub}>
-                      {secondarySubject.title} • Grade {userGrade}
-                    </Text>
+                    <LinearGradient
+                      colors={[
+                        lesson.color || "#4f46e5",
+                        (lesson.color || "#4f46e5") + "99",
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.recentLessonGradient}
+                    >
+                      <View style={styles.recentLessonIconBubble}>
+                        <Text style={styles.recentLessonIcon}>
+                          {lesson.icon}
+                        </Text>
+                      </View>
+                      <View style={styles.recentLessonMeta}>
+                        <Text style={styles.recentLessonTitle}>
+                          {lesson.subjectTitle}
+                        </Text>
+                        <Text
+                          style={styles.recentLessonSubtitle}
+                          numberOfLines={1}
+                        >
+                          {lesson.lessonTitle}
+                        </Text>
+                      </View>
+                      <View style={styles.recentLessonPlayBtn}>
+                        <Text
+                          style={[
+                            styles.recentLessonPlayText,
+                            { color: lesson.color || "#4f46e5" },
+                          ]}
+                        >
+                          Resume
+                        </Text>
+                      </View>
+                    </LinearGradient>
                   </Pressable>
-                )}
+                ))}
               </View>
             </View>
           )}
@@ -553,7 +643,9 @@ export default function HomeScreen(): React.JSX.Element {
                 key={game.key}
                 style={[
                   styles.arcadeGameRow,
-                  game.isRecent ? styles.recentGameBorder : styles.featuredGameBorder,
+                  game.isRecent
+                    ? styles.recentGameBorder
+                    : styles.featuredGameBorder,
                 ]}
                 onPress={() => launchMiniGame(game.key)}
               >
@@ -566,7 +658,9 @@ export default function HomeScreen(): React.JSX.Element {
                     <View
                       style={[
                         styles.gameBadgePill,
-                        game.isRecent ? styles.badgeRecent : styles.badgeFeatured,
+                        game.isRecent
+                          ? styles.badgeRecent
+                          : styles.badgeFeatured,
                       ]}
                     >
                       <Text style={styles.gameBadgePillText}>{game.badge}</Text>
@@ -687,6 +781,13 @@ const styles = StyleSheet.create({
   track: { backgroundColor: "#000", height: 7, borderRadius: 5, marginTop: 5 },
   fill: { height: "100%", backgroundColor: "#df6ce8", borderRadius: 5 },
   section: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 20,
+    marginBottom: 9,
+  },
+  sectionTitle: {
     color: "#fff",
     fontSize: 17,
     fontWeight: "900",
@@ -912,4 +1013,51 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textDecorationLine: "underline",
   },
+
+  recentLessonsStack: { gap: 12, marginTop: 4 },
+  recentLessonCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  recentLessonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 14,
+  },
+  recentLessonIconBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recentLessonIcon: { fontSize: 24 },
+  recentLessonMeta: { flex: 1 },
+  recentLessonTitle: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  recentLessonSubtitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  recentLessonPlayBtn: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  recentLessonPlayText: { fontSize: 13, fontWeight: "900" },
 });

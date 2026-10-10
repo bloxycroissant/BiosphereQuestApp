@@ -119,6 +119,42 @@ export default function ExploreScreen(): React.JSX.Element {
       difficulty: lesson.difficulty,
     });
 
+    void (async () => {
+      try {
+        const recentRaw = await AsyncStorage.getItem(
+          "@biosphere_recent_lessons",
+        );
+        const existing: any[] = recentRaw ? JSON.parse(recentRaw) : [];
+
+        const newItem = {
+          grade: grade,
+          subjectTitle: subject.title,
+          lessonTitle: lesson.title,
+          icon: subject.icon,
+          difficulty: lesson.difficulty,
+          color: subject.color,
+        };
+
+        const updated = [
+          newItem,
+          ...existing.filter(
+            (item) =>
+              !(
+                item.subjectTitle === subject.title &&
+                item.lessonTitle === lesson.title
+              ),
+          ),
+        ].slice(0, 2);
+
+        await AsyncStorage.setItem(
+          "@biosphere_recent_lessons",
+          JSON.stringify(updated),
+        );
+      } catch (err) {
+        console.error("Failed to update recent lessons", err);
+      }
+    })();
+
     requestAnimationFrame(() => {
       Animated.timing(screenTransition, {
         toValue: 1,
@@ -470,8 +506,14 @@ export default function ExploreScreen(): React.JSX.Element {
                 onPress={() => setShowNotes(true)}
               >
                 <LinearGradient
-                  colors={[activeSubject.color + "25", activeSubject.color + "08"]}
-                  style={[styles.openNotesGradient, { borderColor: activeSubject.color }]}
+                  colors={[
+                    activeSubject.color + "25",
+                    activeSubject.color + "08",
+                  ]}
+                  style={[
+                    styles.openNotesGradient,
+                    { borderColor: activeSubject.color },
+                  ]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
@@ -479,10 +521,21 @@ export default function ExploreScreen(): React.JSX.Element {
                     <Text style={styles.openNotesIcon}>📓</Text>
                   </View>
                   <View style={styles.openNotesMeta}>
-                    <Text style={styles.openNotesTitle}>Comprehensive Notes</Text>
-                    <Text style={styles.openNotesSub}>Read complete reference guide</Text>
+                    <Text style={styles.openNotesTitle}>
+                      Comprehensive Notes
+                    </Text>
+                    <Text style={styles.openNotesSub}>
+                      Read complete reference guide
+                    </Text>
                   </View>
-                  <Text style={[styles.openNotesArrow, { color: activeSubject.color }]}>Read</Text>
+                  <Text
+                    style={[
+                      styles.openNotesArrow,
+                      { color: activeSubject.color },
+                    ]}
+                  >
+                    Read
+                  </Text>
                 </LinearGradient>
               </Pressable>
 
@@ -1033,8 +1086,18 @@ const styles = StyleSheet.create({
   openNotesIcon: { fontSize: 24 },
   openNotesMeta: { flex: 1 },
   openNotesTitle: { color: "#ffffff", fontSize: 16, fontWeight: "900" },
-  openNotesSub: { color: "#a4b7dd", fontSize: 11, fontWeight: "600", marginTop: 2 },
-  openNotesArrow: { fontSize: 14, fontWeight: "900", width: 50, textAlign: "center" },
+  openNotesSub: {
+    color: "#a4b7dd",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  openNotesArrow: {
+    fontSize: 14,
+    fontWeight: "900",
+    width: 50,
+    textAlign: "center",
+  },
 });
 
 const navStyles = StyleSheet.create({
