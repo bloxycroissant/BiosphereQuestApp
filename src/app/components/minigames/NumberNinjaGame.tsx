@@ -1,5 +1,6 @@
+import { LinearGradient } from 'expo-linear-gradient'; // Replace with 'react-native-linear-gradient' if not using Expo
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { generateNinjaProblem, GradeLevel, NinjaProblem } from '../../data/questionGenerators';
 import { MinigameMotion } from './MinigameMotion';
 
@@ -52,51 +53,54 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   };
 
   return (
-    <MinigameMotion key={`challenge-${questionNumber}`} style={styles.container}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
-        <Text style={styles.progress}>Grade {grade} • Challenge {questionNumber}</Text>
-        <Text style={[styles.timer, timeLeft <= 5 && styles.warning]}>⏱ {timeLeft}s</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.eyebrow}>⚡ +50 XP PER CORRECT ANSWER</Text>
-        <Text style={styles.title}>Number Ninja</Text>
-        <Text style={styles.prompt}>{question.prompt}</Text>
-        <View style={styles.options}>
-          {question.options.map((option) => {
-            const correct = selected !== null && option === question.correctAnswer;
-            const incorrect = selected === option && selected !== question.correctAnswer;
-            return (
-              <TouchableOpacity
-                key={option}
-                style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
-                onPress={() => answer(option)}
-                disabled={selected !== null}
-              >
-                <Text style={styles.optionText}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
+    <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
+      <MinigameMotion key={`challenge-${questionNumber}`} style={styles.container}>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+          <Text style={styles.progress}>Grade {grade} • Challenge {questionNumber}</Text>
+          <Text style={[styles.timer, timeLeft <= 5 && styles.warning]}>⏱ {timeLeft}s</Text>
         </View>
-        {selected !== null && (
-          <View style={styles.feedback}>
-            <Text style={styles.feedbackText}>
-              {selected === -1 ? `Time's up! The answer was ${question.correctAnswer}.` :
-                selected === question.correctAnswer ? 'Bullseye! +50 XP' : `The answer was ${question.correctAnswer}.`}
-            </Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={next}>
-              <Text style={styles.buttonText}>Next Challenge →</Text>
-            </TouchableOpacity>
+        <View style={styles.content}>
+          <Text style={styles.eyebrow}>⚡ +50 XP PER CORRECT ANSWER</Text>
+          <Text style={styles.title}>Number Ninja</Text>
+          <Text style={styles.prompt}>{question.prompt}</Text>
+          <View style={styles.options}>
+            {question.options.map((option) => {
+              const correct = selected !== null && option === question.correctAnswer;
+              const incorrect = selected === option && selected !== question.correctAnswer;
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
+                  onPress={() => answer(option)}
+                  disabled={selected !== null}
+                >
+                  <Text style={styles.optionText}>{option}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
-        <Text style={styles.score}>Score: {score}</Text>
-      </View>
-    </MinigameMotion>
+          {selected !== null && (
+            <View style={styles.feedback}>
+              <Text style={styles.feedbackText}>
+                {selected === -1 ? `Time's up! The answer was ${question.correctAnswer}.` :
+                  selected === question.correctAnswer ? 'Bullseye! +50 XP' : `The answer was ${question.correctAnswer}.`}
+              </Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={next}>
+                <Text style={styles.buttonText}>Next Challenge →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <Text style={styles.score}>Score: {score}</Text>
+        </View>
+      </MinigameMotion>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#091426' } as ViewStyle,
+  background: { flex: 1 } as ViewStyle,
+  container: { flex: 1, backgroundColor: 'transparent' } as ViewStyle,
   topBar: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' } as ViewStyle,
   backText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
   progress: { color: '#cbd5e1', fontSize: 12, fontWeight: '800' } as TextStyle,
@@ -105,13 +109,13 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'center', padding: 20 } as ViewStyle,
   eyebrow: { color: '#facc15', fontSize: 11, textAlign: 'center', fontWeight: '900', letterSpacing: 1, marginBottom: 8 } as TextStyle,
   title: { color: '#fff', fontSize: 24, textAlign: 'center', fontWeight: '900', marginBottom: 20 } as TextStyle,
-  prompt: { color: '#fef3c7', fontSize: 24, fontWeight: '900', textAlign: 'center', backgroundColor: '#2b2a22', borderRadius: 18, padding: 26, marginBottom: 20, overflow: 'hidden' } as TextStyle,
+  prompt: { color: '#fef3c7', fontSize: 24, fontWeight: '900', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 18, padding: 26, marginBottom: 20, overflow: 'hidden' } as TextStyle,
   options: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 } as ViewStyle,
-  option: { width: '47%', backgroundColor: '#172235', borderWidth: 1.5, borderColor: '#475569', borderRadius: 14, padding: 18, alignItems: 'center' } as ViewStyle,
-  correctOption: { borderColor: '#22c55e', backgroundColor: '#123328' } as ViewStyle,
-  incorrectOption: { borderColor: '#fb7185', backgroundColor: '#3b2028' } as ViewStyle,
+  option: { width: '47%', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.15)', borderRadius: 14, padding: 18, alignItems: 'center' } as ViewStyle,
+  correctOption: { borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.25)' } as ViewStyle,
+  incorrectOption: { borderColor: '#fb7185', backgroundColor: 'rgba(251, 113, 133, 0.25)' } as ViewStyle,
   optionText: { color: '#fff', fontSize: 22, fontWeight: '900' } as TextStyle,
-  feedback: { marginTop: 18, backgroundColor: '#1e293b', padding: 14, borderRadius: 14 } as ViewStyle,
+  feedback: { marginTop: 18, backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: 14, borderRadius: 14 } as ViewStyle,
   feedbackText: { color: '#e2e8f0', fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: 12 } as TextStyle,
   primaryButton: { backgroundColor: '#16a34a', padding: 14, borderRadius: 12, alignItems: 'center' } as ViewStyle,
   buttonText: { color: '#fff', fontSize: 14, fontWeight: '900' } as TextStyle,
