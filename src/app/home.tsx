@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   View,
+  ViewStyle,
 } from "react-native";
 
 if (Platform.OS !== "web") {
@@ -157,7 +158,6 @@ export default function HomeScreen(): React.JSX.Element {
   const sessionsListAnim = useRef(new Animated.Value(0)).current;
   const modalBadgePulse = useRef(new Animated.Value(1)).current;
 
-  // Custom Modal Animations
   const modalSlideAnim = useRef(new Animated.Value(300)).current;
   const modalFadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -1170,7 +1170,6 @@ export default function HomeScreen(): React.JSX.Element {
             })}
           </View>
 
-          {/* CALENDAR WIDGET */}
           <Text style={styles.section}>Study Calendar & Schedule</Text>
           <View style={styles.calendarWidget}>
             <View style={styles.calendarTopHeader}>
@@ -1338,7 +1337,6 @@ export default function HomeScreen(): React.JSX.Element {
         </Animated.View>
       </ScrollView>
 
-      {/* NOTIFICATIONS MODAL WITH LEADERBOARD ALERTS */}
       <Modal
         visible={isNotificationsModalOpen}
         animationType="slide"
@@ -1413,7 +1411,6 @@ export default function HomeScreen(): React.JSX.Element {
         </View>
       </Modal>
 
-      {/* ANIMATED ADD STUDY SESSION MODAL */}
       <Modal
         visible={isAddSessionModalOpen}
         animationType="none"
@@ -2343,8 +2340,12 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   lockBackdropButton: {
-    ...StyleSheet.absoluteFill,
-  },
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  } as ViewStyle,
   lockCopy: {
     alignItems: "center",
     width: "100%",

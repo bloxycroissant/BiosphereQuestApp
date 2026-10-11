@@ -39,6 +39,7 @@ interface LocalSession {
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
+const STUDY_SESSIONS_KEY = "@biosphere_study_sessions_v1";
 
 export default function ProfileScreen(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -102,40 +103,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [tempWebsite, setTempWebsite] = useState(website);
   const [tempProfileImage, setTempProfileImage] = useState(profileImage);
 
-  const rawSessions: Array<{ id: string | number; [key: string]: any }> = ((
-    progress as any
-  )?.sessions ?? [
-    {
-      id: "1",
-      day: "Mon",
-      title: "Ecology Basics",
-      time: "10:00 AM",
-      duration: "45 mins",
-      done: false,
-    },
-    {
-      id: "2",
-      day: "Wed",
-      title: "Ecosystems & Biomes",
-      time: "12:00 PM",
-      duration: "1 hr",
-      done: false,
-    },
-  ]) as Array<{ id: string | number; [key: string]: any }>;
-
-  const [sessions, setSessions] = useState<LocalSession[]>(
-    rawSessions.map((s) => ({
-      id: String(s.id),
-      day: String(s.day || "Mon"),
-      title: String(s.title || ""),
-      time: String(s.time || ""),
-      duration: String(s.duration || "30 mins"),
-      category: String(s.category || "Science"),
-      description: String(s.description || ""),
-      reminder: String(s.reminder || "10 mins before"),
-      done: Boolean(s.done),
-    })),
-  );
+  const [sessions, setSessions] = useState<LocalSession[]>([]);
 
   const [newTitle, setNewTitle] = useState("");
   const [newDay, setNewDay] = useState("Mon");
@@ -146,7 +114,6 @@ export default function ProfileScreen(): React.JSX.Element {
   const [newDescription, setNewDescription] = useState("");
   const [newReminder, setNewReminder] = useState("10 mins before");
 
-  // --- FULL CLOUD BACKUP & RESTORE FOR REGISTERED USERS ---
   const syncFullProfileToCloud = async (): Promise<void> => {
     try {
       const {
@@ -212,13 +179,12 @@ export default function ProfileScreen(): React.JSX.Element {
       const mergedSchool = localProfile.school || cloudDetails.school || "";
       const mergedPhone = localProfile.phone || cloudDetails.phone || "";
       const mergedWebsite = localProfile.website || cloudDetails.website || "";
-      const mergedSessions =
-        Array.isArray(localProfile.sessions) && localProfile.sessions.length > 0
-          ? localProfile.sessions
-          : Array.isArray(cloudDetails.sessions) &&
-              cloudDetails.sessions.length > 0
-            ? cloudDetails.sessions
-            : sessions;
+
+      const mergedSessions = Array.isArray(localProfile.sessions)
+        ? localProfile.sessions
+        : Array.isArray(cloudDetails.sessions)
+        ? cloudDetails.sessions
+        : [];
 
       const resolvedName =
         localProfile.name ||
@@ -543,7 +509,10 @@ export default function ProfileScreen(): React.JSX.Element {
       if (parsed.website) setWebsite(parsed.website);
       if (parsed.profileImage !== undefined)
         setProfileImage(parsed.profileImage);
-      if (parsed.sessions) setSessions(parsed.sessions);
+
+      if (Array.isArray(parsed.sessions)) {
+        setSessions(parsed.sessions);
+      }
 
       if (parsed.streak !== undefined) setStreak(parsed.streak);
       if (parsed.lessons !== undefined) setLessons(parsed.lessons);
@@ -700,7 +669,7 @@ export default function ProfileScreen(): React.JSX.Element {
     }
   };
 
-  const completeAndDeleteSession = (id: string): void => {
+  const completeAndDeleteSession = async (id: string): Promise<void> => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const updatedSessions = sessions.filter((s) => s.id !== id);
     setSessions(updatedSessions);
@@ -710,24 +679,34 @@ export default function ProfileScreen(): React.JSX.Element {
     setLessons(newLessons);
     setXp(newXp);
     progress.addXp(25);
-    void persistData({
+
+    await persistData({
       sessions: updatedSessions,
       lessons: newLessons,
       xp: newXp,
     });
 
-    void (async () => {
-      try {
-        await supabase.rpc("sync_user_xp", {
-          p_name: username || name || "Explorer",
-          p_total_xp: xp,
-          p_earned_xp: 25,
-        });
-        await syncFullProfileToCloud();
-      } catch (e) {
-        console.error("Failed to sync session XP to Supabase:", e);
+    try {
+      const homeSessionsRaw = await AsyncStorage.getItem(STUDY_SESSIONS_KEY);
+      if (homeSessionsRaw) {
+        const homeSessions = JSON.parse(homeSessionsRaw);
+        const updatedHomeSessions = homeSessions.filter((s: any) => s.id !== id);
+        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updatedHomeSessions));
       }
-    })();
+    } catch (e) {
+      console.error("Failed to sync study session removal to home calendar:", e);
+    }
+
+    try {
+      await supabase.rpc("sync_user_xp", {
+        p_name: username || name || "Explorer",
+        p_total_xp: xp + 25,
+        p_earned_xp: 25,
+      });
+      await syncFullProfileToCloud();
+    } catch (e) {
+      console.error("Failed to sync session XP to Supabase:", e);
+    }
   };
 
   const addSession = (): void => {
@@ -1162,7 +1141,6 @@ export default function ProfileScreen(): React.JSX.Element {
               {email ? <Text style={styles.email}>{email}</Text> : null}
             </View>
 
-            {/* Stella Mascot aligned directly with Username, Full Name and Email on the right */}
             <Image
               source={stellaMascot}
               style={styles.stellaMascot}
