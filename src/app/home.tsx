@@ -59,6 +59,15 @@ interface StudySession {
   reminder: string;
 }
 
+interface LeaderboardNotification {
+  id: string;
+  type: "weekly" | "daily";
+  title: string;
+  message: string;
+  timestamp: string;
+  badge: string;
+}
+
 const ALL_ARCADE_GAMES = [
   {
     key: "flashcards",
@@ -134,13 +143,13 @@ export default function HomeScreen(): React.JSX.Element {
   const sessionsListAnim = useRef(new Animated.Value(0)).current;
   const modalBadgePulse = useRef(new Animated.Value(1)).current;
 
-  const [userName, setUserName] = useState("BloxyCroissant");
+  const [userName, setUserName] = useState("Explorer");
   const [userGrade, setUserGrade] = useState("1");
 
   const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(0);
   const [lessons, setLessons] = useState(0);
-  const [xp, setXp] = useState(5399);
+  const [xp, setXp] = useState(0);
   const [studyMinutes, setStudyMinutes] = useState(0);
 
   const prevLevelRef = useRef<number | null>(null);
@@ -168,6 +177,8 @@ export default function HomeScreen(): React.JSX.Element {
   const [isAddSessionModalOpen, setIsAddSessionModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
 
+  const [leaderboardNotifications, setLeaderboardNotifications] = useState<LeaderboardNotification[]>([]);
+
   const [formTitle, setFormTitle] = useState("");
   const [formCategory, setFormCategory] = useState("Science");
   const [formStartHour, setFormStartHour] = useState(9);
@@ -177,10 +188,6 @@ export default function HomeScreen(): React.JSX.Element {
   const [formDurationMins, setFormDurationMins] = useState(30);
   const [formNotes, setFormNotes] = useState("");
   const [formReminder, setFormReminder] = useState("10 mins before");
-
-
-  const userRank = 1; 
-  const isWinner = userRank === 1;
 
   const nextLevelXp = progress.nextLevelXp || 100;
   const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
@@ -259,6 +266,37 @@ export default function HomeScreen(): React.JSX.Element {
     const interval = setInterval(checkParentRules, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  // Generate Leaderboard Notifications (Weekly & Daily)
+  useEffect(() => {
+    const generateLeaderboardAlerts = () => {
+      const mockRank = xp > 5000 ? 1 : xp > 3000 ? 2 : xp > 1500 ? 3 : 4;
+      
+      const weeklyAlert: LeaderboardNotification = {
+        id: "weekly-lb-1",
+        type: "weekly",
+        title: mockRank === 1 ? "🏆 Weekly Champion!" : `🥇 Weekly Leaderboard: Rank #${mockRank}`,
+        message: mockRank === 1 
+          ? `Congratulations ${userName}! You finished #1 on the Weekly Champions Leaderboard with ${xp} XP!`
+          : `Great job ${userName}! You completed the week at place #${mockRank} with ${xp} XP. Keep learning to reach #1!`,
+        timestamp: "Weekly Summary",
+        badge: mockRank === 1 ? "WINNER" : "TOP RANK",
+      };
+
+      const dailyAlert: LeaderboardNotification = {
+        id: "daily-lb-1",
+        type: "daily",
+        title: `📊 Daily Rank Update: #${mockRank}`,
+        message: `Hello ${userName}! Your account is currently at rank #${mockRank} on today's leaderboard with ${xp} XP.`,
+        timestamp: "Today",
+        badge: "DAILY UPDATE",
+      };
+
+      setLeaderboardNotifications([weeklyAlert, dailyAlert]);
+    };
+
+    generateLeaderboardAlerts();
+  }, [userName, xp]);
 
   const getDaysInMonth = (month: number, year: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -602,7 +640,7 @@ export default function HomeScreen(): React.JSX.Element {
 
         setStreak(parsed.streak !== undefined ? parsed.streak : 0);
         setLessons(parsed.lessons !== undefined ? parsed.lessons : 0);
-        setXp(restoredXp || 5399);
+        setXp(restoredXp);
         setStudyMinutes(
           parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
         );
@@ -624,7 +662,7 @@ export default function HomeScreen(): React.JSX.Element {
         prevLevelRef.current = 0;
         setStreak(0);
         setLessons(0);
-        setXp(5399);
+        setXp(0);
         setStudyMinutes(0);
       }
 
@@ -1201,7 +1239,7 @@ export default function HomeScreen(): React.JSX.Element {
         </Animated.View>
       </ScrollView>
 
-      {/* NOTIFICATIONS MODAL (INCLUDES WEEKLY LEADERBOARD NOTIFICATION) */}
+      {/* NOTIFICATIONS MODAL WITH LEADERBOARD ALERTS */}
       <Modal
         visible={isNotificationsModalOpen}
         animationType="slide"
@@ -1224,45 +1262,31 @@ export default function HomeScreen(): React.JSX.Element {
               contentContainerStyle={styles.sessionModalContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* WEEKLY LEADERBOARD NOTIFICATION CARD */}
-              <Text style={styles.formSectionHeader}>🏆 WEEKLY LEADERBOARD UPDATES</Text>
-              <View style={[styles.formCard, styles.leaderboardNotificationCard]}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: "#facc15", fontWeight: "900", fontSize: 12 }}>
-                    {isWinner ? "🏆 WEEKLY CHAMPION!" : `📊 RANK #${userRank} UPDATE`}
+              <Text style={styles.formSectionHeader}>LEADERBOARD UPDATES</Text>
+              {leaderboardNotifications.map((lb) => (
+                <View key={lb.id} style={styles.formCard}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={styles.lbBadgePill}>
+                      <Text style={styles.lbBadgePillText}>{lb.badge}</Text>
+                    </View>
+                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
+                      {lb.timestamp}
+                    </Text>
+                  </View>
+                  <Text style={{ color: "#ffffff", fontSize: 15, fontWeight: "900", marginTop: 6 }}>
+                    {lb.title}
                   </Text>
-                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
-                    Every 1 Week
+                  <Text style={{ color: "#cbd5e1", fontSize: 12, fontWeight: "600", marginTop: 4, lineHeight: 18 }}>
+                    {lb.message}
                   </Text>
                 </View>
-
-                <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "900", marginTop: 6 }}>
-                  {isWinner
-                    ? `Congratulations ${userName}! 🎉 You are in 1st Place this week!`
-                    : `Keep going ${userName}! You are currently ranked #${userRank}.`}
-                </Text>
-
-                <View style={styles.leaderboardStatsBadgeRow}>
-                  <View style={styles.leaderboardPill}>
-                    <Text style={styles.leaderboardPillLabel}>CURRENT XP</Text>
-                    <Text style={styles.leaderboardPillVal}>{xp} XP</Text>
-                  </View>
-                  <View style={styles.leaderboardPill}>
-                    <Text style={styles.leaderboardPillLabel}>YOUR POSITION</Text>
-                    <Text style={styles.leaderboardPillVal}>#{userRank}</Text>
-                  </View>
-                </View>
-
-                <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 8 }}>
-                  Weekly Champions reset every Sunday! Finish lessons and play games to boost your XP!
-                </Text>
-              </View>
+              ))}
 
               <Text style={styles.formSectionHeader}>UPCOMING STUDY REMINDERS</Text>
               {studySessions.length === 0 ? (
                 <View style={styles.formCard}>
                   <Text style={styles.noSessionsText}>
-                    No upcoming study reminders scheduled yet.
+                    No active study reminders scheduled yet.
                   </Text>
                 </View>
               ) : (
@@ -1961,34 +1985,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1e293b",
   },
-  leaderboardNotificationCard: {
-    borderColor: "#facc15",
-    borderWidth: 1.5,
-    backgroundColor: "#1e1b4b",
+  lbBadgePill: {
+    backgroundColor: "#8b5cf6",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  leaderboardStatsBadgeRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
-  leaderboardPill: {
-    backgroundColor: "rgba(250, 204, 21, 0.15)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(250, 204, 21, 0.3)",
-  },
-  leaderboardPillLabel: {
-    color: "#fde047",
-    fontSize: 8,
-    fontWeight: "900",
-  },
-  leaderboardPillVal: {
+  lbBadgePillText: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 9,
     fontWeight: "900",
-    marginTop: 2,
   },
   formFieldLabel: {
     color: "#818cf8",
