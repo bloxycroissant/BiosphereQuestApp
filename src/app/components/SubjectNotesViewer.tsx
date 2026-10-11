@@ -269,14 +269,12 @@ export default function SubjectNotesViewer({
   const [bookmarkedPages, setBookmarkedPages] = useState<Record<number, BookmarkOption>>({});
   const [currentBookmarkDesign, setCurrentBookmarkDesign] = useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
 
-  // Animation System Refs
   const flipAnim = useRef(new Animated.Value(0)).current;
   const bookmarkDropAnim = useRef(new Animated.Value(-80)).current;
   const bookmarkScaleAnim = useRef(new Animated.Value(0.2)).current;
   const bookmarkBtnScale = useRef(new Animated.Value(1)).current;
   const bookmarkTextOpacity = useRef(new Animated.Value(1)).current;
   
-  // Child-Friendly Closing Notebook Animation Refs
   const closeNotebookScale = useRef(new Animated.Value(1)).current;
   const closeNotebookRotate = useRef(new Animated.Value(0)).current;
   const closeNotebookOffsetY = useRef(new Animated.Value(0)).current;
@@ -349,7 +347,6 @@ export default function SubjectNotesViewer({
     }).start();
   }, []);
 
-  // Fun, Child-Friendly Closing Sequence (Pop, Wobble & Fly Away)
   const handleCloseViewer = () => {
     if (pageTurnAudio) {
       try {
@@ -361,13 +358,11 @@ export default function SubjectNotesViewer({
       }
     }
 
-    // 1. Back button bounce feedback
     Animated.sequence([
       Animated.timing(backBtnScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
       Animated.spring(backBtnScale, { toValue: 1.1, friction: 3, useNativeDriver: true }),
     ]).start();
 
-    // 2. Playful rubber-band scale up, slight tilt, then smooth shrink and fly away
     Animated.parallel([
       Animated.timing(headerFadeAnim, {
         toValue: 0,
@@ -375,14 +370,12 @@ export default function SubjectNotesViewer({
         useNativeDriver: true,
       }),
       Animated.sequence([
-        // Quick elastic pop outward
         Animated.timing(closeNotebookScale, {
           toValue: 1.08,
           duration: 120,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
-        // Fun shrink & fly downward with a slight playful spin
         Animated.parallel([
           Animated.timing(closeNotebookScale, {
             toValue: 0.2,
@@ -391,13 +384,13 @@ export default function SubjectNotesViewer({
             useNativeDriver: true,
           }),
           Animated.timing(closeNotebookRotate, {
-            toValue: -8, // subtle playful tilt
+            toValue: -8, 
             duration: 320,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(closeNotebookOffsetY, {
-            toValue: 120, // bounce downward into distance
+            toValue: 120, 
             duration: 320,
             easing: Easing.in(Easing.quad),
             useNativeDriver: true,
@@ -895,7 +888,6 @@ export default function SubjectNotesViewer({
           </ScrollView>
         </View>
 
-        {/* Child-Friendly Playful Shrink & Fly Away Back Animation */}
         <Animated.View
           style={[
             styles.notebookWrapper,
