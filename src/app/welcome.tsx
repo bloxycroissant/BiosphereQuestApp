@@ -47,18 +47,15 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [selectedGrade, setSelectedGrade] = useState(3);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]); // Starts empty now!
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]); 
 
-  // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
   const scaleButtonAnim = useRef(new Animated.Value(1)).current;
 
-  // Track press scales dynamically for grid items
   const boxScales = useRef<{ [key: string]: Animated.Value }>({}).current;
 
-  // Helper to get or create a scale animation value for grid items
   const getBoxScale = (key: string | number) => {
     const stringKey = String(key);
     if (!boxScales[stringKey]) {
@@ -83,7 +80,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
     ]).start(() => callback());
   };
 
-  // Mascot floating loop animation
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -101,7 +97,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
     ).start();
   }, [floatAnim]);
 
-  // Trigger step transition animation whenever "step" changes
   useEffect(() => {
     fadeAnim.setValue(0);
     slideAnim.setValue(20);
@@ -164,7 +159,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   };
 
   const handleLaunch = async (): Promise<void> => {
-    // --- NEW VALIDATION: Must pick at least 2 subjects ---
     if (selectedSubjects.length < 2) {
       Alert.alert(
         "Choose Your Path!", 
@@ -177,10 +171,8 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
       try {
         await AsyncStorage.removeItem("@biosphere_profile_data_v1");
 
-        // Clear out stale cache
         await AsyncStorage.removeItem(STORAGE_KEY);
 
-        // Save standalone keys for fallback access
         await AsyncStorage.setItem("explorerName", fullName.trim());
         await AsyncStorage.setItem("explorerUsername", username.trim());
         await AsyncStorage.setItem("explorerGrade", selectedGrade.toString());
@@ -189,7 +181,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
           JSON.stringify(selectedSubjects),
         );
 
-        // Seed the full profile cache
         const initialProfile = {
           name: fullName.trim(),
           username: username.trim(),
@@ -232,7 +223,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Animated Floating Mascot */}
           <Animated.View
             style={{
               transform: [{ translateY: floatAnim }],
@@ -245,7 +235,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
             <Image source={astro} style={styles.mascot} contentFit="contain" />
           </Animated.View>
 
-          {/* Animated Content Step Container */}
           <Animated.View
             style={[
               styles.stepContainer,

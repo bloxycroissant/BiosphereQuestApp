@@ -4,7 +4,6 @@ import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Notifications from "expo-notifications";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -21,7 +20,14 @@ import {
   ViewStyle,
 } from "react-native";
 
-if (Platform.OS !== "web") {
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+} catch (e) {
+  console.warn("expo-notifications is not supported in this environment", e);
+}
+
+if (Platform.OS !== "web" && Notifications && Notifications.setNotificationHandler) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -211,7 +217,7 @@ export default function HomeScreen(): React.JSX.Element {
   const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
 
   const scheduleStudyReminder = async (session: StudySession) => {
-    if (Platform.OS === "web") return;
+    if (Platform.OS === "web" || !Notifications) return;
 
     try {
       const { status } = await Notifications.requestPermissionsAsync();
