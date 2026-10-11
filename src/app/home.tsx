@@ -4,12 +4,14 @@ import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,18 @@ import {
   TextInput,
   View,
 } from "react-native";
+
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 const target = require("../../assets/BiosphereQuestAssets/target.png");
@@ -143,6 +157,10 @@ export default function HomeScreen(): React.JSX.Element {
   const sessionsListAnim = useRef(new Animated.Value(0)).current;
   const modalBadgePulse = useRef(new Animated.Value(1)).current;
 
+  // Custom Modal Animations
+  const modalSlideAnim = useRef(new Animated.Value(300)).current;
+  const modalFadeAnim = useRef(new Animated.Value(0)).current;
+
   const [userName, setUserName] = useState("Explorer");
   const [userGrade, setUserGrade] = useState("1");
 
@@ -191,6 +209,85 @@ export default function HomeScreen(): React.JSX.Element {
 
   const nextLevelXp = progress.nextLevelXp || 100;
   const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+
+  const scheduleStudyReminder = async (session: StudySession) => {
+    if (Platform.OS === "web") return;
+
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        return;
+      }
+
+      const [year, month, day] = session.dateStr.split("-").map(Number);
+      const [timeStr, period] = session.startTime.split(" ");
+      let [hours, minutes] = timeStr.split(":").map(Number);
+
+      if (period === "PM" && hours < 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+
+      const triggerDate = new Date(year, month - 1, day, hours, minutes);
+
+      if (session.reminder === "5 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 5);
+      if (session.reminder === "10 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 10);
+      if (session.reminder === "30 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 30);
+
+      if (triggerDate > new Date()) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `📚 Study Time: ${session.title}`,
+            body: `Your ${session.category} session starts soon! (${session.startTime})`,
+            sound: true,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerDate,
+          },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to schedule notification", e);
+    }
+  };
+
+  useEffect(() => {
+    if (isAddSessionModalOpen) {
+      modalSlideAnim.setValue(300);
+      modalFadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(modalFadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(modalSlideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isAddSessionModalOpen]);
+
+  const closeAddSessionModal = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(modalFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalSlideAnim, {
+        toValue: 300,
+        duration: 200,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsAddSessionModalOpen(false);
+      if (callback) callback();
+    });
+  };
 
   useEffect(() => {
     Animated.loop(
@@ -267,7 +364,6 @@ export default function HomeScreen(): React.JSX.Element {
     return () => clearInterval(interval);
   }, []);
 
-  // Generate Leaderboard Notifications (Weekly & Daily)
   useEffect(() => {
     const generateLeaderboardAlerts = () => {
       const mockRank = xp > 5000 ? 1 : xp > 3000 ? 2 : xp > 1500 ? 3 : 4;
@@ -421,6 +517,8 @@ export default function HomeScreen(): React.JSX.Element {
       reminder: formReminder,
     };
 
+    await scheduleStudyReminder(newSession);
+
     const updated = [newSession, ...studySessions];
     setStudySessions(updated);
     try {
@@ -430,8 +528,9 @@ export default function HomeScreen(): React.JSX.Element {
     }
 
     setFormTitle("");
-    setIsAddSessionModalOpen(false);
-    triggerSessionListAnimation();
+    closeAddSessionModal(() => {
+      triggerSessionListAnimation();
+    });
   };
 
   const checkParentRules = async () => {
@@ -1314,17 +1413,27 @@ export default function HomeScreen(): React.JSX.Element {
         </View>
       </Modal>
 
-      {/* ADD STUDY SESSION MODAL */}
+      {/* ANIMATED ADD STUDY SESSION MODAL */}
       <Modal
         visible={isAddSessionModalOpen}
-        animationType="slide"
+        animationType="none"
         transparent={true}
-        onRequestClose={() => setIsAddSessionModalOpen(false)}
+        onRequestClose={() => closeAddSessionModal()}
       >
-        <View style={styles.sessionModalBackdrop}>
-          <View style={styles.sessionModalContainer}>
+        <Animated.View
+          style={[
+            styles.sessionModalBackdrop,
+            { opacity: modalFadeAnim },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.sessionModalContainer,
+              { transform: [{ translateY: modalSlideAnim }] },
+            ]}
+          >
             <View style={styles.sessionModalHeader}>
-              <Pressable onPress={() => setIsAddSessionModalOpen(false)}>
+              <Pressable onPress={() => closeAddSessionModal()}>
                 <Text style={styles.sessionModalCancelText}>Cancel</Text>
               </Pressable>
               <View style={styles.sessionModalHeaderTitleGroup}>
@@ -1341,12 +1450,21 @@ export default function HomeScreen(): React.JSX.Element {
                 </Animated.View>
                 <Text style={styles.sessionModalHeaderTitle}>Add Study Session</Text>
               </View>
-              <Pressable
-                style={styles.sessionModalSaveBtn}
-                onPress={handleSaveStudySession}
-              >
-                <Text style={styles.sessionModalSaveBtnText}>Save</Text>
-              </Pressable>
+              {(() => {
+                const saveHandler = createCardPressHandler(handleSaveStudySession);
+                return (
+                  <AnimatedPressable
+                    style={[
+                      styles.sessionModalSaveBtn,
+                      { transform: [{ scale: saveHandler.scale }] },
+                    ]}
+                    onPressIn={saveHandler.onPressIn}
+                    onPressOut={saveHandler.onPressOut}
+                  >
+                    <Text style={styles.sessionModalSaveBtnText}>Save</Text>
+                  </AnimatedPressable>
+                );
+              })()}
             </View>
 
             <ScrollView
@@ -1410,105 +1528,86 @@ export default function HomeScreen(): React.JSX.Element {
 
                 <View style={styles.formDivider} />
 
-                <Text style={styles.formFieldLabel}>PRESET START TIME</Text>
-                <View style={styles.timePickerRow}>
-                  {[
-                    { h: 8, m: 0, p: "AM" as const },
-                    { h: 9, m: 0, p: "AM" as const },
-                    { h: 10, m: 0, p: "AM" as const },
-                    { h: 2, m: 0, p: "PM" as const },
-                    { h: 4, m: 0, p: "PM" as const },
-                    { h: 7, m: 0, p: "PM" as const },
-                  ].map((preset, idx) => {
-                    const isSel =
-                      formStartHour === preset.h &&
-                      formStartMin === preset.m &&
-                      formStartPeriod === preset.p;
-                    const label = `${preset.h}:00 ${preset.p}`;
-                    const timeHandler = createCardPressHandler(() => {
-                      setFormStartHour(preset.h);
-                      setFormStartMin(preset.m);
-                      setFormStartPeriod(preset.p);
-                    });
-
-                    return (
-                      <AnimatedPressable
-                        key={idx}
-                        style={[
-                          styles.formChip,
-                          isSel && styles.formChipSelected,
-                          { transform: [{ scale: timeHandler.scale }] },
-                        ]}
-                        onPressIn={timeHandler.onPressIn}
-                        onPressOut={timeHandler.onPressOut}
-                      >
-                        <Text
-                          style={[
-                            styles.formChipText,
-                            isSel && styles.formChipTextSelected,
-                          ]}
-                        >
-                          {label}
-                        </Text>
-                      </AnimatedPressable>
-                    );
-                  })}
-                </View>
-
-                <View style={styles.formDivider} />
-
                 <Text style={styles.formFieldLabel}>CUSTOMIZE TIME</Text>
                 <View style={styles.customTimeRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldSubLabel}>HOUR</Text>
                     <View style={styles.counterControl}>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormStartHour((h) => (h <= 1 ? 12 : h - 1))}
-                      >
-                        <Text style={styles.counterBtnText}>-</Text>
-                      </Pressable>
+                      {(() => {
+                        const subBtn = createCardPressHandler(() => setFormStartHour((h) => (h <= 1 ? 12 : h - 1)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            onPressIn={subBtn.onPressIn}
+                            onPressOut={subBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>-</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                       <Text style={styles.counterValueText}>{formStartHour}</Text>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormStartHour((h) => (h >= 12 ? 1 : h + 1))}
-                      >
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </Pressable>
+                      {(() => {
+                        const addBtn = createCardPressHandler(() => setFormStartHour((h) => (h >= 12 ? 1 : h + 1)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            onPressIn={addBtn.onPressIn}
+                            onPressOut={addBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>+</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                     </View>
                   </View>
 
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldSubLabel}>MINUTE</Text>
                     <View style={styles.counterControl}>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormStartMin((m) => (m <= 0 ? 45 : m - 15))}
-                      >
-                        <Text style={styles.counterBtnText}>-</Text>
-                      </Pressable>
+                      {(() => {
+                        const subBtn = createCardPressHandler(() => setFormStartMin((m) => (m <= 0 ? 45 : m - 15)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            onPressIn={subBtn.onPressIn}
+                            onPressOut={subBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>-</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                       <Text style={styles.counterValueText}>
                         {String(formStartMin).padStart(2, "0")}
                       </Text>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormStartMin((m) => (m >= 45 ? 0 : m + 15))}
-                      >
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </Pressable>
+                      {(() => {
+                        const addBtn = createCardPressHandler(() => setFormStartMin((m) => (m >= 45 ? 0 : m + 15)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            onPressIn={addBtn.onPressIn}
+                            onPressOut={addBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>+</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                     </View>
                   </View>
 
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldSubLabel}>AM / PM</Text>
-                    <Pressable
-                      style={styles.periodToggleBtn}
-                      onPress={() =>
-                        setFormStartPeriod((p) => (p === "AM" ? "PM" : "AM"))
-                      }
-                    >
-                      <Text style={styles.periodToggleText}>{formStartPeriod}</Text>
-                    </Pressable>
+                    {(() => {
+                      const periodBtn = createCardPressHandler(() => setFormStartPeriod((p) => (p === "AM" ? "PM" : "AM")));
+                      return (
+                        <AnimatedPressable
+                          style={[styles.periodToggleBtn, { transform: [{ scale: periodBtn.scale }] }]}
+                          onPressIn={periodBtn.onPressIn}
+                          onPressOut={periodBtn.onPressOut}
+                        >
+                          <Text style={styles.periodToggleText}>{formStartPeriod}</Text>
+                        </AnimatedPressable>
+                      );
+                    })()}
                   </View>
                 </View>
 
@@ -1518,38 +1617,62 @@ export default function HomeScreen(): React.JSX.Element {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
                     <View style={styles.counterControl}>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormDurationHours(Math.max(0, formDurationHours - 1))}
-                      >
-                        <Text style={styles.counterBtnText}>-</Text>
-                      </Pressable>
+                      {(() => {
+                        const subBtn = createCardPressHandler(() => setFormDurationHours(Math.max(0, formDurationHours - 1)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            onPressIn={subBtn.onPressIn}
+                            onPressOut={subBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>-</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                       <Text style={styles.counterValueText}>{formDurationHours}</Text>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormDurationHours(formDurationHours + 1)}
-                      >
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </Pressable>
+                      {(() => {
+                        const addBtn = createCardPressHandler(() => setFormDurationHours(formDurationHours + 1));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            onPressIn={addBtn.onPressIn}
+                            onPressOut={addBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>+</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                     </View>
                   </View>
 
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (MINUTES)</Text>
                     <View style={styles.counterControl}>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormDurationMins(Math.max(0, formDurationMins - 15))}
-                      >
-                        <Text style={styles.counterBtnText}>-</Text>
-                      </Pressable>
+                      {(() => {
+                        const subBtn = createCardPressHandler(() => setFormDurationMins(Math.max(0, formDurationMins - 15)));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            onPressIn={subBtn.onPressIn}
+                            onPressOut={subBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>-</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                       <Text style={styles.counterValueText}>{formDurationMins}</Text>
-                      <Pressable
-                        style={styles.counterBtn}
-                        onPress={() => setFormDurationMins(formDurationMins + 15)}
-                      >
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </Pressable>
+                      {(() => {
+                        const addBtn = createCardPressHandler(() => setFormDurationMins(formDurationMins + 15));
+                        return (
+                          <AnimatedPressable
+                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            onPressIn={addBtn.onPressIn}
+                            onPressOut={addBtn.onPressOut}
+                          >
+                            <Text style={styles.counterBtnText}>+</Text>
+                          </AnimatedPressable>
+                        );
+                      })()}
                     </View>
                   </View>
                 </View>
@@ -1604,8 +1727,8 @@ export default function HomeScreen(): React.JSX.Element {
                 </ScrollView>
               </View>
             </ScrollView>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       <Modal visible={isLocked} animationType="fade" transparent={true}>
@@ -2022,11 +2145,6 @@ const styles = StyleSheet.create({
   },
   formChipsRow: {
     flexDirection: "row",
-    gap: 8,
-  },
-  timePickerRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
   customTimeRow: {
