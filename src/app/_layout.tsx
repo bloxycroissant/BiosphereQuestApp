@@ -1,8 +1,8 @@
-import { DarkTheme, DefaultTheme, Slot, ThemeProvider, usePathname } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { DarkTheme, DefaultTheme, Slot, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Animated, StyleSheet, useColorScheme } from 'react-native';
 import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/mobile-navigation';
@@ -14,12 +14,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
   
-  // Check if current route is Welcome, Auth, or part of the Parent Portal group
   const isWelcomeOrAuth = pathname === '/' || pathname === '/login' || pathname === '/signup';
   const isParentRoute = pathname.includes('/parent-dashboard') || pathname.startsWith('/parent');
 
-  // Also check if we are explicitly on a standalone screen outside tabs if any (e.g. games, settings)
-  // If it's a student tab route, we render AppTabs. Otherwise, we render AnimatedRoute with Slot.
   const isStudentTabRoute = 
     pathname.includes('/home') || 
     pathname.includes('/courses') || 
@@ -35,7 +32,6 @@ export default function RootLayout() {
       <ProgressProvider>
         <LinearGradient colors={['#090b20', '#28285e', '#0b4070']} style={styles.background}>
           <AnimatedSplashOverlay />
-          {/* Render plain Slot for Auth, Welcome, Parent routes, or explicit secondary screens; use AppTabs for student tabs */}
           {isWelcomeOrAuth || isParentRoute || !isStudentTabRoute ? <AnimatedRoute /> : <AppTabs />}
         </LinearGradient>
       </ProgressProvider>

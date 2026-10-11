@@ -1,7 +1,5 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function ParentDashboard() {
   return (
@@ -12,7 +10,6 @@ export default function ParentDashboard() {
           <Text style={styles.subtext}>Monitoring Captain Alex's Mission</Text>
         </View>
 
-        {/* Quick Stats Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Daily Screen Time</Text>
           <Text style={styles.statValue}>45 mins / 60 mins</Text>
@@ -21,7 +18,6 @@ export default function ParentDashboard() {
           </View>
         </View>
 
-        {/* Recent Quests Feed */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Recent Activity</Text>
           <View style={styles.activityRow}>
