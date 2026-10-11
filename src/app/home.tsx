@@ -8,11 +8,13 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -24,6 +26,7 @@ const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
 const LAST_LESSON_KEY = "@biosphere_last_lesson_v1";
 const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
 const RECENT_GAMES_KEY = "@biosphere_recent_games_v1";
+const STUDY_SESSIONS_KEY = "@biosphere_study_sessions_v1";
 
 interface ActiveLessonData {
   grade: number;
@@ -41,6 +44,19 @@ interface MiniGameMeta {
   icon: string;
   badge: string;
   isRecent: boolean;
+}
+
+interface StudySession {
+  id: string;
+  title: string;
+  category: string;
+  dateStr: string;
+  dayOfWeek: string;
+  startTime: string;
+  durationHours: number;
+  durationMinutes: number;
+  notes: string;
+  reminder: string;
 }
 
 const ALL_ARCADE_GAMES = [
@@ -88,18 +104,43 @@ const ALL_ARCADE_GAMES = [
   },
 ];
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+const MONTH_SHORT = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+];
+const WEEKDAY_NAMES_FULL = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+];
+const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const CATEGORIES = ["Science", "Math", "Ecology", "Biology", "General"];
+const REMINDERS = ["None", "5 mins before", "10 mins before", "30 mins before"];
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export default function HomeScreen(): React.JSX.Element {
   const progress = useProgress();
   const appear = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(-120)).current;
 
-  const [userName, setUserName] = useState("Explorer");
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const bellPulseAnim = useRef(new Animated.Value(1)).current;
+  const xpPulseAnim = useRef(new Animated.Value(1)).current;
+
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const sessionsListAnim = useRef(new Animated.Value(0)).current;
+  const modalBadgePulse = useRef(new Animated.Value(1)).current;
+
+  const [userName, setUserName] = useState("BloxyCroissant");
   const [userGrade, setUserGrade] = useState("1");
 
   const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(0);
   const [lessons, setLessons] = useState(0);
-  const [xp, setXp] = useState(0);
+  const [xp, setXp] = useState(5399);
   const [studyMinutes, setStudyMinutes] = useState(0);
 
   const prevLevelRef = useRef<number | null>(null);
@@ -117,15 +158,243 @@ export default function HomeScreen(): React.JSX.Element {
   const [welcomeSubjects, setWelcomeSubjects] = useState<string[]>([]);
   const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
 
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth());
+  const [selectedDay, setSelectedDay] = useState(now.getDate());
+  const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(false);
+
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [isAddSessionModalOpen, setIsAddSessionModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+
+  const [formTitle, setFormTitle] = useState("");
+  const [formCategory, setFormCategory] = useState("Science");
+  const [formStartHour, setFormStartHour] = useState(9);
+  const [formStartMin, setFormStartMin] = useState(0);
+  const [formStartPeriod, setFormStartPeriod] = useState<"AM" | "PM">("AM");
+  const [formDurationHours, setFormDurationHours] = useState(0);
+  const [formDurationMins, setFormDurationMins] = useState(30);
+  const [formNotes, setFormNotes] = useState("");
+  const [formReminder, setFormReminder] = useState("10 mins before");
+
+
+  const userRank = 1; 
+  const isWinner = userRank === 1;
+
   const nextLevelXp = progress.nextLevelXp || 100;
-  const width =
-    `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+  const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -5,
+          duration: 1300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bellPulseAnim, {
+          toValue: 1.18,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(bellPulseAnim, {
+          toValue: 1,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+        Animated.delay(3500),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(xpPulseAnim, {
+          toValue: 0.75,
+          duration: 800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(xpPulseAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(modalBadgePulse, {
+          toValue: 1.1,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalBadgePulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     checkParentRules();
     const interval = setInterval(checkParentRules, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  const getDaysInMonth = (month: number, year: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfWeek = (month: number, year: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const formatSelectedDateKey = (dayNum: number, m = currentMonth, y = currentYear) => {
+    const formattedMonth = String(m + 1).padStart(2, "0");
+    const formattedDay = String(dayNum).padStart(2, "0");
+    return `${y}-${formattedMonth}-${formattedDay}`;
+  };
+
+  const triggerSlideAnimation = (direction: "up" | "down", callback: () => void) => {
+    const startVal = direction === "up" ? 18 : -18;
+    slideAnim.setValue(startVal);
+    callback();
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      friction: 7,
+      tension: 110,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePrevMonth = () => {
+    triggerSlideAnimation("up", () => {
+      let nextMonth = currentMonth - 1;
+      let nextYear = currentYear;
+      if (nextMonth < 0) {
+        nextMonth = 11;
+        nextYear = currentYear - 1;
+      }
+      setCurrentMonth(nextMonth);
+      setCurrentYear(nextYear);
+
+      const maxDays = getDaysInMonth(nextMonth, nextYear);
+      setSelectedDay((prev) => Math.min(prev, maxDays));
+      triggerSessionListAnimation();
+    });
+  };
+
+  const handleNextMonth = () => {
+    triggerSlideAnimation("down", () => {
+      let nextMonth = currentMonth + 1;
+      let nextYear = currentYear;
+      if (nextMonth > 11) {
+        nextMonth = 0;
+        nextYear = currentYear + 1;
+      }
+      setCurrentMonth(nextMonth);
+      setCurrentYear(nextYear);
+
+      const maxDays = getDaysInMonth(nextMonth, nextYear);
+      setSelectedDay((prev) => Math.min(prev, maxDays));
+      triggerSessionListAnimation();
+    });
+  };
+
+  const triggerSessionListAnimation = () => {
+    sessionsListAnim.setValue(0);
+    Animated.spring(sessionsListAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSelectDayNumber = (dayNum: number) => {
+    setSelectedDay(dayNum);
+    triggerSessionListAnimation();
+  };
+
+  const loadStudySessions = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STUDY_SESSIONS_KEY);
+      if (stored) {
+        setStudySessions(JSON.parse(stored));
+      } else {
+        const todayStr = formatSelectedDateKey(now.getDate(), now.getMonth(), now.getFullYear());
+        const initialSample: StudySession[] = [
+          {
+            id: "1",
+            title: "Biosphere Lab Quiz Review",
+            category: "Science",
+            dateStr: todayStr,
+            dayOfWeek: WEEKDAY_NAMES_FULL[now.getDay()],
+            startTime: "9:00 AM",
+            durationHours: 0,
+            durationMinutes: 30,
+            notes: "Review plant germination and energy laws",
+            reminder: "10 mins before",
+          },
+        ];
+        setStudySessions(initialSample);
+        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(initialSample));
+      }
+      sessionsListAnim.setValue(1);
+    } catch (e) {
+      console.error("Failed to load study sessions", e);
+    }
+  };
+
+  const handleSaveStudySession = async () => {
+    const dateKey = formatSelectedDateKey(selectedDay);
+    const dateObj = new Date(currentYear, currentMonth, selectedDay);
+    const formattedStartTime = `${formStartHour}:${String(formStartMin).padStart(2, "0")} ${formStartPeriod}`;
+
+    const newSession: StudySession = {
+      id: Date.now().toString(),
+      title: formTitle.trim() || "Study Session",
+      category: formCategory,
+      dateStr: dateKey,
+      dayOfWeek: WEEKDAY_NAMES_FULL[dateObj.getDay()],
+      startTime: formattedStartTime,
+      durationHours: formDurationHours,
+      durationMinutes: formDurationMins,
+      notes: formNotes,
+      reminder: formReminder,
+    };
+
+    const updated = [newSession, ...studySessions];
+    setStudySessions(updated);
+    try {
+      await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save study session", e);
+    }
+
+    setFormTitle("");
+    setIsAddSessionModalOpen(false);
+    triggerSessionListAnimation();
+  };
 
   const checkParentRules = async () => {
     try {
@@ -171,14 +440,6 @@ export default function HomeScreen(): React.JSX.Element {
       return currentTotalMins >= targetTotalMins;
     } catch {
       return false;
-    }
-  };
-
-  const navigateToRoute = (path: string) => {
-    try {
-      router.push(path as any);
-    } catch (err) {
-      router.replace(path as any);
     }
   };
 
@@ -341,7 +602,7 @@ export default function HomeScreen(): React.JSX.Element {
 
         setStreak(parsed.streak !== undefined ? parsed.streak : 0);
         setLessons(parsed.lessons !== undefined ? parsed.lessons : 0);
-        setXp(restoredXp);
+        setXp(restoredXp || 5399);
         setStudyMinutes(
           parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
         );
@@ -363,19 +624,17 @@ export default function HomeScreen(): React.JSX.Element {
         prevLevelRef.current = 0;
         setStreak(0);
         setLessons(0);
-        setXp(0);
+        setXp(5399);
         setStudyMinutes(0);
       }
 
       setLastLesson(progress.lastLesson);
       setHasCourseRecords(progress.completedLessons.length > 0);
 
-      // --- FETCH RECENT LESSONS ARRAY ---
       const recentStr = await AsyncStorage.getItem("@biosphere_recent_lessons");
       if (recentStr) {
         setRecentLessons(JSON.parse(recentStr));
       } else if (progress.lastLesson) {
-        // Fallback: Check if there's a lastLesson set from welcome screen to use as starting point
         const gradeSubjs = curriculum[resolvedGrade] || [];
         const matched = gradeSubjs.find(
           (s) => s.title === progress.lastLesson?.subjectTitle,
@@ -396,6 +655,7 @@ export default function HomeScreen(): React.JSX.Element {
     useCallback(() => {
       loadSharedProgress();
       loadArcadeGames();
+      loadStudySessions();
     }, []),
   );
 
@@ -424,6 +684,49 @@ export default function HomeScreen(): React.JSX.Element {
     } as any);
   };
 
+  const createCardPressHandler = (action: () => void) => {
+    const scale = new Animated.Value(1);
+
+    const onPressIn = () => {
+      Animated.spring(scale, {
+        toValue: 0.95,
+        friction: 4,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const onPressOut = () => {
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 3,
+        tension: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        action();
+      });
+    };
+
+    return { scale, onPressIn, onPressOut };
+  };
+
+  const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+  const firstDayOffset = getFirstDayOfWeek(currentMonth, currentYear);
+
+  const prevMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  const daysInPrevMonth = getDaysInMonth(prevMonthIndex, prevMonthYear);
+
+  const activeDateObj = new Date(currentYear, currentMonth, selectedDay);
+  const activeDayOfWeekName = WEEKDAY_NAMES_FULL[activeDateObj.getDay()];
+
+  const targetDateKey = formatSelectedDateKey(selectedDay);
+  const activeDaySessions = studySessions.filter((s) => s.dateStr === targetDateKey);
+
+  const sessionListTranslateY = sessionsListAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
+
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
       {Boolean(showLevelUp && levelUpText.trim()) && (
@@ -443,7 +746,9 @@ export default function HomeScreen(): React.JSX.Element {
       >
         <View style={styles.header}>
           <View style={styles.greeting}>
-            <Image source={logo} style={styles.avatar} contentFit="contain" />
+            <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
+              <Image source={logo} style={styles.avatar} contentFit="contain" />
+            </Animated.View>
             <View>
               <Text style={styles.small}>
                 {greeting},{userGrade ? ` Grade ${userGrade}` : ""}
@@ -451,7 +756,16 @@ export default function HomeScreen(): React.JSX.Element {
               <Text style={styles.name}>{userName}</Text>
             </View>
           </View>
-          <Text style={styles.bell}>🔔</Text>
+          <Pressable onPress={() => setIsNotificationsModalOpen(true)}>
+            <Animated.Text
+              style={[
+                styles.bell,
+                { transform: [{ scale: bellPulseAnim }] },
+              ]}
+            >
+              🔔
+            </Animated.Text>
+          </Pressable>
         </View>
 
         <Animated.View
@@ -478,13 +792,17 @@ export default function HomeScreen(): React.JSX.Element {
               <Text style={styles.xp}>{xp} XP</Text>
             </View>
             <View style={styles.track}>
-              <View style={[styles.fill, { width }]} />
+              <Animated.View
+                style={[
+                  styles.fill,
+                  { width, opacity: xpPulseAnim },
+                ]}
+              />
             </View>
           </View>
 
           {!hasCourseRecords ? (
             <View>
-              {/* DYNAMIC HEADER: New Explorer */}
               <Text style={styles.sectionTitle}>
                 Start Your First Lesson 🚀
               </Text>
@@ -508,16 +826,87 @@ export default function HomeScreen(): React.JSX.Element {
                       .slice(0, 2);
                   }
 
-                  return displaySubjs.map((subjDef, idx) => (
-                    <Pressable
-                      key={idx}
-                      style={styles.recentLessonCard}
-                      onPress={() => handleOpenSubjectFromHome(subjDef.title)}
+                  return displaySubjs.map((subjDef, idx) => {
+                    const cardHandler = createCardPressHandler(() =>
+                      handleOpenSubjectFromHome(subjDef.title)
+                    );
+
+                    return (
+                      <AnimatedPressable
+                        key={idx}
+                        style={[
+                          styles.recentLessonCard,
+                          { transform: [{ scale: cardHandler.scale }] },
+                        ]}
+                        onPressIn={cardHandler.onPressIn}
+                        onPressOut={cardHandler.onPressOut}
+                      >
+                        <LinearGradient
+                          colors={[
+                            subjDef.color || "#4f46e5",
+                            (subjDef.color || "#4f46e5") + "99",
+                          ]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.recentLessonGradient}
+                        >
+                          <View style={styles.recentLessonIconBubble}>
+                            <Text style={styles.recentLessonIcon}>
+                              {subjDef.icon}
+                            </Text>
+                          </View>
+                          <View style={styles.recentLessonMeta}>
+                            <Text style={styles.recentLessonTitle}>
+                              Grade {userGrade} Course
+                            </Text>
+                            <Text
+                              style={styles.recentLessonSubtitle}
+                              numberOfLines={1}
+                            >
+                              {subjDef.title}
+                            </Text>
+                          </View>
+                          <View style={styles.recentLessonPlayBtn}>
+                            <Text
+                              style={[
+                                styles.recentLessonPlayText,
+                                { color: subjDef.color || "#4f46e5" },
+                              ]}
+                            >
+                              Start
+                            </Text>
+                          </View>
+                        </LinearGradient>
+                      </AnimatedPressable>
+                    );
+                  });
+                })()}
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.section}>Continue Learning</Text>
+
+              <View style={styles.recentLessonsStack}>
+                {recentLessons.map((lesson, index) => {
+                  const cardHandler = createCardPressHandler(() =>
+                    handleOpenSubjectFromHome(lesson.subjectTitle)
+                  );
+
+                  return (
+                    <AnimatedPressable
+                      key={index}
+                      style={[
+                        styles.recentLessonCard,
+                        { transform: [{ scale: cardHandler.scale }] },
+                      ]}
+                      onPressIn={cardHandler.onPressIn}
+                      onPressOut={cardHandler.onPressOut}
                     >
                       <LinearGradient
                         colors={[
-                          subjDef.color || "#4f46e5",
-                          (subjDef.color || "#4f46e5") + "99",
+                          lesson.color || "#4f46e5",
+                          (lesson.color || "#4f46e5") + "99",
                         ]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -525,106 +914,65 @@ export default function HomeScreen(): React.JSX.Element {
                       >
                         <View style={styles.recentLessonIconBubble}>
                           <Text style={styles.recentLessonIcon}>
-                            {subjDef.icon}
+                            {lesson.icon}
                           </Text>
                         </View>
                         <View style={styles.recentLessonMeta}>
                           <Text style={styles.recentLessonTitle}>
-                            Grade {userGrade} Course
+                            {lesson.subjectTitle}
                           </Text>
                           <Text
                             style={styles.recentLessonSubtitle}
                             numberOfLines={1}
                           >
-                            {subjDef.title}
+                            {lesson.lessonTitle}
                           </Text>
                         </View>
                         <View style={styles.recentLessonPlayBtn}>
                           <Text
                             style={[
                               styles.recentLessonPlayText,
-                              { color: subjDef.color || "#4f46e5" },
+                              { color: lesson.color || "#4f46e5" },
                             ]}
                           >
-                            Start
+                            Resume
                           </Text>
                         </View>
                       </LinearGradient>
-                    </Pressable>
-                  ));
-                })()}
-              </View>
-            </View>
-          ) : (
-            <View>
-              {/* DYNAMIC HEADER: Returning Explorer */}
-              <Text style={styles.section}>Continue Learning</Text>
-
-              {/* NEW VERTICAL RECENT LESSON STACK */}
-              <View style={styles.recentLessonsStack}>
-                {recentLessons.map((lesson, index) => (
-                  <Pressable
-                    key={index}
-                    style={styles.recentLessonCard}
-                    onPress={() =>
-                      handleOpenSubjectFromHome(lesson.subjectTitle)
-                    }
-                  >
-                    <LinearGradient
-                      colors={[
-                        lesson.color || "#4f46e5",
-                        (lesson.color || "#4f46e5") + "99",
-                      ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.recentLessonGradient}
-                    >
-                      <View style={styles.recentLessonIconBubble}>
-                        <Text style={styles.recentLessonIcon}>
-                          {lesson.icon}
-                        </Text>
-                      </View>
-                      <View style={styles.recentLessonMeta}>
-                        <Text style={styles.recentLessonTitle}>
-                          {lesson.subjectTitle}
-                        </Text>
-                        <Text
-                          style={styles.recentLessonSubtitle}
-                          numberOfLines={1}
-                        >
-                          {lesson.lessonTitle}
-                        </Text>
-                      </View>
-                      <View style={styles.recentLessonPlayBtn}>
-                        <Text
-                          style={[
-                            styles.recentLessonPlayText,
-                            { color: lesson.color || "#4f46e5" },
-                          ]}
-                        >
-                          Resume
-                        </Text>
-                      </View>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
+                    </AnimatedPressable>
+                  );
+                })}
               </View>
             </View>
           )}
 
-          <Pressable
-            style={styles.challenge}
-            onPress={() => launchMiniGame("quiz")}
-          >
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.challengeTag}>DAILY CHALLENGE</Text>
-              <Text style={styles.challengeTitle}>Science & Math Quiz</Text>
-              <Text style={styles.challengeSub}>
-                5 questions • +150 XP • Tap to Start!
-              </Text>
-            </View>
-            <Image source={target} style={styles.target} contentFit="contain" />
-          </Pressable>
+          {(() => {
+            const challengeHandler = createCardPressHandler(() =>
+              launchMiniGame("quiz")
+            );
+
+            return (
+              <AnimatedPressable
+                style={[
+                  styles.challenge,
+                  { transform: [{ scale: challengeHandler.scale }] },
+                ]}
+                onPressIn={challengeHandler.onPressIn}
+                onPressOut={challengeHandler.onPressOut}
+              >
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.challengeTag}>DAILY CHALLENGE</Text>
+                  <Text style={styles.challengeTitle}>Science & Math Quiz</Text>
+                  <Text style={styles.challengeSub}>
+                    5 questions • +150 XP • Tap to Start!
+                  </Text>
+                </View>
+                <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
+                  <Image source={target} style={styles.target} contentFit="contain" />
+                </Animated.View>
+              </AnimatedPressable>
+            );
+          })()}
 
           <Text style={styles.section}>Study Time</Text>
           <View style={styles.study}>
@@ -638,46 +986,603 @@ export default function HomeScreen(): React.JSX.Element {
 
           <Text style={styles.section}>Arcade Challenges</Text>
           <View style={styles.arcadeStack}>
-            {displayGames.map((game) => (
+            {displayGames.map((game) => {
+              const gameHandler = createCardPressHandler(() =>
+                launchMiniGame(game.key)
+              );
+
+              return (
+                <AnimatedPressable
+                  key={game.key}
+                  style={[
+                    styles.arcadeGameRow,
+                    game.isRecent
+                      ? styles.recentGameBorder
+                      : styles.featuredGameBorder,
+                    { transform: [{ scale: gameHandler.scale }] },
+                  ]}
+                  onPressIn={gameHandler.onPressIn}
+                  onPressOut={gameHandler.onPressOut}
+                >
+                  <View style={styles.arcadeIconBubble}>
+                    <Text style={styles.arcadeIconText}>{game.icon}</Text>
+                  </View>
+                  <View style={styles.arcadeGameMeta}>
+                    <View style={styles.arcadeTitleLine}>
+                      <Text style={styles.arcadeGameTitle}>{game.title}</Text>
+                      <View
+                        style={[
+                          styles.gameBadgePill,
+                          game.isRecent
+                            ? styles.badgeRecent
+                            : styles.badgeFeatured,
+                        ]}
+                      >
+                        <Text style={styles.gameBadgePillText}>{game.badge}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.arcadeGameDesc} numberOfLines={1}>
+                      {game.subtitle}
+                    </Text>
+                  </View>
+                  <View style={styles.arcadePlayButton}>
+                    <Text style={styles.arcadePlayText}>Play</Text>
+                  </View>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+
+          {/* CALENDAR WIDGET */}
+          <Text style={styles.section}>Study Calendar & Schedule</Text>
+          <View style={styles.calendarWidget}>
+            <View style={styles.calendarTopHeader}>
+              <Text style={styles.calendarTopHeaderDate}>
+                {activeDayOfWeekName}, {MONTH_NAMES[currentMonth]} {selectedDay}
+              </Text>
               <Pressable
-                key={game.key}
-                style={[
-                  styles.arcadeGameRow,
-                  game.isRecent
-                    ? styles.recentGameBorder
-                    : styles.featuredGameBorder,
-                ]}
-                onPress={() => launchMiniGame(game.key)}
+                style={styles.calendarCollapseBtn}
+                onPress={() => setIsCalendarCollapsed(!isCalendarCollapsed)}
               >
-                <View style={styles.arcadeIconBubble}>
-                  <Text style={styles.arcadeIconText}>{game.icon}</Text>
+                <Text style={styles.calendarCollapseIcon}>
+                  {isCalendarCollapsed ? "⌄" : "⌃"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {!isCalendarCollapsed && (
+              <>
+                <View style={styles.monthTitleRow}>
+                  <Text style={styles.monthTitleText}>
+                    {MONTH_NAMES[currentMonth]} {currentYear}
+                  </Text>
+                  <View style={styles.monthNavArrowsGroup}>
+                    <Pressable style={styles.arrowIconBtn} onPress={handlePrevMonth}>
+                      <Text style={styles.caretIconText}>▲</Text>
+                    </Pressable>
+                    <Pressable style={styles.arrowIconBtn} onPress={handleNextMonth}>
+                      <Text style={styles.caretIconText}>▼</Text>
+                    </Pressable>
+                  </View>
                 </View>
-                <View style={styles.arcadeGameMeta}>
-                  <View style={styles.arcadeTitleLine}>
-                    <Text style={styles.arcadeGameTitle}>{game.title}</Text>
-                    <View
-                      style={[
-                        styles.gameBadgePill,
-                        game.isRecent
-                          ? styles.badgeRecent
-                          : styles.badgeFeatured,
-                      ]}
-                    >
-                      <Text style={styles.gameBadgePillText}>{game.badge}</Text>
+
+                <Animated.View
+                  style={{
+                    transform: [{ translateY: slideAnim }],
+                    opacity: slideAnim.interpolate({
+                      inputRange: [-18, 0, 18],
+                      outputRange: [0.3, 1, 0.3],
+                    }),
+                  }}
+                >
+                  <View style={styles.calendarGridHeaderRow}>
+                    {WEEKDAYS_SHORT.map((dayLabel) => (
+                      <Text key={dayLabel} style={styles.weekdayHeaderText}>
+                        {dayLabel}
+                      </Text>
+                    ))}
+                  </View>
+
+                  <View style={styles.calendarGridContainer}>
+                    {[...Array(firstDayOffset)].map((_, i) => {
+                      const prevDayNum = daysInPrevMonth - firstDayOffset + i + 1;
+                      return (
+                        <View key={`prev-${i}`} style={styles.calendarDayCell}>
+                          <Text style={styles.calendarDayCellTextDimmed}>
+                            {prevDayNum}
+                          </Text>
+                        </View>
+                      );
+                    })}
+
+                    {[...Array(daysInMonth)].map((_, i) => {
+                      const dayNum = i + 1;
+                      const isSelected = selectedDay === dayNum;
+                      const dateKey = formatSelectedDateKey(dayNum);
+                      const hasSession = studySessions.some((s) => s.dateStr === dateKey);
+
+                      return (
+                        <Pressable
+                          key={`day-${dayNum}`}
+                          style={[
+                            styles.calendarDayCell,
+                            isSelected && styles.calendarDayCellSelected,
+                          ]}
+                          onPress={() => handleSelectDayNumber(dayNum)}
+                        >
+                          <Text
+                            style={[
+                              styles.calendarDayCellText,
+                              isSelected && styles.calendarDayCellTextSelected,
+                            ]}
+                          >
+                            {dayNum}
+                          </Text>
+                          {hasSession && !isSelected && (
+                            <View style={styles.calendarDot} />
+                          )}
+                        </Pressable>
+                      );
+                    })}
+
+                    {(() => {
+                      const totalCellsUsed = firstDayOffset + daysInMonth;
+                      const remainingSlots = (7 - (totalCellsUsed % 7)) % 7;
+                      const extraSlotsNeeded = totalCellsUsed + remainingSlots < 35 
+                        ? remainingSlots + 7 
+                        : remainingSlots;
+
+                      return [...Array(extraSlotsNeeded)].map((_, i) => (
+                        <View key={`next-${i}`} style={styles.calendarDayCell}>
+                          <Text style={styles.calendarDayCellTextDimmed}>
+                            {i + 1}
+                          </Text>
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </Animated.View>
+              </>
+            )}
+
+            <View style={styles.agendaHeaderRow}>
+              <Text style={styles.selectedDateHeadline}>
+                Study Sessions
+              </Text>
+              <Pressable
+                style={styles.addScheduleBtn}
+                onPress={() => setIsAddSessionModalOpen(true)}
+              >
+                <Text style={styles.addScheduleBtnText}>+ Schedule</Text>
+              </Pressable>
+            </View>
+
+            <Animated.View
+              style={[
+                styles.sessionsContainer,
+                {
+                  opacity: sessionsListAnim,
+                  transform: [{ translateY: sessionListTranslateY }],
+                },
+              ]}
+            >
+              {activeDaySessions.length === 0 ? (
+                <Text style={styles.noSessionsText}>
+                  No study sessions planned for this date. Tap "+ Schedule" to add one!
+                </Text>
+              ) : (
+                activeDaySessions.map((session) => (
+                  <View key={session.id} style={styles.sessionItemCard}>
+                    <View style={styles.sessionCardLeft}>
+                      <View style={styles.sessionCategoryPill}>
+                        <Text style={styles.sessionCategoryText}>
+                          {session.category}
+                        </Text>
+                      </View>
+                      <Text style={styles.sessionTitleText}>{session.title}</Text>
+                      {session.notes ? (
+                        <Text style={styles.sessionNotesText} numberOfLines={1}>
+                          {session.notes}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.sessionCardRight}>
+                      <Text style={styles.sessionTimeText}>{session.startTime}</Text>
+                      <Text style={styles.sessionDurationText}>
+                        {session.durationHours > 0 ? `${session.durationHours}h ` : ""}
+                        {session.durationMinutes}m
+                      </Text>
                     </View>
                   </View>
-                  <Text style={styles.arcadeGameDesc} numberOfLines={1}>
-                    {game.subtitle}
-                  </Text>
-                </View>
-                <View style={styles.arcadePlayButton}>
-                  <Text style={styles.arcadePlayText}>Play</Text>
-                </View>
-              </Pressable>
-            ))}
+                ))
+              )}
+            </Animated.View>
           </View>
         </Animated.View>
       </ScrollView>
+
+      {/* NOTIFICATIONS MODAL (INCLUDES WEEKLY LEADERBOARD NOTIFICATION) */}
+      <Modal
+        visible={isNotificationsModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsNotificationsModalOpen(false)}
+      >
+        <View style={styles.sessionModalBackdrop}>
+          <View style={styles.sessionModalContainer}>
+            <View style={styles.sessionModalHeader}>
+              <Text style={styles.sessionModalHeaderTitle}>🔔 Notifications</Text>
+              <Pressable
+                style={styles.sessionModalSaveBtn}
+                onPress={() => setIsNotificationsModalOpen(false)}
+              >
+                <Text style={styles.sessionModalSaveBtnText}>Close</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.sessionModalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* WEEKLY LEADERBOARD NOTIFICATION CARD */}
+              <Text style={styles.formSectionHeader}>🏆 WEEKLY LEADERBOARD UPDATES</Text>
+              <View style={[styles.formCard, styles.leaderboardNotificationCard]}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: "#facc15", fontWeight: "900", fontSize: 12 }}>
+                    {isWinner ? "🏆 WEEKLY CHAMPION!" : `📊 RANK #${userRank} UPDATE`}
+                  </Text>
+                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
+                    Every 1 Week
+                  </Text>
+                </View>
+
+                <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "900", marginTop: 6 }}>
+                  {isWinner
+                    ? `Congratulations ${userName}! 🎉 You are in 1st Place this week!`
+                    : `Keep going ${userName}! You are currently ranked #${userRank}.`}
+                </Text>
+
+                <View style={styles.leaderboardStatsBadgeRow}>
+                  <View style={styles.leaderboardPill}>
+                    <Text style={styles.leaderboardPillLabel}>CURRENT XP</Text>
+                    <Text style={styles.leaderboardPillVal}>{xp} XP</Text>
+                  </View>
+                  <View style={styles.leaderboardPill}>
+                    <Text style={styles.leaderboardPillLabel}>YOUR POSITION</Text>
+                    <Text style={styles.leaderboardPillVal}>#{userRank}</Text>
+                  </View>
+                </View>
+
+                <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 8 }}>
+                  Weekly Champions reset every Sunday! Finish lessons and play games to boost your XP!
+                </Text>
+              </View>
+
+              <Text style={styles.formSectionHeader}>UPCOMING STUDY REMINDERS</Text>
+              {studySessions.length === 0 ? (
+                <View style={styles.formCard}>
+                  <Text style={styles.noSessionsText}>
+                    No upcoming study reminders scheduled yet.
+                  </Text>
+                </View>
+              ) : (
+                studySessions.map((session) => (
+                  <View key={session.id} style={styles.formCard}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ color: "#38bdf8", fontWeight: "900", fontSize: 11 }}>
+                        {session.category.toUpperCase()} • {session.reminder}
+                      </Text>
+                      <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
+                        {session.dateStr}
+                      </Text>
+                    </View>
+                    <Text style={{ color: "#ffffff", fontSize: 15, fontWeight: "900", marginTop: 4 }}>
+                      {session.title}
+                    </Text>
+                    <Text style={{ color: "#818cf8", fontSize: 12, fontWeight: "800", marginTop: 2 }}>
+                      ⏰ Start Time: {session.startTime} ({session.durationHours > 0 ? `${session.durationHours}h ` : ""}{session.durationMinutes}m)
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ADD STUDY SESSION MODAL */}
+      <Modal
+        visible={isAddSessionModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsAddSessionModalOpen(false)}
+      >
+        <View style={styles.sessionModalBackdrop}>
+          <View style={styles.sessionModalContainer}>
+            <View style={styles.sessionModalHeader}>
+              <Pressable onPress={() => setIsAddSessionModalOpen(false)}>
+                <Text style={styles.sessionModalCancelText}>Cancel</Text>
+              </Pressable>
+              <View style={styles.sessionModalHeaderTitleGroup}>
+                <Animated.View
+                  style={[
+                    styles.sessionModalDateBadge,
+                    { transform: [{ scale: modalBadgePulse }] },
+                  ]}
+                >
+                  <Text style={styles.sessionModalDateBadgeMonth}>
+                    {MONTH_SHORT[currentMonth]}
+                  </Text>
+                  <Text style={styles.sessionModalDateBadgeDay}>{selectedDay}</Text>
+                </Animated.View>
+                <Text style={styles.sessionModalHeaderTitle}>Add Study Session</Text>
+              </View>
+              <Pressable
+                style={styles.sessionModalSaveBtn}
+                onPress={handleSaveStudySession}
+              >
+                <Text style={styles.sessionModalSaveBtnText}>Save</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.sessionModalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.formSectionHeader}>CORE INFORMATION</Text>
+              <View style={styles.formCard}>
+                <Text style={styles.formFieldLabel}>SESSION TITLE / TOPIC *</Text>
+                <TextInput
+                  style={styles.formTextInput}
+                  placeholder="e.g. Biosphere Lab Quiz Review"
+                  placeholderTextColor="#64748b"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+
+                <View style={styles.formDivider} />
+
+                <Text style={styles.formFieldLabel}>CATEGORY / SUBJECT</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.formChipsRow}
+                >
+                  {CATEGORIES.map((cat) => {
+                    const isSel = formCategory === cat;
+                    const chipHandler = createCardPressHandler(() => setFormCategory(cat));
+
+                    return (
+                      <AnimatedPressable
+                        key={cat}
+                        style={[
+                          styles.formChip,
+                          isSel && styles.formChipSelected,
+                          { transform: [{ scale: chipHandler.scale }] },
+                        ]}
+                        onPressIn={chipHandler.onPressIn}
+                        onPressOut={chipHandler.onPressOut}
+                      >
+                        <Text
+                          style={[
+                            styles.formChipText,
+                            isSel && styles.formChipTextSelected,
+                          ]}
+                        >
+                          {cat}
+                        </Text>
+                      </AnimatedPressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              <Text style={styles.formSectionHeader}>TIMING & SCHEDULE</Text>
+              <View style={styles.formCard}>
+                <Text style={styles.formFieldLabel}>TARGET DATE</Text>
+                <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 13, marginBottom: 12 }}>
+                  {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
+                </Text>
+
+                <View style={styles.formDivider} />
+
+                <Text style={styles.formFieldLabel}>PRESET START TIME</Text>
+                <View style={styles.timePickerRow}>
+                  {[
+                    { h: 8, m: 0, p: "AM" as const },
+                    { h: 9, m: 0, p: "AM" as const },
+                    { h: 10, m: 0, p: "AM" as const },
+                    { h: 2, m: 0, p: "PM" as const },
+                    { h: 4, m: 0, p: "PM" as const },
+                    { h: 7, m: 0, p: "PM" as const },
+                  ].map((preset, idx) => {
+                    const isSel =
+                      formStartHour === preset.h &&
+                      formStartMin === preset.m &&
+                      formStartPeriod === preset.p;
+                    const label = `${preset.h}:00 ${preset.p}`;
+                    const timeHandler = createCardPressHandler(() => {
+                      setFormStartHour(preset.h);
+                      setFormStartMin(preset.m);
+                      setFormStartPeriod(preset.p);
+                    });
+
+                    return (
+                      <AnimatedPressable
+                        key={idx}
+                        style={[
+                          styles.formChip,
+                          isSel && styles.formChipSelected,
+                          { transform: [{ scale: timeHandler.scale }] },
+                        ]}
+                        onPressIn={timeHandler.onPressIn}
+                        onPressOut={timeHandler.onPressOut}
+                      >
+                        <Text
+                          style={[
+                            styles.formChipText,
+                            isSel && styles.formChipTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </AnimatedPressable>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.formDivider} />
+
+                <Text style={styles.formFieldLabel}>CUSTOMIZE TIME</Text>
+                <View style={styles.customTimeRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formFieldSubLabel}>HOUR</Text>
+                    <View style={styles.counterControl}>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormStartHour((h) => (h <= 1 ? 12 : h - 1))}
+                      >
+                        <Text style={styles.counterBtnText}>-</Text>
+                      </Pressable>
+                      <Text style={styles.counterValueText}>{formStartHour}</Text>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormStartHour((h) => (h >= 12 ? 1 : h + 1))}
+                      >
+                        <Text style={styles.counterBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formFieldSubLabel}>MINUTE</Text>
+                    <View style={styles.counterControl}>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormStartMin((m) => (m <= 0 ? 45 : m - 15))}
+                      >
+                        <Text style={styles.counterBtnText}>-</Text>
+                      </Pressable>
+                      <Text style={styles.counterValueText}>
+                        {String(formStartMin).padStart(2, "0")}
+                      </Text>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormStartMin((m) => (m >= 45 ? 0 : m + 15))}
+                      >
+                        <Text style={styles.counterBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formFieldSubLabel}>AM / PM</Text>
+                    <Pressable
+                      style={styles.periodToggleBtn}
+                      onPress={() =>
+                        setFormStartPeriod((p) => (p === "AM" ? "PM" : "AM"))
+                      }
+                    >
+                      <Text style={styles.periodToggleText}>{formStartPeriod}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.formDivider} />
+
+                <View style={styles.durationRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
+                    <View style={styles.counterControl}>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormDurationHours(Math.max(0, formDurationHours - 1))}
+                      >
+                        <Text style={styles.counterBtnText}>-</Text>
+                      </Pressable>
+                      <Text style={styles.counterValueText}>{formDurationHours}</Text>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormDurationHours(formDurationHours + 1)}
+                      >
+                        <Text style={styles.counterBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formFieldLabel}>DURATION (MINUTES)</Text>
+                    <View style={styles.counterControl}>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormDurationMins(Math.max(0, formDurationMins - 15))}
+                      >
+                        <Text style={styles.counterBtnText}>-</Text>
+                      </Pressable>
+                      <Text style={styles.counterValueText}>{formDurationMins}</Text>
+                      <Pressable
+                        style={styles.counterBtn}
+                        onPress={() => setFormDurationMins(formDurationMins + 15)}
+                      >
+                        <Text style={styles.counterBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.formSectionHeader}>ADDITIONAL DETAILS</Text>
+              <View style={styles.formCard}>
+                <Text style={styles.formFieldLabel}>DESCRIPTION / NOTES</Text>
+                <TextInput
+                  style={[styles.formTextInput, { minHeight: 60 }]}
+                  placeholder="Add specific goals, chapters, or items to bring..."
+                  placeholderTextColor="#64748b"
+                  multiline
+                  value={formNotes}
+                  onChangeText={setFormNotes}
+                />
+
+                <View style={styles.formDivider} />
+
+                <Text style={styles.formFieldLabel}>REMINDER NOTIFICATION</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.formChipsRow}
+                >
+                  {REMINDERS.map((r) => {
+                    const isSel = formReminder === r;
+                    const remHandler = createCardPressHandler(() => setFormReminder(r));
+
+                    return (
+                      <AnimatedPressable
+                        key={r}
+                        style={[
+                          styles.formChip,
+                          isSel && styles.formChipSelected,
+                          { transform: [{ scale: remHandler.scale }] },
+                        ]}
+                        onPressIn={remHandler.onPressIn}
+                        onPressOut={remHandler.onPressOut}
+                      >
+                        <Text
+                          style={[
+                            styles.formChipText,
+                            isSel && styles.formChipTextSelected,
+                          ]}
+                        >
+                          {r}
+                        </Text>
+                      </AnimatedPressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={isLocked} animationType="fade" transparent={true}>
         <View style={styles.lockOverlay}>
@@ -744,7 +1649,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
-  content: { padding: 18, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 36 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -768,18 +1673,424 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 13,
     padding: 10,
-    marginTop: 18,
+    marginTop: 16,
   },
   labels: { flexDirection: "row", justifyContent: "space-between" },
   label: { color: "#fff", fontSize: 11, fontWeight: "800" },
   levelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 14,
+    marginTop: 12,
   },
   xp: { color: "#edaa39", fontWeight: "900" },
   track: { backgroundColor: "#000", height: 7, borderRadius: 5, marginTop: 5 },
   fill: { height: "100%", backgroundColor: "#df6ce8", borderRadius: 5 },
+  
+  calendarWidget: {
+    backgroundColor: "#161c2e",
+    borderColor: "#232a3f",
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 8,
+  },
+  calendarTopHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  calendarTopHeaderDate: {
+    color: "#e2e8f0",
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.2,
+  },
+  calendarCollapseBtn: {
+    backgroundColor: "#21293e",
+    borderRadius: 6,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarCollapseIcon: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  monthTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  monthTitleText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  monthNavArrowsGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  arrowIconBtn: {
+    padding: 3,
+  },
+  caretIconText: {
+    color: "#94a3b8",
+    fontSize: 9,
+  },
+  calendarGridHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  weekdayHeaderText: {
+    flex: 1,
+    textAlign: "center",
+    color: "#f8fafc",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  calendarGridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  calendarDayCell: {
+    width: "14.28%",
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 1,
+    position: "relative",
+  },
+  calendarDayCellSelected: {
+    backgroundColor: "#38bdf8",
+    borderRadius: 16,
+  },
+  calendarDayCellText: {
+    color: "#f8fafc",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  calendarDayCellTextDimmed: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "400",
+  },
+  calendarDayCellTextSelected: {
+    color: "#0f172a",
+    fontWeight: "700",
+  },
+  calendarDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#38bdf8",
+    position: "absolute",
+    bottom: 2,
+  },
+
+  agendaHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#21293e",
+  },
+  selectedDateHeadline: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  addScheduleBtn: {
+    backgroundColor: "#8b5cf6",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  addScheduleBtnText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  sessionsContainer: {
+    marginTop: 6,
+  },
+  noSessionsText: {
+    color: "#64748b",
+    fontSize: 11,
+    fontStyle: "italic",
+    textAlign: "center",
+    paddingVertical: 8,
+  },
+  sessionItemCard: {
+    backgroundColor: "#1e273e",
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: "#38bdf8",
+  },
+  sessionCardLeft: { flex: 1, paddingRight: 8 },
+  sessionCategoryPill: {
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginBottom: 3,
+  },
+  sessionCategoryText: {
+    color: "#38bdf8",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  sessionTitleText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  sessionNotesText: {
+    color: "#94a3b8",
+    fontSize: 10,
+    marginTop: 1,
+  },
+  sessionCardRight: { alignItems: "flex-end" },
+  sessionTimeText: {
+    color: "#7dd3fc",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  sessionDurationText: {
+    color: "#94a3b8",
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+
+  sessionModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(3, 7, 18, 0.9)",
+    justifyContent: "flex-end",
+  },
+  sessionModalContainer: {
+    backgroundColor: "#0d152a",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "90%",
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  sessionModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b",
+  },
+  sessionModalCancelText: {
+    color: "#e879f9",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  sessionModalHeaderTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sessionModalDateBadge: {
+    backgroundColor: "#ef4444",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: "center",
+  },
+  sessionModalDateBadgeMonth: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  sessionModalDateBadgeDay: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  sessionModalHeaderTitle: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  sessionModalSaveBtn: {
+    backgroundColor: "#a855f7",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  sessionModalSaveBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  sessionModalContent: {
+    paddingVertical: 16,
+    gap: 16,
+  },
+  formSectionHeader: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  formCard: {
+    backgroundColor: "#141f3d",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  leaderboardNotificationCard: {
+    borderColor: "#facc15",
+    borderWidth: 1.5,
+    backgroundColor: "#1e1b4b",
+  },
+  leaderboardStatsBadgeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  leaderboardPill: {
+    backgroundColor: "rgba(250, 204, 21, 0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(250, 204, 21, 0.3)",
+  },
+  leaderboardPillLabel: {
+    color: "#fde047",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  leaderboardPillVal: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  formFieldLabel: {
+    color: "#818cf8",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  formFieldSubLabel: {
+    color: "#64748b",
+    fontSize: 9,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  formTextInput: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+    paddingVertical: 4,
+  },
+  formDivider: {
+    height: 1,
+    backgroundColor: "#1e293b",
+    marginVertical: 12,
+  },
+  formChipsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  timePickerRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  customTimeRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  periodToggleBtn: {
+    backgroundColor: "#1e293b",
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  periodToggleText: {
+    color: "#38bdf8",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  formChip: {
+    backgroundColor: "#1e293b",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  formChipSelected: {
+    backgroundColor: "#8b5cf6",
+    borderColor: "#c084fc",
+  },
+  formChipText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  formChipTextSelected: {
+    color: "#ffffff",
+    fontWeight: "900",
+  },
+  durationRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  counterControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1e293b",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    justifyContent: "space-between",
+  },
+  counterBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  counterBtnText: {
+    color: "#a855f7",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  counterValueText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
   section: {
     color: "#fff",
     fontSize: 17,
@@ -794,68 +2105,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 9,
   },
-  startLearningCard: {
-    backgroundColor: "#16234b",
-    borderColor: "#4f46e5",
-    borderWidth: 1.5,
-    borderRadius: 18,
-    padding: 16,
-    gap: 14,
-  },
-  startLearningContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  startLearningIconBubble: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#253468",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  startLearningIcon: {
-    fontSize: 24,
-  },
-  startLearningMeta: {
-    flex: 1,
-  },
-  startLearningTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  startLearningSubtitle: {
-    color: "#a5b8de",
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-  },
-  startLearningButton: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  startLearningButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  cards: { flexDirection: "row", gap: 10 },
-  course: {
-    flex: 1,
-    minHeight: 102,
-    backgroundColor: "#172849",
-    borderColor: "#4568cf",
-    borderWidth: 1,
-    borderRadius: 15,
-    padding: 11,
-  },
-  courseIcon: { color: "#f1bd48", fontSize: 27, fontWeight: "900" },
-  courseTitle: { color: "#fff", fontWeight: "900", marginTop: 4, fontSize: 13 },
-  courseSub: { color: "#bac7e0", fontSize: 10, marginTop: 2 },
   challenge: {
     backgroundColor: "#4642ae",
     borderColor: "#c2cf34",
