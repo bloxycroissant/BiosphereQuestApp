@@ -1,8 +1,10 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useAudioPlayer } from "expo-audio";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -10,10 +12,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { type Lesson, type Subject } from "./curriculum";
-import { notebookCurriculum } from "./subjectdata";
+import { type Subject } from "./curriculum";
 
 const pageTurnSoundFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/Page Turn.mp3");
+const stellaMascotImage = require("../../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
 interface SubjectNotesViewerProps {
   subject: Subject;
@@ -57,10 +59,10 @@ const HIGHLIGHTER_PALETTE = [
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const getLessonVisualData = (
-  lesson: Lesson,
+  lessonTitle: string,
   isScience: boolean,
 ): LessonVisualData => {
-  const title = lesson.title.toLowerCase();
+  const title = (lessonTitle || "").toLowerCase();
   let steps: LessonVisualStep[];
 
   if (isScience) {
@@ -68,278 +70,100 @@ const getLessonVisualData = (
       steps = [
         {
           icon: "🌱",
-          label: "Plant",
-          detail: "Start with a healthy seed or young plant.",
+          label: "Plant Germination",
+          detail: "Start with a healthy seed or young plant embedded in fertile soil.",
         },
         {
           icon: "☀️",
-          label: "Resources",
-          detail: "Provide plenty of sunlight, water, and good soil.",
+          label: "Resource Absorption",
+          detail: "Provide plenty of sunlight, clean water, and rich organic minerals.",
         },
         {
           icon: "🌼",
-          label: "Growth",
-          detail: "Watch as it grows into a mature, adult plant!",
+          label: "Full Maturity",
+          detail: "Watch as it blossoms into a mature, adult organism capable of reproduction!",
         },
       ];
     } else if (/life cycle|metamorph|animal/.test(title)) {
       steps = [
         {
           icon: "🥚",
-          label: "Beginning",
-          detail: "Life begins as an egg or a newborn.",
+          label: "Initial Stage",
+          detail: "Life begins inside a protective egg membrane or as a newborn juvenile.",
         },
         {
           icon: "🐛",
-          label: "Change",
-          detail: "The animal grows and develops over time.",
+          label: "Developmental Phase",
+          detail: "The animal feeds continuously, grows rapidly, and undergoes structural change.",
         },
         {
           icon: "🦋",
-          label: "Adult",
-          detail: "It reaches maturity and can reproduce.",
+          label: "Adult Stage",
+          detail: "The organism reaches full biological maturity and passes on genetic traits.",
         },
       ];
     } else if (/matter|solid|liquid|gas|mixture|melting/.test(title)) {
       steps = [
         {
           icon: "🧊",
-          label: "Solid",
-          detail: "Keeps its own shape and volume.",
+          label: "Solid State",
+          detail: "Molecules remain tightly packed together, holding a fixed shape and volume.",
         },
         {
           icon: "💧",
-          label: "Liquid",
-          detail: "Flows to take the shape of its container.",
+          label: "Liquid State",
+          detail: "Thermal energy loosens molecular bonds, allowing fluid movement and flow.",
         },
         {
           icon: "☁️",
-          label: "Gas",
-          detail: "Expands to fill all available space.",
-        },
-      ];
-    } else if (/force|motion|gravity|speed/.test(title)) {
-      steps = [
-        {
-          icon: "✋",
-          label: "Force",
-          detail: "A push or a pull applied to an object.",
-        },
-        {
-          icon: "➡️",
-          label: "Changes",
-          detail: "The force changes the object’s speed or direction.",
-        },
-        {
-          icon: "⚽",
-          label: "Motion",
-          detail: "The object moves based on the force applied.",
-        },
-      ];
-    } else if (/energy|electric|circuit|magnet/.test(title)) {
-      steps = [
-        {
-          icon: "🔋",
-          label: "Source",
-          detail: "Energy comes from a battery or the sun.",
-        },
-        {
-          icon: "〰️",
-          label: "Transfer",
-          detail: "Energy flows through wires or the air.",
-        },
-        {
-          icon: "💡",
-          label: "Effect",
-          detail: "It creates light, heat, or movement.",
-        },
-      ];
-    } else if (
-      /earth|space|weather|water|soil|rock|plate|solar|moon|sun/.test(title)
-    ) {
-      steps = [
-        {
-          icon: "🌦️",
-          label: "Observe",
-          detail: "Look at the sky, rocks, or weather outside.",
-        },
-        {
-          icon: "🌍",
-          label: "Connect",
-          detail: "See how it affects the Earth and living things.",
-        },
-        {
-          icon: "🔎",
-          label: "Explain",
-          detail: "Describe the natural patterns you see.",
-        },
-      ];
-    } else if (/sense|organ|body|health/.test(title)) {
-      steps = [
-        {
-          icon: "👀",
-          label: "Notice",
-          detail: "Use your eyes, ears, nose, tongue, or skin.",
-        },
-        {
-          icon: "🧠",
-          label: "Process",
-          detail: "Your brain understands the signals.",
-        },
-        {
-          icon: "💬",
-          label: "Describe",
-          detail: "Tell others what you are experiencing.",
+          label: "Gas State",
+          detail: "High temperature drives particles apart, expanding to fill any container space.",
         },
       ];
     } else {
       steps = [
         {
           icon: "🔎",
-          label: "Observe",
-          detail: "Look closely at the scientific details.",
+          label: "Observation",
+          detail: "Examine key physical phenomena and record empirical field data.",
         },
         {
           icon: "📝",
-          label: "Record",
-          detail: "Write down your evidence and findings.",
+          label: "Documentation",
+          detail: "Log all findings carefully inside a structured research framework.",
         },
         {
           icon: "💡",
-          label: "Explain",
-          detail: "State why this happens using science.",
+          label: "Conclusion",
+          detail: "Formulate a sound scientific rule supported by verifiable evidence.",
         },
       ];
     }
-  } else if (/fraction|percent/.test(title)) {
-    steps = [
-      {
-        icon: "🍰",
-        label: "Whole",
-        detail: "Start with one complete object or group.",
-      },
-      {
-        icon: "✂️",
-        label: "Equal parts",
-        detail: "Divide it into pieces of the exact same size.",
-      },
-      {
-        icon: "½",
-        label: "One part",
-        detail: "Select a specific number of those pieces.",
-      },
-    ];
-  } else if (/shape|polygon|angle|geometry|symmetry/.test(title)) {
-    steps = [
-      {
-        icon: "△",
-        label: "Sides",
-        detail: "Count the straight or curved edges.",
-      },
-      {
-        icon: "◻️",
-        label: "Corners",
-        detail: "Count the sharp points or angles.",
-      },
-      {
-        icon: "🔍",
-        label: "Compare",
-        detail: "Match the features to name the shape.",
-      },
-    ];
-  } else if (/graph|data|statistics|probability|pictograph|tally/.test(title)) {
-    steps = [
-      {
-        icon: "📊",
-        label: "Collect",
-        detail: "Gather numbers or votes from a group.",
-      },
-      {
-        icon: "📈",
-        label: "Organize",
-        detail: "Put the data into a neat chart or graph.",
-      },
-      {
-        icon: "💡",
-        label: "Conclude",
-        detail: "Read the chart to find the highest or lowest.",
-      },
-    ];
-  } else if (/time|measurement|area|perimeter|volume|length/.test(title)) {
-    steps = [
-      {
-        icon: "📏",
-        label: "Measure",
-        detail: "Use a ruler, clock, or formula.",
-      },
-      {
-        icon: "🧮",
-        label: "Calculate",
-        detail: "Add up the numbers or multiply the sides.",
-      },
-      {
-        icon: "✅",
-        label: "Check",
-        detail: "Make sure your units (like cm or hours) are correct.",
-      },
-    ];
-  } else if (/multiply|division|equal groups|ratio/.test(title)) {
-    steps = [
-      {
-        icon: "● ●",
-        label: "Group 1",
-        detail: "Identify the size of the first group.",
-      },
-      {
-        icon: "● ●",
-        label: "Group 2",
-        detail: "Make sure all groups have the same amount.",
-      },
-      {
-        icon: "🧮",
-        label: "Total",
-        detail: "Find the total number across all groups.",
-      },
-    ];
-  } else if (/add|subtract|integer|equation|expression|number/.test(title)) {
-    steps = [
-      {
-        icon: "🔢",
-        label: "Known",
-        detail: "Find the numbers you already have.",
-      },
-      {
-        icon: "➕",
-        label: "Relationship",
-        detail: "Decide if things are combining or separating.",
-      },
-      { icon: "❓", label: "Find", detail: "Solve for the missing number." },
-    ];
   } else {
     steps = [
       {
         icon: "📘",
-        label: "Idea",
-        detail: "Read the main math concept carefully.",
+        label: "Rule Identification",
+        detail: "Read and analyze the core mathematical rule or algebraic principle.",
       },
       {
         icon: "🧩",
-        label: "Connect",
-        detail: "Link the concept to the numbers in the problem.",
+        label: "Variable Alignment",
+        detail: "Substitute given numerical values into the target equation correctly.",
       },
       {
         icon: "✅",
-        label: "Check",
-        detail: "Solve it and verify your answer makes sense.",
+        label: "Verification",
+        detail: "Execute steps systematically and double-check units and calculations.",
       },
     ];
   }
 
   return {
-    title: "Visual Lesson Map",
+    title: "Visual Concept Map",
     summary: isScience
-      ? "Observe the parts, connect them to the lesson, and explain what the evidence shows."
-      : "Notice the parts, show how they relate, and check that your answer fits the lesson.",
+      ? "Observe key physical components, trace fundamental interactions, and conclude with verified empirical evidence."
+      : "Identify given variables, apply mathematical formulas step-by-step, and verify your results against core rules.",
     steps,
   };
 };
@@ -375,23 +199,25 @@ function LessonVisual({ data }: { data: LessonVisualData }) {
 const getGradeStudyGuidance = (gradeLevel: number, isScience: boolean) => {
   if (gradeLevel <= 2) {
     return isScience
-      ? "Look closely at familiar objects or living things. Describe what you can observe, compare what is alike or different, and use a drawing when it helps."
-      : "Use counters, drawings, objects, or a number line. Say what each number or shape represents before choosing an answer.";
+      ? "Look closely at familiar objects or living things in your environment. Describe what you can observe with your five senses, compare what is alike or different, and draw a simple scientific picture when it helps clarify your thoughts."
+      : "Use physical counters, visual drawings, real objects, or a simple number line. Always state what each number or shape stands for out loud before selecting your final answer.";
   }
   if (gradeLevel <= 4) {
     return isScience
-      ? "Record observations carefully, compare results, and explain how the evidence supports your conclusion."
-      : "Choose a model or strategy, show each step, and check that your units and answer make sense.";
+      ? "Record your observations carefully in an organized notebook. Compare experimental results across multiple trials, and explain clearly how physical evidence directly supports your scientific conclusions."
+      : "Select an appropriate mathematical model or strategy. Carefully write down every calculation step, label your units, and check that your final solution makes logical sense.";
   }
   return isScience
-    ? "Connect the evidence to the scientific idea, distinguish observation from inference, and justify your conclusion."
-    : "Connect representations and rules, show a complete solution, and justify why the result fits the problem.";
+    ? "Connect observational evidence directly to broader scientific theories. Distinguish carefully between direct physical observation and logical inference, justifying every conclusion with empirical data."
+    : "Connect symbolic equations, geometric models, and numerical relationships. Provide complete step-by-step proofs, and justify why your computed result fits the constraints of the original problem statement.";
 };
 
 const buildLessonExpansion = (
   gradeLevel: number,
   subjectTitle: string,
-  lesson: Lesson,
+  lessonTitle: string,
+  lessonMeaning?: string,
+  lessonExample?: string,
 ) => {
   const cleanSubject = subjectTitle.toLowerCase();
   const isScience =
@@ -405,37 +231,30 @@ const buildLessonExpansion = (
       "energy",
       "space",
     ].some((s) => cleanSubject.includes(s));
-  const keyword = lesson.title.toLowerCase();
+  const keyword = lessonTitle.toLowerCase();
   const gradeHint = getGradeStudyGuidance(gradeLevel, isScience);
 
-  const oldSubject = notebookCurriculum[gradeLevel]?.find(
-    (s) => s.title === subjectTitle,
-  );
-  const oldLesson = oldSubject?.lessons.find((l) => l.title === lesson.title);
-
-  const lessonMeaning =
-    oldLesson?.meaning ||
-    lesson.meaning ||
-    "Study the basic principles of this topic.";
-  const lessonExample =
-    oldLesson?.example ||
-    lesson.example ||
-    "Look around you to see how this concept works in everyday life!";
+  const meaningText =
+    lessonMeaning ||
+    `Study the foundational laws and structural mechanics governing ${keyword}.`;
+  const exampleText =
+    lessonExample ||
+    `Examine practical everyday phenomena to see how ${keyword} works in real-world environments!`;
 
   return {
     isScience,
-    definition: lessonMeaning,
+    definition: meaningText,
     explanation: isScience
-      ? `Look closely at ${keyword}.\n\n1. What do you notice?\n2. Which detail is evidence?\n3. What does the evidence tell you?\n\nStudy tip:\n${gradeHint}`
-      : `Read the question about ${keyword}.\n\n1. What do you know?\n2. What do you need to find?\n3. Choose a model or operation. Show your steps.\n4. Check your answer.\n\nStudy tip:\n${gradeHint}`,
-    example: lessonExample,
+      ? `In-Depth Scientific Analysis of ${keyword}:\n\n1. Structural Properties & Observations: When examining ${keyword}, scientists begin by documenting physical attributes, thermal changes, and environmental interactions. Every physical system operates according to fixed scientific laws that govern energy conservation, molecular behavior, and system equilibrium.\n\n2. Key Mechanisms & Relationships: Observing ${keyword} requires analyzing cause-and-effect patterns. For instance, changes in temperature, pressure, forces, or biological resources directly alter how the system behaves. Identifying these variables allows us to predict future outcomes accurately.\n\n3. Empirical Rules to Remember: Always distinguish between directly observable traits (such as color, mass, or velocity) and inferred properties (such as chemical composition or potential energy). Verifiable scientific conclusions are built on reproducible, empirical evidence.\n\nAcademic Guidance Note:\n${gradeHint}`
+      : `Comprehensive Mathematical Explanation of ${keyword}:\n\n1. Foundational Rules & Principles: The mathematical framework of ${keyword} relies on fundamental axioms, formulas, and operational definitions. Understanding this topic requires recognizing how numerical quantities interact within structured equations.\n\n2. Systematic Problem Approach: When solving problems involving ${keyword}, always follow a clear three-step process:\n- Step A: Carefully identify all given information and denote unknown target variables.\n- Step B: Select the appropriate formula or operational rule that relates the known values to the target unknown.\n- Step C: Perform arithmetic calculations systematically, ensuring proper order of operations and maintaining exact units of measure.\n\n3. Proof and Validation Protocols: Never accept a calculated result without verification. Substitute your calculated value back into the original expression to verify equality and ensure that your result is logically reasonable.\n\nAcademic Guidance Note:\n${gradeHint}`,
+    example: exampleText,
     exampleExplanation: isScience
-      ? `Look at the example. What can you observe? Which detail is evidence?\n\nExplain how it connects to this idea: ${lessonMeaning}`
-      : `What do the numbers, objects, or shapes mean?\n\nShow how they connect. Check that your answer fits the question.\n\nMain idea to remember: ${lessonMeaning}`,
+      ? `Detailed Breakdown of the Example:\n\nAnalyze the scenario provided above regarding ${keyword}. Observe how each physical component operates in harmony with scientific principles. The key evidence lies in noticing specific physical interactions and identifying how energy or mass transfers between states.\n\nCore Principles Illustrated:\n• Observation: Identify the initial conditions and physical properties presented in the real-world setup.\n• Analysis: Connect these initial conditions directly to the definition: "${meaningText}".\n• Conclusion: Synthesize these findings to understand how natural systems remain balanced and governed by natural laws.`
+      : `Detailed Breakdown of the Example:\n\nExamine the mathematical context established in the example above. Every number, symbol, and geometric representation corresponds to a precise quantitative relationship. By decomposing the example into discrete operational steps, we can easily see how the abstract rule translates into a practical solution.\n\nCore Principles Illustrated:\n• Setup: Match the numbers from the example with their corresponding operational positions.\n• Calculation: Execute each operation step-by-step while adhering strictly to algebraic rules.\n• Verification: Re-check that your computed result satisfies the overarching rule: "${meaningText}".`,
     computation: isScience
-      ? `1. Observe: ${lessonExample}\n2. Find a detail that supports the lesson idea.\n3. Explain what the evidence shows.`
-      : `1. Read: ${lessonExample}\n2. Find the important numbers or shapes.\n3. Show your steps.\n4. Check that your answer fits the question.`,
-    practice: `Explain ${keyword} in your own words. Give one example and say how it fits the lesson idea.`,
+      ? `Step-by-Step Practical Demonstration:\n\n1. Observation Phase: Examine the example details carefully: "${exampleText}". Identify the primary objects, forces, or biological entities involved in the process.\n\n2. Evidence Identification: Locate key details that demonstrate scientific principles in action. Note any changes in energy, state of matter, or physical structure.\n\n3. Analytical Explanation: Connect the empirical evidence directly back to the scientific laws governing ${keyword}. Formulate a concise summary explaining why the outcome occurred based on verifiable physical properties.`
+      : `Step-by-Step Computational Procedure:\n\n1. Read & Deconstruct: Review the problem statement: "${exampleText}". Extract all given quantities, operational conditions, and required target units.\n\n2. Operational Setup: Arrange the numbers in logical order according to the standard formula for ${keyword}. Ensure all measurement units are uniform prior to calculation.\n\n3. Execute Calculation: Perform the required arithmetic operations step-by-step. Work cleanly from left to right while respecting formal order of operations.\n\n4. Logical Check: Verify that the computed numerical output falls within reasonable physical or numerical bounds.`,
+    practice: `Comprehensive Activity Exercise:\n\nIn your own words, explain the core meaning of ${keyword}. Next, construct a complete original example that illustrates this concept in action.\n\nExercise Tasks:\n1. Write out the primary definition using clear, formal academic language.\n2. Detail a practical scenario where this concept applies.\n3. Write a short explanation demonstrating step-by-step how your scenario proves the rule!`,
   };
 };
 
@@ -450,8 +269,15 @@ export default function SubjectNotesViewer({
   const [bookmarkedPages, setBookmarkedPages] = useState<Record<number, BookmarkOption>>({});
   const [currentBookmarkDesign, setCurrentBookmarkDesign] = useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
 
+  // Animation System Refs
   const flipAnim = useRef(new Animated.Value(0)).current;
-  const bookmarkDropAnim = useRef(new Animated.Value(0)).current;
+  const bookmarkDropAnim = useRef(new Animated.Value(-80)).current;
+  const bookmarkScaleAnim = useRef(new Animated.Value(0.2)).current;
+  const bookmarkBtnScale = useRef(new Animated.Value(1)).current;
+  const closeAnim = useRef(new Animated.Value(0)).current;
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const mascotFloatAnim = useRef(new Animated.Value(0)).current;
+
   const swatchAnimValues = useRef<Record<string, Animated.Value>>({}).current;
   const stickyTabAnimValues = useRef<Record<number, Animated.Value>>({}).current;
 
@@ -462,6 +288,101 @@ export default function SubjectNotesViewer({
 
   const currentPageRef = useRef<number>(currentPage);
   currentPageRef.current = currentPage;
+
+  const isChildTheme = gradeLevel <= 3;
+
+  const theme = {
+    pageBg: isChildTheme ? "#fffdf0" : "#f8f9fa",
+    dividerColor: isChildTheme ? "#ffd166" : "#cbd5e1",
+    ringColor: isChildTheme ? "#ff7043" : "#cbd5e1",
+    holeBorder: isChildTheme ? "#f4a261" : "#94a3b8",
+    borderRadius: isChildTheme ? 18 : 6,
+    titleSize: isChildTheme ? 26 : 22,
+    bodySize: isChildTheme ? 16 : 14,
+    bodyLineHeight: isChildTheme ? 26 : 22,
+  };
+
+  const CARTOON_CHARACTERS = [
+    { avatar: "🦉", name: "Ollie the Owl", tip: "Great reading! Swipe or tap to keep going!", isStella: false },
+    { avatar: "🦊", name: "Felix the Fox", tip: "You're doing super awesome!", isStella: false },
+    { avatar: "🐼", name: "Pippin Panda", tip: "Spot any fun ideas on this page?", isStella: false },
+    { avatar: "", name: "Stella (Biosphere Quest Mascot)", tip: "Keep exploring, cosmic learner!", isStella: true },
+  ];
+
+  const LAB_STAMPS = [
+    { icon: "🔬", title: "LAB PRO-TIP", tip: "Analyze the core evidence before forming your hypothesis." },
+    { icon: "💡", title: "KEY INSIGHT", tip: "Notice how this principle connects to real-world models." },
+    { icon: "📊", title: "FIELD NOTE", tip: "Verify all units and check your steps for consistency." },
+  ];
+
+  const activeCharacter = CARTOON_CHARACTERS[currentPage % CARTOON_CHARACTERS.length];
+  const activeLabStamp = LAB_STAMPS[currentPage % LAB_STAMPS.length];
+
+  // Continuous Floating Mascot Idle Animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotFloatAnim, {
+          toValue: -6,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotFloatAnim, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.timing(headerFadeAnim, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Animated Screen Close Transition when going back to courses
+  const handleCloseViewer = () => {
+    Animated.timing(closeAnim, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
+  const chapterList = useMemo(() => {
+    const list = [];
+    const lessons = subject.lessons || [];
+
+    for (let i = 0; i < 7; i++) {
+      if (i < lessons.length) {
+        list.push({
+          title: lessons[i].title,
+          meaning: lessons[i].meaning,
+          example: lessons[i].example,
+        });
+      } else {
+        const fallbackTitles = [
+          "Practical Synthesis & Real-World Application",
+          "Advanced System Analysis & Guided Practice",
+          "Comprehensive Field Exercise & Mastery Challenge",
+        ];
+        const titleIndex = i - lessons.length;
+        list.push({
+          title: fallbackTitles[titleIndex % fallbackTitles.length],
+          meaning: `Apply core subject rules from earlier chapters to solve complex problems in ${subject.title}.`,
+          example: `Observe real-world scenarios in ${subject.title} and apply step-by-step reasoning to establish verifiable solutions.`,
+        });
+      }
+    }
+    return list;
+  }, [subject]);
 
   const getSwatchAnim = (id: string) => {
     if (!swatchAnimValues[id]) {
@@ -497,8 +418,8 @@ export default function SubjectNotesViewer({
     const tabs: Array<{ pageIndex: number; label: string; color: string }> = [];
     const colors = ["#FF5252", "#FF7043", "#FFA726", "#66BB6A", "#26A69A", "#42A5F5", "#AB47BC"];
 
-    subject.lessons.forEach((_, index) => {
-      const startPageIndex = 1 + index * 4;
+    chapterList.forEach((_, index) => {
+      const startPageIndex = 1 + index * 2;
       tabs.push({
         pageIndex: startPageIndex,
         label: `Ch ${index + 1}`,
@@ -507,7 +428,13 @@ export default function SubjectNotesViewer({
     });
 
     return tabs;
-  }, [subject]);
+  }, [chapterList]);
+
+  const tabCount = stickyTabs.length;
+  const isCompressed = tabCount > 6;
+  const dynamicTabHeight = isCompressed ? Math.max(18, 160 / tabCount) : 30;
+  const dynamicFontSize = isCompressed ? 8 : 10;
+  const dynamicArrowSize = isCompressed ? dynamicTabHeight / 2 : 15;
 
   const applyHighlightKey = (wordKey: string) => {
     const activeColor = selectedHighlighterRef.current;
@@ -575,7 +502,14 @@ export default function SubjectNotesViewer({
     return text.split("\n\n").map((paragraph, pIdx) => {
       const words = paragraph.split(" ");
       return (
-        <Text key={pIdx} style={[styles.bodyText, pIdx > 0 && { marginTop: 10 }]}>
+        <Text
+          key={pIdx}
+          style={[
+            styles.bodyText,
+            { fontSize: theme.bodySize, lineHeight: theme.bodyLineHeight },
+            pIdx > 0 && { marginTop: 10 },
+          ]}
+        >
           {words.map((word, wIdx) => {
             const wordKey = `${currentPage}-${prefix}-${pIdx}-${wIdx}`;
             const highlightColor = wordHighlights[wordKey];
@@ -611,97 +545,121 @@ export default function SubjectNotesViewer({
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.pageTitle}>{subject.title} Guide</Text>
-        <Text style={styles.pageSubtitle}>
-          Grade {gradeLevel} Explorer's Notebook
+        <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+          {isChildTheme ? `🌈 ${subject.title} Field Guide` : `📑 ${subject.title} Comprehensive Journal`}
         </Text>
-        <View style={styles.divider} />
-        <Text style={styles.sectionHeading}>👋 Welcome Explorer!</Text>
-        {renderParagraphs(`This notebook contains all the core definitions, visual maps, and practice guides for ${subject.title}.`, "intro-1")}
-        <Text style={styles.sectionHeading}>📖 How to use this book</Text>
-        {renderParagraphs("Select a highlighter color above and tap or drag across text to highlight it! Select 'Off' to erase highlights or swipe left/right across pages to turn them. Use the sticky arrow tabs along the right edge to jump directly across chapters.", "intro-2")}
+        <Text style={styles.pageSubtitle}>
+          Grade {gradeLevel} Explorer's Master Notebook
+        </Text>
+        <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+        <Text style={styles.sectionHeading}>
+          {isChildTheme ? "🎈 Welcome Explorer!" : "🔬 Academic Research Notebook"}
+        </Text>
+        {renderParagraphs(`Welcome to the master field notebook for ${subject.title}! This study guide is meticulously designed to provide complete conceptual clarity across 7 full chapters: rigorous scientific and mathematical definitions, step-by-step worked examples, and interactive activity exercises.`, "intro-1")}
+        <Text style={styles.sectionHeading}>📖 Notebook Structural Organization</Text>
+        {renderParagraphs("• Chapters 1–4 (Theoretical Foundations): Focus purely on extensive explanations, formal definitions, and deep descriptions of core principles.\n\n• Chapters 5–7 (Practical Applications): Focus on comprehensive real-world worked examples, step-by-step computation models, and guided activity exercises.\n\nHighlighter Tool Usage: Choose a color from the toolbar above to mark important text. Select 'Off' to clear highlights. Use the sticky arrow tabs on the right margin to jump directly across chapters.", "intro-2")}
       </ScrollView>,
     );
 
-    subject.lessons.forEach((lesson, index) => {
-      const expansion = buildLessonExpansion(gradeLevel, subject.title, lesson);
-      const visualData = getLessonVisualData(lesson, expansion.isScience);
-
-      generatedPages.push(
-        <ScrollView
-          key={`lesson-${index}-p1`}
-          style={styles.pageContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 1</Text>
-          <Text style={styles.pageTitle}>{lesson.title}</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sectionHeading}>📖 Concept & Definition</Text>
-          {renderParagraphs(expansion.definition, `l${index}-p1`)}
-          <Text style={styles.sectionHeading}>🧠 How to think about it</Text>
-          {renderParagraphs(expansion.explanation, `l${index}-p2`)}
-        </ScrollView>,
+    chapterList.forEach((chap, index) => {
+      const expansion = buildLessonExpansion(
+        gradeLevel,
+        subject.title,
+        chap.title,
+        chap.meaning,
+        chap.example,
       );
+      const visualData = getLessonVisualData(chap.title, expansion.isScience);
+      const isExplanationChapter = index < 4;
+      const includeVisualMap = index < 2;
 
-      generatedPages.push(
-        <ScrollView
-          key={`lesson-${index}-p2`}
-          style={styles.pageContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 2</Text>
-          <Text style={styles.pageTitle}>Visual Concept Map</Text>
-          <View style={styles.divider} />
-          {renderParagraphs(`Follow the concept map from top to bottom. Each step shows one part of ${lesson.title.toLowerCase()}.`, `l${index}-map`)}
-          <LessonVisual data={visualData} />
-        </ScrollView>,
-      );
+      if (isExplanationChapter) {
+        generatedPages.push(
+          <ScrollView
+            key={`chap-${index}-p1`}
+            style={styles.pageContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Theoretical Foundations (Part 1)</Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>{chap.title}</Text>
+            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+            <Text style={styles.sectionHeading}>📖 Core Axiom & Definition</Text>
+            {renderParagraphs(expansion.definition, `c${index}-p1`)}
+            <Text style={styles.sectionHeading}>🧠 Comprehensive Theoretical Breakdown</Text>
+            {renderParagraphs(expansion.explanation, `c${index}-p2`)}
+          </ScrollView>,
+        );
 
-      generatedPages.push(
-        <ScrollView
-          key={`lesson-${index}-p3`}
-          style={styles.pageContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 3</Text>
-          <Text style={styles.pageTitle}>Worked Example</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sectionHeading}>⭐ Real-World Example</Text>
-          {renderParagraphs(expansion.example, `l${index}-ex`)}
-          <Text style={styles.sectionHeading}>
-            {expansion.isScience
-              ? "🔬 Observe and Explain"
-              : "🧮 Computation Workspace"}
-          </Text>
-          {renderParagraphs(expansion.computation, `l${index}-comp`)}
-          <Text style={styles.sectionHeading}>💡 Why this matters</Text>
-          {renderParagraphs(expansion.exampleExplanation, `l${index}-why`)}
-        </ScrollView>,
-      );
+        generatedPages.push(
+          <ScrollView
+            key={`chap-${index}-p2`}
+            style={styles.pageContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Theoretical Foundations (Part 2)</Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              {includeVisualMap ? "Visual Concept Map" : "Structural Rules & Analysis"}
+            </Text>
+            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+            
+            {includeVisualMap ? (
+              <>
+                {renderParagraphs(`Examine the flow diagram below to understand the key sequential steps of ${chap.title.toLowerCase()}.`, `c${index}-map-desc`)}
+                <LessonVisual data={visualData} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.sectionHeading}>🔬 Deep Structural Rules & Mechanics</Text>
+                {renderParagraphs(`Mastering ${chap.title.toLowerCase()} requires analyzing how each rule fits into the overarching academic system.\n\n• Axiom 1 (Fundamental Definition): Always start by anchoring your analysis in the primary definition. Identify all core properties and governing rules before attempting complex problems.\n\n• Axiom 2 (System Interactions): Observe how internal variables interact with external influences. Changing one element shifts the equilibrium of the entire mathematical or physical framework.\n\n• Axiom 3 (Verification Protocols): Always cross-examine your observational or computational data against established scientific laws and mathematical proofs. Consistency across multiple test conditions ensures true mastery!`, `c${index}-deep-desc`)}
+              </>
+            )}
+          </ScrollView>,
+        );
+      } else {
+        generatedPages.push(
+          <ScrollView
+            key={`chap-${index}-p3`}
+            style={styles.pageContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Practical Application (Part 1)</Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>{chap.title}</Text>
+            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+            <Text style={styles.sectionHeading}>⭐ Worked Real-World Example</Text>
+            {renderParagraphs(expansion.example, `c${index}-ex`)}
+            <Text style={styles.sectionHeading}>
+              {expansion.isScience ? "🔬 Step-by-Step Empirical Solution" : "🧮 Step-by-Step Computation Model"}
+            </Text>
+            {renderParagraphs(expansion.computation, `c${index}-comp`)}
+          </ScrollView>,
+        );
 
-      generatedPages.push(
-        <ScrollView
-          key={`lesson-${index}-p4`}
-          style={styles.pageContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.pageSubtitle}>Chapter {index + 1} • Part 4</Text>
-          <Text style={styles.pageTitle}>Practice & Apply</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sectionHeading}>🎯 Guided Practice</Text>
-          {renderParagraphs(expansion.practice, `l${index}-prac`)}
-          <Text style={styles.sectionHeading}>🚀 Explorer's Mission Tip</Text>
-          {renderParagraphs("Keep this relationship in mind as you try new situations in the Arcade. A strong explanation names the idea, points to a useful detail, and tells how that detail matches the definition!", `l${index}-tip`)}
-        </ScrollView>,
-      );
+        generatedPages.push(
+          <ScrollView
+            key={`chap-${index}-p4`}
+            style={styles.pageContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Practical Application (Part 2)</Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>Activity Practice Exercise</Text>
+            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+            <Text style={styles.sectionHeading}>🎯 Guided Activity Exercise</Text>
+            {renderParagraphs(expansion.practice, `c${index}-prac`)}
+            <Text style={styles.sectionHeading}>💡 Analytical Breakdown & Solution Notes</Text>
+            {renderParagraphs(expansion.exampleExplanation, `c${index}-why`)}
+            <Text style={styles.sectionHeading}>🚀 Explorer's Mission Strategy</Text>
+            {renderParagraphs("Apply the foundational rules and theoretical descriptions from Chapters 1–4 to complete this activity exercise. Always check your steps against the definition to verify complete correctness!", `c${index}-tip`)}
+          </ScrollView>,
+        );
+      }
     });
 
     return generatedPages;
-  }, [subject, gradeLevel, selectedHighlighter, wordHighlights, currentPage]);
+  }, [subject, gradeLevel, chapterList, selectedHighlighter, wordHighlights, currentPage, isChildTheme, theme]);
 
   const totalPages = pages.length;
 
@@ -750,20 +708,42 @@ export default function SubjectNotesViewer({
     jumpToPage(newPage);
   };
 
+  // Toggle Bookmark logic with interactive state change and bouncing scale animations
   const toggleBookmark = () => {
+    Animated.sequence([
+      Animated.timing(bookmarkBtnScale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
+      Animated.spring(bookmarkBtnScale, { toValue: 1, friction: 3, tension: 120, useNativeDriver: true }),
+    ]).start();
+
     setBookmarkedPages((prev) => {
       const next = { ...prev };
-      if (next[currentPage]) {
-        delete next[currentPage];
+      const isAlreadyBookmarked = !!next[currentPage];
+
+      if (isAlreadyBookmarked) {
+        Animated.parallel([
+          Animated.timing(bookmarkDropAnim, { toValue: -80, duration: 200, useNativeDriver: true }),
+          Animated.timing(bookmarkScaleAnim, { toValue: 0.2, duration: 180, useNativeDriver: true }),
+        ]).start(() => {
+          delete next[currentPage];
+        });
       } else {
         next[currentPage] = currentBookmarkDesign;
-        bookmarkDropAnim.setValue(-60);
-        Animated.spring(bookmarkDropAnim, {
-          toValue: 0,
-          friction: 6,
-          tension: 100,
-          useNativeDriver: true,
-        }).start();
+        bookmarkDropAnim.setValue(-80);
+        bookmarkScaleAnim.setValue(0.2);
+
+        Animated.parallel([
+          Animated.spring(bookmarkDropAnim, {
+            toValue: 0,
+            friction: 5,
+            tension: 90,
+            useNativeDriver: true,
+          }),
+          Animated.spring(bookmarkScaleAnim, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          }),
+        ]).start();
       }
       return next;
     });
@@ -776,176 +756,310 @@ export default function SubjectNotesViewer({
 
   const activeBookmark = bookmarkedPages[currentPage];
 
+  // Interpolated animation values for smooth screen exit when returning to courses
+  const closeTranslateY = closeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 100],
+  });
+  const closeScale = closeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.94],
+  });
+  const closeOpacity = closeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
   return (
     <SafeAreaView style={styles.fullScreenWrapper} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable onPress={onClose} style={styles.backBtn}>
-          <Text style={styles.backText}> Back to Courses</Text>
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: subject.color }]}>
-          {subject.icon} {subject.title} Notes
-        </Text>
-        <Pressable onPress={toggleBookmark} style={styles.bookmarkToggleBtn}>
-          <Text style={styles.bookmarkToggleText}>
-            {activeBookmark ? `${activeBookmark.icon} Bookmarked` : "🔖 Add Bookmark"}
-          </Text>
-        </Pressable>
-      </View>
+      <Animated.View
+        style={[
+          styles.containerAnimatedWrapper,
+          {
+            opacity: closeOpacity,
+            transform: [{ translateY: closeTranslateY }, { scale: closeScale }],
+          },
+        ]}
+      >
+        {/* Top Header */}
+        <Animated.View style={[styles.header, { opacity: headerFadeAnim }]}>
+          <Pressable onPress={handleCloseViewer} style={styles.backBtn}>
+            <Text style={styles.backText}> Back to Courses</Text>
+          </Pressable>
 
-      <View style={styles.toolbarRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
-          <Text style={styles.toolbarLabel}>Highlighter:</Text>
-          <AnimatedPressable
-            style={[
-              styles.colorSwatch,
-              !selectedHighlighter && styles.swatchSelected,
-              { transform: [{ scale: getSwatchAnim("off") }] },
-            ]}
-            onPress={() => handleSelectHighlighter(null, "off")}
+          <Text
+            style={[styles.headerTitle, { color: subject.color }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            <Text style={{ fontSize: 9, color: "#fff" }}>Off</Text>
-          </AnimatedPressable>
-          {HIGHLIGHTER_PALETTE.map((item) => (
+            {subject.icon} {subject.title}
+          </Text>
+        </Animated.View>
+
+        {/* Toolbar for Highlighters and Tag Designs */}
+        <View style={styles.toolbarRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
+            <Text style={styles.toolbarLabel}>Highlighter:</Text>
             <AnimatedPressable
-              key={item.id}
               style={[
                 styles.colorSwatch,
-                { backgroundColor: item.color },
-                selectedHighlighter === item.color && styles.swatchSelected,
-                { transform: [{ scale: getSwatchAnim(item.id) }] },
+                !selectedHighlighter && styles.swatchSelected,
+                { transform: [{ scale: getSwatchAnim("off") }] },
               ]}
-              onPress={() => handleSelectHighlighter(item.color, item.id)}
-            />
-          ))}
-
-          <View style={styles.toolbarDivider} />
-
-          <Text style={styles.toolbarLabel}>Bookmark Design:</Text>
-          {BOOKMARK_DESIGNS.map((design) => (
-            <Pressable
-              key={design.id}
-              style={[
-                styles.designBadge,
-                currentBookmarkDesign.id === design.id && styles.designBadgeSelected,
-              ]}
-              onPress={() => setCurrentBookmarkDesign(design)}
+              onPress={() => handleSelectHighlighter(null, "off")}
             >
-              <Text style={{ fontSize: 13 }}>{design.icon}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.notebookWrapper}>
-        <View style={styles.notebookPage} {...panResponder.panHandlers}>
-          <View style={styles.bindingContainer}>
-            {[...Array(18)].map((_, i) => (
-              <View key={i} style={styles.bindingGroup}>
-                <View style={styles.bindingRing} />
-                <View style={styles.bindingHole} />
-              </View>
+              <Text style={{ fontSize: 9, color: "#fff" }}>Off</Text>
+            </AnimatedPressable>
+            {HIGHLIGHTER_PALETTE.map((item) => (
+              <AnimatedPressable
+                key={item.id}
+                style={[
+                  styles.colorSwatch,
+                  { backgroundColor: item.color },
+                  selectedHighlighter === item.color && styles.swatchSelected,
+                  { transform: [{ scale: getSwatchAnim(item.id) }] },
+                ]}
+                onPress={() => handleSelectHighlighter(item.color, item.id)}
+              />
             ))}
-          </View>
 
-          {activeBookmark && (
+            <View style={styles.toolbarDivider} />
+
+            <Text style={styles.toolbarLabel}>Ribbon Design:</Text>
+            {BOOKMARK_DESIGNS.map((design) => (
+              <Pressable
+                key={design.id}
+                style={[
+                  styles.designBadge,
+                  currentBookmarkDesign.id === design.id && styles.designBadgeSelected,
+                ]}
+                onPress={() => setCurrentBookmarkDesign(design)}
+              >
+                <Text style={{ fontSize: 13 }}>{design.icon}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={styles.notebookWrapper}>
+          <View
+            style={[
+              styles.notebookPage,
+              {
+                backgroundColor: theme.pageBg,
+                borderRadius: theme.borderRadius,
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.bindingContainer}>
+              {[...Array(18)].map((_, i) => (
+                <View key={i} style={styles.bindingGroup}>
+                  <View
+                    style={[
+                      styles.bindingRing,
+                      { backgroundColor: theme.ringColor },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.bindingHole,
+                      { borderColor: theme.holeBorder },
+                    ]}
+                  />
+                </View>
+              ))}
+            </View>
+
+            {/* Hanging Animated Ribbon Bookmark */}
+            {activeBookmark && (
+              <Animated.View
+                style={[
+                  styles.bookmarkRibbonLarge,
+                  {
+                    backgroundColor: activeBookmark.color,
+                    transform: [
+                      { translateY: bookmarkDropAnim },
+                      { scale: bookmarkScaleAnim },
+                    ],
+                  },
+                ]}
+              >
+                <Text style={styles.bookmarkIconTextLarge}>{activeBookmark.icon}</Text>
+              </Animated.View>
+            )}
+
             <Animated.View
               style={[
-                styles.bookmarkRibbonLarge,
+                styles.pageContentWrapper,
                 {
-                  backgroundColor: activeBookmark.color,
-                  transform: [{ translateY: bookmarkDropAnim }],
+                  transformOrigin: "left" as any,
+                  transform: [{ perspective: 1200 }, { rotateY }],
                 },
               ]}
             >
-              <Text style={styles.bookmarkIconTextLarge}>{activeBookmark.icon}</Text>
-            </Animated.View>
-          )}
+              {pages[currentPage]}
 
-          <Animated.View
-            style={[
-              styles.pageContentWrapper,
-              {
-                transformOrigin: "left" as any,
-                transform: [{ perspective: 1200 }, { rotateY }],
-              },
-            ]}
-          >
-            {pages[currentPage]}
+              {/* Pagination Footer with Interactive Toggle Button */}
+              <View style={[styles.paginationFooter, { borderTopColor: theme.dividerColor }]}>
+                <Text style={styles.pageIndicator}>
+                  Page {currentPage + 1} of {totalPages}
+                </Text>
 
-            <View style={styles.paginationFooter}>
-              <Text style={styles.pageIndicator}>
-                Page {currentPage + 1} of {totalPages}
-              </Text>
-            </View>
-          </Animated.View>
-
-          <View style={styles.stickyTabsContainer} pointerEvents="box-none">
-            {stickyTabs.map((tab, idx) => {
-              const isActive =
-                currentPage >= tab.pageIndex &&
-                (idx === stickyTabs.length - 1 || currentPage < stickyTabs[idx + 1].pageIndex);
-              const animVal = getStickyTabAnim(tab.pageIndex);
-
-              return (
+                {/* Bookmark Action Button with Dynamic Label */}
                 <AnimatedPressable
-                  key={`sticky-${idx}`}
+                  onPress={toggleBookmark}
                   style={[
-                    styles.stickyArrowFlag,
-                    { backgroundColor: tab.color },
-                    isActive && styles.stickyArrowFlagActive,
-                    { transform: [{ translateX: animVal }] },
+                    styles.bookmarkToggleBtn,
+                    activeBookmark ? styles.bookmarkedActiveBtn : styles.unbookmarkedBtn,
+                    { transform: [{ scale: bookmarkBtnScale }] },
                   ]}
-                  onPress={() => jumpToPage(tab.pageIndex)}
                 >
-                  <Text style={styles.stickyFlagText} numberOfLines={1}>
-                    {tab.label}
+                  <Text style={styles.bookmarkToggleText}>
+                    {activeBookmark
+                      ? `${activeBookmark.icon} Bookmarked (Tap to Remove)`
+                      : "🔖 Add Bookmark"}
                   </Text>
-                  <View style={[styles.arrowTip, { borderLeftColor: tab.color }]} />
                 </AnimatedPressable>
-              );
-            })}
-          </View>
+              </View>
+            </Animated.View>
 
-          {!selectedHighlighter && (
-            <>
-              <Pressable
-                style={styles.tapZoneLeft}
-                onPress={() => turnPage("prev")}
-                disabled={currentPage === 0}
-              />
-              <Pressable
-                style={styles.tapZoneRight}
-                onPress={() => turnPage("next")}
-                disabled={currentPage === totalPages - 1}
-              />
-            </>
-          )}
+            {/* Character Companion Overlay with Floating Animation */}
+            {isChildTheme && (
+              <Animated.View
+                style={[
+                  styles.cartoonHelperCard,
+                  { transform: [{ translateY: mascotFloatAnim }] },
+                ]}
+              >
+                {activeCharacter.isStella ? (
+                  <Image
+                    source={stellaMascotImage}
+                    style={styles.stellaMascotIcon}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.cartoonAvatar}>{activeCharacter.avatar}</Text>
+                )}
+                <View style={styles.cartoonSpeechBubble}>
+                  <Text style={styles.cartoonName}>{activeCharacter.name}</Text>
+                  <Text style={styles.cartoonTipText}>{activeCharacter.tip}</Text>
+                </View>
+              </Animated.View>
+            )}
+
+            {!isChildTheme && (
+              <Animated.View
+                style={[
+                  styles.labStampCard,
+                  { transform: [{ translateY: mascotFloatAnim }] },
+                ]}
+              >
+                <Text style={styles.labStampIcon}>{activeLabStamp.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.labStampTitle}>{activeLabStamp.title}</Text>
+                  <Text style={styles.labStampTipText}>{activeLabStamp.tip}</Text>
+                </View>
+              </Animated.View>
+            )}
+
+            <View style={styles.stickyTabsContainer} pointerEvents="box-none">
+              <ScrollView
+                contentContainerStyle={[
+                  styles.stickyTabsScrollContent,
+                  isCompressed && { gap: 4 },
+                ]}
+                showsVerticalScrollIndicator={false}
+                pointerEvents="box-none"
+              >
+                {stickyTabs.map((tab, idx) => {
+                  const isActive =
+                    currentPage >= tab.pageIndex &&
+                    (idx === stickyTabs.length - 1 || currentPage < stickyTabs[idx + 1].pageIndex);
+                  const animVal = getStickyTabAnim(tab.pageIndex);
+
+                  return (
+                    <AnimatedPressable
+                      key={`sticky-${idx}`}
+                      style={[
+                        styles.stickyArrowFlag,
+                        {
+                          backgroundColor: tab.color,
+                          height: dynamicTabHeight,
+                        },
+                        isActive && styles.stickyArrowFlagActive,
+                        { transform: [{ translateX: animVal }] },
+                      ]}
+                      onPress={() => jumpToPage(tab.pageIndex)}
+                    >
+                      <Text
+                        style={[styles.stickyFlagText, { fontSize: dynamicFontSize }]}
+                        numberOfLines={1}
+                      >
+                        {tab.label}
+                      </Text>
+                      <View
+                        style={[
+                          styles.arrowTip,
+                          {
+                            borderLeftColor: tab.color,
+                            borderTopWidth: dynamicArrowSize,
+                            borderBottomWidth: dynamicArrowSize,
+                            borderLeftWidth: Math.round(dynamicArrowSize * 0.8),
+                          },
+                        ]}
+                      />
+                    </AnimatedPressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Side tap zones constrained to avoid interfering with footer controls */}
+            {!selectedHighlighter && (
+              <>
+                <Pressable
+                  style={styles.tapZoneLeft}
+                  onPress={() => turnPage("prev")}
+                  disabled={currentPage === 0}
+                />
+                <Pressable
+                  style={styles.tapZoneRight}
+                  onPress={() => turnPage("next")}
+                  disabled={currentPage === totalPages - 1}
+                />
+              </>
+            )}
+          </View>
         </View>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   fullScreenWrapper: { flex: 1, backgroundColor: "#091426" },
+  containerAnimatedWrapper: { flex: 1 },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 8,
+    zIndex: 50,
   },
-  backBtn: { paddingVertical: 6, paddingRight: 10 },
-  backText: { color: "#e582ff", fontWeight: "900", fontSize: 15 },
-  headerTitle: { fontSize: 16, fontWeight: "900" },
-  bookmarkToggleBtn: {
-    backgroundColor: "#1e293b",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+  backBtn: { paddingVertical: 6, paddingRight: 8 },
+  backText: { color: "#e582ff", fontWeight: "900", fontSize: 14 },
+
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "right",
+    paddingRight: 10,
   },
-  bookmarkToggleText: { color: "#f8fafc", fontSize: 12, fontWeight: "800" },
 
   toolbarRow: {
     backgroundColor: "#0f172a",
@@ -953,6 +1067,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#1e293b",
+    zIndex: 40,
   },
   toolbarScroll: { flexDirection: "row", alignItems: "center", gap: 8 },
   toolbarLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "700" },
@@ -982,8 +1097,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40 
   },
   notebookPage: {
-    backgroundColor: "#fdf7ea",
-    borderRadius: 8,
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: 4,
     flex: 1,
@@ -1013,7 +1126,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: "#091426",
     borderWidth: 1,
-    borderColor: "#b4aca0",
     marginLeft: 10,
   },
   bindingRing: {
@@ -1021,7 +1133,6 @@ const styles = StyleSheet.create({
     left: -12,
     width: 24,
     height: 4,
-    backgroundColor: "#a19d94",
     borderRadius: 2,
     zIndex: 2,
   },
@@ -1046,19 +1157,57 @@ const styles = StyleSheet.create({
   },
   bookmarkIconTextLarge: { fontSize: 20 },
 
+  cartoonHelperCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#ffd166",
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 6,
+    gap: 6,
+    elevation: 2,
+  },
+  cartoonAvatar: { fontSize: 18 },
+  stellaMascotIcon: { width: 22, height: 22 },
+  cartoonSpeechBubble: { flex: 1 },
+  cartoonName: { fontSize: 10.5, fontWeight: "900", color: "#ff7043" },
+  cartoonTipText: { fontSize: 10.5, fontWeight: "600", color: "#475569" },
+
+  labStampCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 6,
+    gap: 8,
+  },
+  labStampIcon: { fontSize: 16 },
+  labStampTitle: { fontSize: 10, fontWeight: "900", color: "#334155", letterSpacing: 0.5 },
+  labStampTipText: { fontSize: 10.5, fontWeight: "600", color: "#64748b" },
+
   stickyTabsContainer: {
     position: "absolute",
     right: -52,
-    top: 30,
-    bottom: 30,
+    top: 20,
+    bottom: 20,
     width: 56,
+    zIndex: 25,
+  },
+  stickyTabsScrollContent: {
+    flexDirection: "column",
     justifyContent: "space-around",
     alignItems: "flex-start",
-    zIndex: 25,
+    paddingVertical: 4,
   },
   stickyArrowFlag: {
     width: 64,
-    height: 30,
     opacity: 0.9,
     borderTopRightRadius: 2,
     borderBottomRightRadius: 2,
@@ -1076,7 +1225,6 @@ const styles = StyleSheet.create({
   },
   stickyFlagText: {
     color: "#ffffff",
-    fontSize: 10,
     fontWeight: "900",
     textAlign: "center",
   },
@@ -1086,9 +1234,6 @@ const styles = StyleSheet.create({
     top: 0,
     width: 0,
     height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderLeftWidth: 12,
     borderTopColor: "transparent",
     borderBottomColor: "transparent",
   },
@@ -1098,7 +1243,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: { paddingBottom: 20 },
   pageTitle: {
     color: "#1e293b",
-    fontSize: 24,
     fontWeight: "900",
     marginBottom: 2,
   },
@@ -1112,7 +1256,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 2,
-    backgroundColor: "#e2d8c5",
     marginBottom: 16,
     borderRadius: 1,
   },
@@ -1128,8 +1271,6 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     color: "#475569",
-    fontSize: 14.5,
-    lineHeight: 24,
     fontWeight: "600",
   },
 
@@ -1185,28 +1326,52 @@ const styles = StyleSheet.create({
   },
 
   paginationFooter: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 10,
     paddingTop: 12,
     borderTopWidth: 2,
-    borderTopColor: "#e2d8c5",
+    zIndex: 100,
   },
   pageIndicator: { color: "#94a3b8", fontSize: 13, fontWeight: "800" },
+
+  bookmarkToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  unbookmarkedBtn: {
+    backgroundColor: "#1e293b",
+    borderWidth: 1,
+    borderColor: "#475569",
+  },
+  bookmarkedActiveBtn: {
+    backgroundColor: "#ff4757",
+    borderWidth: 1,
+    borderColor: "#ff6b81",
+  },
+  bookmarkToggleText: { color: "#ffffff", fontSize: 12, fontWeight: "900" },
 
   tapZoneLeft: {
     position: "absolute",
     top: 0,
-    bottom: 0,
+    bottom: 60,
     left: 0,
     width: "25%",
-    zIndex: 30,
+    zIndex: 10,
   },
   tapZoneRight: {
     position: "absolute",
     top: 0,
-    bottom: 0,
+    bottom: 60,
     right: 0,
     width: "25%",
-    zIndex: 30,
+    zIndex: 10,
   },
 });
