@@ -274,7 +274,13 @@ export default function SubjectNotesViewer({
   const bookmarkDropAnim = useRef(new Animated.Value(-80)).current;
   const bookmarkScaleAnim = useRef(new Animated.Value(0.2)).current;
   const bookmarkBtnScale = useRef(new Animated.Value(1)).current;
-  const closeAnim = useRef(new Animated.Value(0)).current;
+  const bookmarkTextOpacity = useRef(new Animated.Value(1)).current;
+  
+  // Child-Friendly Closing Notebook Animation Refs
+  const closeNotebookScale = useRef(new Animated.Value(1)).current;
+  const closeNotebookRotate = useRef(new Animated.Value(0)).current;
+  const closeNotebookOffsetY = useRef(new Animated.Value(0)).current;
+  const backBtnScale = useRef(new Animated.Value(1)).current;
   const headerFadeAnim = useRef(new Animated.Value(0)).current;
   const mascotFloatAnim = useRef(new Animated.Value(0)).current;
 
@@ -318,7 +324,6 @@ export default function SubjectNotesViewer({
   const activeCharacter = CARTOON_CHARACTERS[currentPage % CARTOON_CHARACTERS.length];
   const activeLabStamp = LAB_STAMPS[currentPage % LAB_STAMPS.length];
 
-  // Continuous Floating Mascot Idle Animation
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -344,14 +349,62 @@ export default function SubjectNotesViewer({
     }).start();
   }, []);
 
-  // Animated Screen Close Transition when going back to courses
+  // Fun, Child-Friendly Closing Sequence (Pop, Wobble & Fly Away)
   const handleCloseViewer = () => {
-    Animated.timing(closeAnim, {
-      toValue: 1,
-      duration: 280,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start(() => {
+    if (pageTurnAudio) {
+      try {
+        pageTurnAudio.volume = 0.2;
+        pageTurnAudio.seekTo(0);
+        pageTurnAudio.play();
+      } catch (e) {
+        console.log("Audio play error", e);
+      }
+    }
+
+    // 1. Back button bounce feedback
+    Animated.sequence([
+      Animated.timing(backBtnScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
+      Animated.spring(backBtnScale, { toValue: 1.1, friction: 3, useNativeDriver: true }),
+    ]).start();
+
+    // 2. Playful rubber-band scale up, slight tilt, then smooth shrink and fly away
+    Animated.parallel([
+      Animated.timing(headerFadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        // Quick elastic pop outward
+        Animated.timing(closeNotebookScale, {
+          toValue: 1.08,
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        // Fun shrink & fly downward with a slight playful spin
+        Animated.parallel([
+          Animated.timing(closeNotebookScale, {
+            toValue: 0.2,
+            duration: 320,
+            easing: Easing.in(Easing.back(1.5)),
+            useNativeDriver: true,
+          }),
+          Animated.timing(closeNotebookRotate, {
+            toValue: -8, // subtle playful tilt
+            duration: 320,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(closeNotebookOffsetY, {
+            toValue: 120, // bounce downward into distance
+            duration: 320,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start(() => {
       onClose();
     });
   };
@@ -708,11 +761,26 @@ export default function SubjectNotesViewer({
     jumpToPage(newPage);
   };
 
-  // Toggle Bookmark logic with interactive state change and bouncing scale animations
   const toggleBookmark = () => {
     Animated.sequence([
-      Animated.timing(bookmarkBtnScale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
-      Animated.spring(bookmarkBtnScale, { toValue: 1, friction: 3, tension: 120, useNativeDriver: true }),
+      Animated.timing(bookmarkBtnScale, { toValue: 0.82, duration: 70, useNativeDriver: true }),
+      Animated.spring(bookmarkBtnScale, {
+        toValue: 1.15,
+        friction: 3,
+        tension: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(bookmarkBtnScale, {
+        toValue: 1,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.sequence([
+      Animated.timing(bookmarkTextOpacity, { toValue: 0.2, duration: 60, useNativeDriver: true }),
+      Animated.timing(bookmarkTextOpacity, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
 
     setBookmarkedPages((prev) => {
@@ -721,10 +789,11 @@ export default function SubjectNotesViewer({
 
       if (isAlreadyBookmarked) {
         Animated.parallel([
-          Animated.timing(bookmarkDropAnim, { toValue: -80, duration: 200, useNativeDriver: true }),
-          Animated.timing(bookmarkScaleAnim, { toValue: 0.2, duration: 180, useNativeDriver: true }),
+          Animated.timing(bookmarkDropAnim, { toValue: -80, duration: 180, useNativeDriver: true }),
+          Animated.timing(bookmarkScaleAnim, { toValue: 0.1, duration: 160, useNativeDriver: true }),
         ]).start(() => {
           delete next[currentPage];
+          setBookmarkedPages({ ...next });
         });
       } else {
         next[currentPage] = currentBookmarkDesign;
@@ -734,13 +803,14 @@ export default function SubjectNotesViewer({
         Animated.parallel([
           Animated.spring(bookmarkDropAnim, {
             toValue: 0,
-            friction: 5,
-            tension: 90,
+            friction: 4,
+            tension: 110,
             useNativeDriver: true,
           }),
           Animated.spring(bookmarkScaleAnim, {
             toValue: 1,
-            friction: 4,
+            friction: 3,
+            tension: 120,
             useNativeDriver: true,
           }),
         ]).start();
@@ -754,38 +824,23 @@ export default function SubjectNotesViewer({
     outputRange: ["-90deg", "0deg"],
   });
 
-  const activeBookmark = bookmarkedPages[currentPage];
+  const closeRotateDeg = closeNotebookRotate.interpolate({
+    inputRange: [-10, 10],
+    outputRange: ["-10deg", "10deg"],
+  });
 
-  // Interpolated animation values for smooth screen exit when returning to courses
-  const closeTranslateY = closeAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 100],
-  });
-  const closeScale = closeAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.94],
-  });
-  const closeOpacity = closeAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
+  const activeBookmark = bookmarkedPages[currentPage];
 
   return (
     <SafeAreaView style={styles.fullScreenWrapper} edges={["top"]}>
-      <Animated.View
-        style={[
-          styles.containerAnimatedWrapper,
-          {
-            opacity: closeOpacity,
-            transform: [{ translateY: closeTranslateY }, { scale: closeScale }],
-          },
-        ]}
-      >
-        {/* Top Header */}
+      <Animated.View style={styles.containerAnimatedWrapper}>
         <Animated.View style={[styles.header, { opacity: headerFadeAnim }]}>
-          <Pressable onPress={handleCloseViewer} style={styles.backBtn}>
-            <Text style={styles.backText}> Back to Courses</Text>
-          </Pressable>
+          <AnimatedPressable
+            onPress={handleCloseViewer}
+            style={[styles.backBtn, { transform: [{ scale: backBtnScale }] }]}
+          >
+            <Text style={styles.backText}>👈 Back to Courses</Text>
+          </AnimatedPressable>
 
           <Text
             style={[styles.headerTitle, { color: subject.color }]}
@@ -796,7 +851,6 @@ export default function SubjectNotesViewer({
           </Text>
         </Animated.View>
 
-        {/* Toolbar for Highlighters and Tag Designs */}
         <View style={styles.toolbarRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
             <Text style={styles.toolbarLabel}>Highlighter:</Text>
@@ -841,7 +895,19 @@ export default function SubjectNotesViewer({
           </ScrollView>
         </View>
 
-        <View style={styles.notebookWrapper}>
+        {/* Child-Friendly Playful Shrink & Fly Away Back Animation */}
+        <Animated.View
+          style={[
+            styles.notebookWrapper,
+            {
+              transform: [
+                { scale: closeNotebookScale },
+                { rotate: closeRotateDeg },
+                { translateY: closeNotebookOffsetY },
+              ],
+            },
+          ]}
+        >
           <View
             style={[
               styles.notebookPage,
@@ -871,7 +937,6 @@ export default function SubjectNotesViewer({
               ))}
             </View>
 
-            {/* Hanging Animated Ribbon Bookmark */}
             {activeBookmark && (
               <Animated.View
                 style={[
@@ -900,13 +965,11 @@ export default function SubjectNotesViewer({
             >
               {pages[currentPage]}
 
-              {/* Pagination Footer with Interactive Toggle Button */}
               <View style={[styles.paginationFooter, { borderTopColor: theme.dividerColor }]}>
                 <Text style={styles.pageIndicator}>
                   Page {currentPage + 1} of {totalPages}
                 </Text>
 
-                {/* Bookmark Action Button with Dynamic Label */}
                 <AnimatedPressable
                   onPress={toggleBookmark}
                   style={[
@@ -915,18 +978,23 @@ export default function SubjectNotesViewer({
                     { transform: [{ scale: bookmarkBtnScale }] },
                   ]}
                 >
-                  <Text style={styles.bookmarkToggleText}>
+                  <Animated.Text
+                    style={[
+                      styles.bookmarkToggleText,
+                      { opacity: bookmarkTextOpacity },
+                    ]}
+                  >
                     {activeBookmark
-                      ? `${activeBookmark.icon} Bookmarked (Tap to Remove)`
-                      : "🔖 Add Bookmark"}
-                  </Text>
+                      ? `${activeBookmark.icon} Unbookmark`
+                      : "🔖 Bookmark"}
+                  </Animated.Text>
                 </AnimatedPressable>
               </View>
             </Animated.View>
 
-            {/* Character Companion Overlay with Floating Animation */}
             {isChildTheme && (
               <Animated.View
+                pointerEvents="none"
                 style={[
                   styles.cartoonHelperCard,
                   { transform: [{ translateY: mascotFloatAnim }] },
@@ -950,6 +1018,7 @@ export default function SubjectNotesViewer({
 
             {!isChildTheme && (
               <Animated.View
+                pointerEvents="none"
                 style={[
                   styles.labStampCard,
                   { transform: [{ translateY: mascotFloatAnim }] },
@@ -1015,7 +1084,6 @@ export default function SubjectNotesViewer({
               </ScrollView>
             </View>
 
-            {/* Side tap zones constrained to avoid interfering with footer controls */}
             {!selectedHighlighter && (
               <>
                 <Pressable
@@ -1031,7 +1099,7 @@ export default function SubjectNotesViewer({
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
       </Animated.View>
     </SafeAreaView>
   );
@@ -1360,16 +1428,16 @@ const styles = StyleSheet.create({
 
   tapZoneLeft: {
     position: "absolute",
-    top: 0,
-    bottom: 60,
+    top: 80,
+    bottom: 80,
     left: 0,
     width: "25%",
     zIndex: 10,
   },
   tapZoneRight: {
     position: "absolute",
-    top: 0,
-    bottom: 60,
+    top: 80,
+    bottom: 80,
     right: 0,
     width: "25%",
     zIndex: 10,
