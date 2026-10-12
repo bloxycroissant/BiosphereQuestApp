@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface ProgressContextType {
   leaderboardXp: number;
@@ -16,7 +16,6 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [totalXp, setTotalXp] = useState<number>(0);
   const [leaderboardXp, setLeaderboardXp] = useState<number>(0);
 
-  // Load saved XP on app start
   useEffect(() => {
     async function loadProgress() {
       try {
@@ -32,7 +31,6 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     loadProgress();
   }, []);
 
-  // Add XP and save to persistent storage for both lifetime & leaderboard totals
   const addXp = async (amount: number) => {
     try {
       const newTotalXp = totalXp + amount;
