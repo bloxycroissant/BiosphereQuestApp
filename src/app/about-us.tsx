@@ -68,8 +68,8 @@ export default function AboutUsScreen() {
           <Image source={stella} style={styles.teamMascotLeft} contentFit="contain" />
           <View style={styles.teamInfoLeft}>
             <Text style={styles.teamName}>Christianne Denise S. Sabando</Text>
-            <Text style={styles.teamRole}>Project Creator, UX/UI Designer, Lead Game Engine & Interactive Systems Developer</Text>
-            <Text style={styles.teamRole}>Front-End Developer</Text>
+            <Text style={styles.teamRole}>Project Owner & Leader, UX/UI Designer, UI/UX Developer, Lead Game Engine & Interactive Systems Developer</Text>
+            <Text style={styles.teamRole}>Lead Front-End Developer & Full Stack Developer</Text>
           </View>
         </View>
 
@@ -77,7 +77,7 @@ export default function AboutUsScreen() {
           <View style={styles.teamInfoRight}>
             <Text style={styles.teamNameRight}>Clarkent A. Arias</Text>
             <Text style={styles.teamRoleRight}>UI & Authentication Developer</Text>
-            <Text style={styles.teamRoleRight}>Back-End Developer</Text>
+            <Text style={styles.teamRoleRight}>Lead Back-End Developer & Full Stack Developer</Text>
           </View>
           <Image source={astro} style={styles.teamMascotRight} contentFit="contain" />
         </View>
