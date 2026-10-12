@@ -221,6 +221,40 @@ export const generateCodebreaker = (
   throw new Error(`Unable to generate a new Codebreaker puzzle for grade ${grade}.`);
 };
 
+const createAlgorithmicFlashcard = (grade: GradeLevel, seed: number): Flashcard => {
+  const op = Math.floor(Math.random() * 4);
+  const a = Math.floor(Math.random() * (10 * grade)) + seed + 2;
+  const b = Math.floor(Math.random() * (5 * grade)) + 1;
+
+  if (op === 0) {
+    return {
+      front: `What is ${a} + ${b}?`,
+      back: `${a + b}`,
+      explanation: 'Add the two numbers together.',
+    };
+  } else if (op === 1) {
+    const sum = a + b;
+    return {
+      front: `What is ${sum} - ${b}?`,
+      back: `${a}`,
+      explanation: 'Subtract the smaller number from the total.',
+    };
+  } else if (op === 2) {
+    return {
+      front: `What is ${a} × ${b}?`,
+      back: `${a * b}`,
+      explanation: 'Multiply the factors together.',
+    };
+  } else {
+    const side = Math.floor(Math.random() * 12) + 2 + seed;
+    return {
+      front: `What is the perimeter of a square with side ${side} cm?`,
+      back: `${side * 4} cm`,
+      explanation: 'A square has 4 equal sides. Multiply side length by 4.',
+    };
+  }
+};
+
 export const generateFlashcard = (grade: GradeLevel): Flashcard => {
   const cards = FLASHCARD_BANK[grade];
   return cards[Math.floor(Math.random() * cards.length)];
@@ -236,22 +270,7 @@ export const generateFlashcardDeck = (
   let seed = 1;
 
   while (deck.length < 6) {
-    const range = 20 + previouslySeen.size * 3 + seed;
-    const left = Math.floor(Math.random() * range) + 1;
-    const right = Math.floor(Math.random() * range) + 1;
-    const operations = [
-      {
-        front: `What is ${left} + ${right}?`,
-        back: String(left + right),
-        explanation: 'Add the two quantities to find their total.',
-      },
-      {
-        front: `What is ${left} × ${right}?`,
-        back: String(left * right),
-        explanation: 'Multiply the number of groups by the quantity in each group.',
-      },
-    ];
-    const card = operations[Math.floor(Math.random() * operations.length)];
+    const card = createAlgorithmicFlashcard(grade, seed);
     if (!usedPrompts.has(card.front)) {
       usedPrompts.add(card.front);
       deck.push(card);
@@ -302,14 +321,77 @@ export const generateNinjaProblem = (
   throw new Error(`Unable to generate a new Number Ninja question for grade ${grade}.`);
 };
 
+const createDynamicQuizQuestion = (grade: GradeLevel, seed: number): QuizQuestion => {
+  const type = seed % 3;
+  if (type === 0) {
+    const a = Math.floor(Math.random() * 15 * grade) + seed + 2;
+    const b = Math.floor(Math.random() * 12 * grade) + 3;
+    const ans = a * b;
+    const opts = makeOptions(ans).map(String);
+    return {
+      question: `What is ${a} × ${b}?`,
+      options: opts,
+      answer: String(ans),
+    };
+  } else if (type === 1) {
+    const base = Math.floor(Math.random() * 10) + 2 + seed;
+    const height = Math.floor(Math.random() * 8) + 2 + seed;
+    const ans = (base * height) / 2;
+    const opts = makeOptions(ans).map(String);
+    return {
+      question: `What is the area of a triangle with base ${base} units and height ${height * 2} units?`,
+      options: opts,
+      answer: String(ans * 2),
+    };
+  } else {
+    const percentChoices = [10, 20, 25, 50, 75];
+    const pct = percentChoices[seed % percentChoices.length];
+    const val = (Math.floor(Math.random() * 20) + 1) * 20 + seed * 4;
+    const ans = (pct / 100) * val;
+    const opts = makeOptions(ans).map(String);
+    return {
+      question: `What is ${pct}% of ${val}?`,
+      options: opts,
+      answer: String(ans),
+    };
+  }
+};
+
 export const generateQuizQuestion = (grade: GradeLevel): QuizQuestion => {
   const bank = QUIZ_BANK[grade];
   const question = bank[Math.floor(Math.random() * bank.length)];
   return { ...question, options: shuffle(question.options) };
 };
 
-export const generateQuizQuestions = (grade: GradeLevel, count: number): QuizQuestion[] =>
-  shuffle(QUIZ_BANK[grade]).slice(0, Math.min(count, QUIZ_BANK[grade].length));
+export const generateQuizQuestions = (
+  grade: GradeLevel,
+  count: number,
+  previouslySeen: ReadonlySet<string> = new Set<string>()
+): QuizQuestion[] => {
+  const bank = QUIZ_BANK[grade];
+  const unseenBank = shuffle(bank.filter((q) => !previouslySeen.has(q.question)));
+  const results: QuizQuestion[] = [];
+  const usedQuestions = new Set([...previouslySeen]);
+
+  for (const q of unseenBank) {
+    if (results.length < count) {
+      results.push({ ...q, options: shuffle(q.options) });
+      usedQuestions.add(q.question);
+    }
+  }
+
+  let seed = 1;
+  while (results.length < count) {
+    const dynamicQ = createDynamicQuizQuestion(grade, seed);
+    if (!usedQuestions.has(dynamicQ.question)) {
+      usedQuestions.add(dynamicQ.question);
+      results.push(dynamicQ);
+    }
+    seed++;
+  }
+
+  return results;
+};
 
 const whackKey = (challenge: WhackChallenge): string =>
   `${challenge.targetMultiple}|${[...challenge.gridNumbers].sort((a, b) => a - b).join(',')}`;
