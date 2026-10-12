@@ -1,4 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient'; // Replace with 'react-native-linear-gradient' if not using Expo
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { generateMemoryPairs, GradeLevel, MemoryMatchCard, Subject } from '../../data/questionGenerators';
