@@ -69,7 +69,7 @@ export default function AboutUsScreen() {
           <View style={styles.teamInfoLeft}>
             <Text style={styles.teamName}>Christianne Denise S. Sabando</Text>
             <Text style={styles.teamRole}>Project Owner & Leader, UX/UI Designer, UI/UX Developer, Lead Game Engine & Interactive Systems Developer</Text>
-            <Text style={styles.teamRole}>Lead Front-End Developer & Full Stack Developer</Text>
+            <Text style={styles.teamRole}>Lead Developer, Lead Front-End Developer & Full Stack Developer</Text>
           </View>
         </View>
 
