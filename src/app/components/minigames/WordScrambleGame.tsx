@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { generateWordScramble, GradeLevel, ScrambleChallenge } from '../../data/questionGenerators';
 import { MinigameMotion } from './MinigameMotion';
@@ -10,24 +10,117 @@ interface Props {
   onClose: () => void;
 }
 
-const ROUND_SECONDS = 30;
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Impossible';
+
+const ROUND_SECONDS = 90;
+
+const getDifficulty = (solvedCount: number): Difficulty => {
+  if (solvedCount <= 0) return 'Easy';
+  if (solvedCount <= 2) return 'Medium';
+  if (solvedCount <= 5) return 'Hard';
+  if (solvedCount <= 8) return 'Expert';
+  return 'Impossible';
+};
+
+const getXPForDifficulty = (diff: Difficulty): number => {
+  switch (diff) {
+    case 'Easy': return 30;
+    case 'Medium': return 50;
+    case 'Hard': return 80;
+    case 'Expert': return 120;
+    case 'Impossible': return 180;
+  }
+};
+
+const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
+  { word: 'PLANT', clue: 'A living organism that absorbs water and sunlight', minGrade: 1 },
+  { word: 'SOLAR', clue: 'Relating to or determined by the sun', minGrade: 1 },
+  { word: 'EARTH', clue: 'The third planet from the sun', minGrade: 1 },
+  { word: 'ANGLE', clue: 'The space between two intersecting lines', minGrade: 2 },
+  { word: 'FORCE', clue: 'A push or pull upon an object', minGrade: 2 },
+  { word: 'ORBIT', clue: 'The curved path of a celestial object around a star', minGrade: 2 },
+  { word: 'DIGIT', clue: 'Any of the numerals from 0 to 9', minGrade: 1 },
+  { word: 'PRISM', clue: 'A solid geometric figure with two parallel bases', minGrade: 3 },
+  { word: 'CELLS', clue: 'The smallest structural and functional unit of organisms', minGrade: 3 },
+  { word: 'FOSSIL', clue: 'The remains or impression of a prehistoric organism', minGrade: 3 },
+  { word: 'GRAVITY', clue: 'The force that attracts a body toward the center of the earth', minGrade: 4 },
+  { word: 'FRACTION', clue: 'A numerical quantity that is not a whole number', minGrade: 4 },
+  { word: 'ECOSYSTEM', clue: 'A biological community of interacting organisms', minGrade: 4 },
+  { word: 'EQUATION', clue: 'A statement that the values of two expressions are equal', minGrade: 5 },
+  { word: 'MOLECULE', clue: 'A group of atoms bonded together', minGrade: 5 },
+  { word: 'PERIMETER', clue: 'The continuous line forming the boundary of a closed geometric figure', minGrade: 5 },
+  { word: 'PHOTOSYNTHESIS', clue: 'Process used by plants to convert light into energy', minGrade: 6 },
+  { word: 'HYPOTHESIS', clue: 'A proposed explanation made on the basis of limited evidence', minGrade: 6 },
+];
+
+const shuffleString = (str: string): string[] => {
+  const arr = str.split('');
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.join('') === str ? shuffleString(str) : arr;
+};
+
+const getUniqueWordScramble = (grade: GradeLevel, seenSet: Set<string>): ScrambleChallenge => {
+  const candidate = generateWordScramble(grade, seenSet);
+  if (candidate && !seenSet.has(candidate.targetWord)) {
+    return candidate;
+  }
+
+  const filtered = WORD_BANK.filter((item) => item.minGrade <= grade && !seenSet.has(item.word));
+
+  if (filtered.length > 0) {
+    const picked = filtered[Math.floor(Math.random() * filtered.length)];
+    return {
+      targetWord: picked.word,
+      clue: picked.clue,
+      jumbledLetters: shuffleString(picked.word),
+    };
+  }
+
+  seenSet.clear();
+  const fallback = WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+  return {
+    targetWord: fallback.word,
+    clue: fallback.clue,
+    jumbledLetters: shuffleString(fallback.word),
+  };
+};
 
 export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
-  const [challenge, setChallenge] = useState<ScrambleChallenge>(() => generateWordScramble(grade));
+
+  const [challenge, setChallenge] = useState<ScrambleChallenge>(() => {
+    const initial = getUniqueWordScramble(grade, seenChallenges.current);
+    seenChallenges.current.add(initial.targetWord);
+    return initial;
+  });
+
   const [pickedTiles, setPickedTiles] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [message, setMessage] = useState('');
   const [finished, setFinished] = useState(false);
-  const [earnedXp, setEarnedXp] = useState(0);
+  const [solvedCount, setSolvedCount] = useState(0);
+  const [totalXp, setTotalXp] = useState(0);
+
   const [timerProgress] = useState(() => new Animated.Value(1));
   const [resultEntrance] = useState(() => new Animated.Value(0));
   const [tileScales, setTileScales] = useState(() => challenge.jumbledLetters.map(() => new Animated.Value(1)));
+
+  const currentDifficulty = getDifficulty(solvedCount);
+  const currentXP = getXPForDifficulty(currentDifficulty);
   const answer = pickedTiles.map((index) => challenge.jumbledLetters[index]).join('');
 
-  useEffect(() => {
-    seenChallenges.current.add(challenge.clue);
-  }, [challenge.clue]);
+  const loadNextWord = useCallback(() => {
+    const nextChallenge = getUniqueWordScramble(grade, seenChallenges.current);
+    seenChallenges.current.add(nextChallenge.targetWord);
+
+    setChallenge(nextChallenge);
+    setTileScales(nextChallenge.jumbledLetters.map(() => new Animated.Value(1)));
+    setPickedTiles([]);
+    setMessage('');
+  }, [grade]);
 
   useEffect(() => {
     if (finished) return;
@@ -36,14 +129,14 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
         if (seconds <= 1) {
           clearInterval(timer);
           setFinished(true);
-          setMessage(`Time is up! The word was ${challenge.targetWord}.`);
           return 0;
         }
         return seconds - 1;
       });
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [finished, challenge.targetWord]);
+  }, [finished]);
 
   useEffect(() => {
     Animated.timing(timerProgress, {
@@ -67,6 +160,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   }, [finished, resultEntrance]);
 
   const animateTile = (index: number, selected: boolean) => {
+    if (!tileScales[index]) return;
     Animated.sequence([
       Animated.timing(tileScales[index], {
         toValue: selected ? 0.9 : 1.08,
@@ -91,47 +185,56 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   };
 
   const checkAnswer = () => {
+    if (finished) return;
+
     if (answer.length !== challenge.targetWord.length) {
       setMessage('Use every letter tile to make the word.');
       return;
     }
+
     if (answer === challenge.targetWord) {
-      const xp = 20 + Math.round((timeLeft / ROUND_SECONDS) * 100);
-      setEarnedXp(xp);
-      setFinished(true);
-      setMessage('That is correct!');
-      onSuccess(xp);
+      onSuccess(currentXP);
+      setTotalXp((prev) => prev + currentXP);
+      setSolvedCount((count) => count + 1);
+      setMessage(`Correct! +${currentXP} XP`);
+
+      setTimeout(() => {
+        loadNextWord();
+      }, 600);
     } else {
       setMessage('Not quite. Rearrange the tiles and try again.');
     }
   };
 
-  const startAgain = () => {
-    const nextChallenge = generateWordScramble(grade, seenChallenges.current);
-    seenChallenges.current.add(nextChallenge.clue);
-    setChallenge(nextChallenge);
-    setTileScales(nextChallenge.jumbledLetters.map(() => new Animated.Value(1)));
+  const restartGame = () => {
+    seenChallenges.current.clear();
+    const initial = getUniqueWordScramble(grade, seenChallenges.current);
+    seenChallenges.current.add(initial.targetWord);
+
+    setChallenge(initial);
+    setTileScales(initial.jumbledLetters.map(() => new Animated.Value(1)));
     setPickedTiles([]);
     setTimeLeft(ROUND_SECONDS);
     timerProgress.setValue(1);
     setMessage('');
     setFinished(false);
-    setEarnedXp(0);
+    setSolvedCount(0);
+    setTotalXp(0);
   };
 
   return (
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
-      <MinigameMotion key={challenge.clue} style={styles.container}>
+      <MinigameMotion key={`${challenge.targetWord}-${solvedCount}`} style={styles.container}>
         {finished ? (
           <Animated.View style={[styles.resultCard, {
             opacity: resultEntrance,
             transform: [{ translateY: resultEntrance.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }, { scale: resultEntrance.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }],
           }]}>
-            <Text style={styles.title}>{earnedXp > 0 ? '🧩 Word solved!' : '⏰ Round over'}</Text>
-            <Text style={styles.subtitle}>{message}</Text>
-            {earnedXp > 0 && <Text style={styles.reward}>+{earnedXp} XP</Text>}
-            <TouchableOpacity style={styles.primaryButton} onPress={startAgain}>
-              <Text style={styles.buttonText}>Play Again</Text>
+            <Text style={styles.title}>⏰ Round Over!</Text>
+            <Text style={styles.subtitle}>You unscrambled {solvedCount} word{solvedCount === 1 ? '' : 's'} before time ran out!</Text>
+            {totalXp > 0 && <Text style={styles.reward}>+{totalXp} XP</Text>}
+            <TouchableOpacity style={styles.primaryButton} onPress={restartGame}>
+              <Text style={styles.buttonText}>Play Again ↻</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.backButton} onPress={onClose}>
               <Text style={styles.backText}>Back to Games</Text>
@@ -141,8 +244,8 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
           <>
             <View style={styles.topBar}>
               <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
-              <Text style={styles.grade}>Grade {grade} • Word Scramble</Text>
-              <Text style={[styles.timer, timeLeft <= 8 && styles.warning]}>⏱ {timeLeft}s</Text>
+              <Text style={styles.grade}>Grade {grade} • {currentDifficulty.toUpperCase()} • Solved: {solvedCount}</Text>
+              <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
             </View>
             <View style={styles.timerTrack}>
               <Animated.View style={[styles.timerFill, {
@@ -151,7 +254,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
               }]} />
             </View>
             <View style={styles.content}>
-              <Text style={styles.eyebrow}>🌱 SCIENCE & MATH WORDS</Text>
+              <Text style={styles.eyebrow}>LEVEL {solvedCount + 1} • {currentDifficulty.toUpperCase()} (+{currentXP} XP)</Text>
               <Text style={styles.title}>Unscramble the word</Text>
               <Text style={styles.clue}>{challenge.clue}</Text>
               <View style={styles.answerRow}>
@@ -171,8 +274,9 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
               <View style={styles.tiles}>
                 {challenge.jumbledLetters.map((letter, index) => {
                   const selected = pickedTiles.includes(index);
+                  const scaleAnim = tileScales[index] || 1;
                   return (
-                    <Animated.View key={`${letter}-${index}`} style={{ transform: [{ scale: tileScales[index] }] }}>
+                    <Animated.View key={`${letter}-${index}`} style={{ transform: [{ scale: scaleAnim }] }}>
                       <TouchableOpacity
                         style={[styles.tile, selected && styles.tileUsed]}
                         onPress={() => toggleTile(index)}
@@ -193,7 +297,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
                   <Text style={styles.buttonText}>Check Word ✓</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.rewardHint}>Solve quickly to earn up to +120 XP</Text>
+              <Text style={styles.rewardHint}>Solve words quickly to earn +{currentXP} XP per word</Text>
             </View>
           </>
         )}
