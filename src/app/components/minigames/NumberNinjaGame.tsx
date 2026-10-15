@@ -10,46 +10,103 @@ interface Props {
   onClose: () => void;
 }
 
-const QUESTION_SECONDS = 15;
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Impossible';
+
+const TOTAL_GAME_SECONDS = 90;
+
+const getDifficulty = (questionNumber: number): Difficulty => {
+  if (questionNumber <= 3) return 'Easy';
+  if (questionNumber <= 7) return 'Medium';
+  if (questionNumber <= 11) return 'Hard';
+  if (questionNumber <= 15) return 'Expert';
+  return 'Impossible';
+};
+
+const getXPForDifficulty = (diff: Difficulty): number => {
+  switch (diff) {
+    case 'Easy': return 30;
+    case 'Medium': return 50;
+    case 'Hard': return 75;
+    case 'Expert': return 100;
+    case 'Impossible': return 150;
+  }
+};
 
 export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenQuestions = useRef(new Set<string>());
-  const [question, setQuestion] = useState<NinjaProblem>(() => generateNinjaProblem(grade));
+
+  const [question, setQuestion] = useState<NinjaProblem>(() => {
+    const initial = generateNinjaProblem(grade, seenQuestions.current);
+    if (initial?.prompt) seenQuestions.current.add(initial.prompt);
+    return initial;
+  });
+
   const [questionNumber, setQuestionNumber] = useState(1);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState(QUESTION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(TOTAL_GAME_SECONDS);
+  const [roundExpired, setRoundExpired] = useState(false);
 
-  useEffect(() => {
-    seenQuestions.current.add(question.prompt);
-  }, [question.prompt]);
+  const currentDifficulty = getDifficulty(questionNumber);
+  const currentXP = getXPForDifficulty(currentDifficulty);
 
+  // Global continuous timer until time runs out completely
   useEffect(() => {
-    if (selected !== null) return;
-    const timer = setTimeout(() => {
-      const nextTime = Math.max(0, timeLeft - 1);
-      setTimeLeft(nextTime);
-      if (nextTime === 0) setSelected(-1);
+    if (roundExpired) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setRoundExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, selected]);
+
+    return () => clearInterval(timer);
+  }, [roundExpired]);
 
   const answer = (value: number) => {
-    if (selected !== null) return;
+    if (selected !== null || roundExpired) return;
     setSelected(value);
     if (value === question.correctAnswer) {
       setScore((current) => current + 1);
-      onSuccess(50);
+      onSuccess(currentXP);
     }
   };
 
   const next = () => {
-    const nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
-    seenQuestions.current.add(nextQuestion.prompt);
+    if (roundExpired) return;
+
+    let nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
+
+    // Reset seen pool when unique question options run out to avoid endless loop / crashes
+    if (!nextQuestion || (nextQuestion.prompt && seenQuestions.current.has(nextQuestion.prompt))) {
+      seenQuestions.current.clear();
+      nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
+    }
+
+    if (nextQuestion?.prompt) {
+      seenQuestions.current.add(nextQuestion.prompt);
+    }
+
     setQuestion(nextQuestion);
     setQuestionNumber((number) => number + 1);
     setSelected(null);
-    setTimeLeft(QUESTION_SECONDS);
+  };
+
+  const restartGame = () => {
+    seenQuestions.current.clear();
+    const nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
+    if (nextQuestion?.prompt) seenQuestions.current.add(nextQuestion.prompt);
+
+    setQuestion(nextQuestion);
+    setQuestionNumber(1);
+    setScore(0);
+    setSelected(null);
+    setTimeLeft(TOTAL_GAME_SECONDS);
+    setRoundExpired(false);
   };
 
   return (
@@ -57,13 +114,14 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
       <MinigameMotion key={`challenge-${questionNumber}`} style={styles.container}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
-          <Text style={styles.progress}>Grade {grade} • Challenge {questionNumber}</Text>
-          <Text style={[styles.timer, timeLeft <= 5 && styles.warning]}>⏱ {timeLeft}s</Text>
+          <Text style={styles.progress}>Grade {grade} • #{questionNumber} [{currentDifficulty.toUpperCase()}]</Text>
+          <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
         </View>
         <View style={styles.content}>
-          <Text style={styles.eyebrow}>⚡ +50 XP PER CORRECT ANSWER</Text>
+          <Text style={styles.eyebrow}>⚡ +{currentXP} XP PER CORRECT ANSWER</Text>
           <Text style={styles.title}>Number Ninja</Text>
           <Text style={styles.prompt}>{question.prompt}</Text>
+
           <View style={styles.options}>
             {question.options.map((option) => {
               const correct = selected !== null && option === question.correctAnswer;
@@ -73,24 +131,38 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
                   key={option}
                   style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
                   onPress={() => answer(option)}
-                  disabled={selected !== null}
+                  disabled={selected !== null || roundExpired}
                 >
                   <Text style={styles.optionText}>{option}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-          {selected !== null && (
+
+          {selected !== null && !roundExpired && (
             <View style={styles.feedback}>
               <Text style={styles.feedbackText}>
-                {selected === -1 ? `Time's up! The answer was ${question.correctAnswer}.` :
-                  selected === question.correctAnswer ? 'Bullseye! +50 XP' : `The answer was ${question.correctAnswer}.`}
+                {selected === question.correctAnswer
+                  ? `Bullseye! +${currentXP} XP`
+                  : `The answer was ${question.correctAnswer}.`}
               </Text>
               <TouchableOpacity style={styles.primaryButton} onPress={next}>
                 <Text style={styles.buttonText}>Next Challenge →</Text>
               </TouchableOpacity>
             </View>
           )}
+
+          {roundExpired && (
+            <View style={styles.feedback}>
+              <Text style={styles.feedbackText}>
+                Time's Up! You scored {score} point{score === 1 ? '' : 's'}.
+              </Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={restartGame}>
+                <Text style={styles.buttonText}>Play Again ↻</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <Text style={styles.score}>Score: {score}</Text>
         </View>
       </MinigameMotion>
