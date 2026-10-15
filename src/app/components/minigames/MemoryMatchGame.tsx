@@ -11,11 +11,38 @@ interface Props {
   onClose: () => void;
 }
 
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Impossible';
+
 const ROUND_SECONDS = 90;
+
+const getDifficulty = (completedBoards: number): Difficulty => {
+  if (completedBoards <= 0) return 'Easy';
+  if (completedBoards === 1) return 'Medium';
+  if (completedBoards === 2) return 'Hard';
+  if (completedBoards === 3) return 'Expert';
+  return 'Impossible';
+};
+
+const getXPForDifficulty = (diff: Difficulty): number => {
+  switch (diff) {
+    case 'Easy': return 50;
+    case 'Medium': return 80;
+    case 'Hard': return 120;
+    case 'Expert': return 170;
+    case 'Impossible': return 250;
+  }
+};
 
 export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, onClose }) => {
   const seenBoards = useRef(new Set<string>());
-  const [cards, setCards] = useState<MemoryMatchCard[]>(() => generateMemoryPairs(grade, new Set(), subject));
+  
+  const [cards, setCards] = useState<MemoryMatchCard[]>(() => {
+    const initialCards = generateMemoryPairs(grade, seenBoards.current, subject);
+    const key = boardKey(initialCards);
+    if (key) seenBoards.current.add(key);
+    return initialCards;
+  });
+
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<string[]>([]);
   const [moves, setMoves] = useState(0);
@@ -25,54 +52,78 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
   const [tileScales] = useState(() => Array.from({ length: 16 }, () => new Animated.Value(1)));
   const mismatchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    seenBoards.current.add(boardKey(cards));
-  }, [cards]);
+  const currentDifficulty = getDifficulty(completedBoards);
+  const currentXP = getXPForDifficulty(currentDifficulty);
 
-  const startNextBoard = useCallback(() => {
+  // Helper to load next non-repeating board
+  const startNextBoard = useCallback((isResetTimer = false) => {
     if (mismatchTimeout.current) {
       clearTimeout(mismatchTimeout.current);
       mismatchTimeout.current = null;
     }
-    const nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
-    seenBoards.current.add(boardKey(nextCards));
+
+    let nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
+    let key = boardKey(nextCards);
+
+    // If board generator exhausts unique layouts, clear seen set to maintain infinite flow without duplicate crashes
+    if (!nextCards || nextCards.length === 0 || (key && seenBoards.current.has(key))) {
+      seenBoards.current.clear();
+      nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
+      key = boardKey(nextCards);
+    }
+
+    if (key) {
+      seenBoards.current.add(key);
+    }
+
     setCards(nextCards);
     setFlipped([]);
     setMatched([]);
     setMoves(0);
-    setTimeLeft(ROUND_SECONDS);
-    setRoundExpired(false);
+
+    if (isResetTimer) {
+      setTimeLeft(ROUND_SECONDS);
+      setRoundExpired(false);
+      setCompletedBoards(0);
+    }
   }, [grade, subject]);
 
+  // Continuous timer countdown across multiple boards
   useEffect(() => {
     if (roundExpired) return;
-    const timer = setTimeout(() => {
-      if (timeLeft <= 1) {
-        setTimeLeft(0);
-        setRoundExpired(true);
-      }
-      else setTimeLeft(timeLeft - 1);
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setRoundExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, roundExpired]);
+
+    return () => clearInterval(timer);
+  }, [roundExpired]);
 
   useEffect(() => () => {
     if (mismatchTimeout.current) clearTimeout(mismatchTimeout.current);
   }, []);
 
   const finishRound = () => {
-    const xp = Math.min(200, 40 + Math.round((timeLeft / ROUND_SECONDS) * 140) + (grade - 1) * 4);
-    onSuccess(xp);
+    onSuccess(currentXP);
     setCompletedBoards((count) => count + 1);
-    startNextBoard();
+    // Board continues under the exact same running timer!
+    startNextBoard(false);
   };
 
   const reveal = (index: number) => {
     if (roundExpired || flipped.length === 2 || flipped.includes(index) || matched.includes(cards[index].pairId)) return;
+    
     Animated.sequence([
       Animated.timing(tileScales[index], { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(tileScales[index], { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
+
     const nextFlipped = [...flipped, index];
     setFlipped(nextFlipped);
     if (nextFlipped.length !== 2) return;
@@ -86,6 +137,7 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
       if (nextMatched.length === cards.length / 2) finishRound();
       return;
     }
+
     mismatchTimeout.current = setTimeout(() => {
       setFlipped([]);
       mismatchTimeout.current = null;
@@ -94,7 +146,7 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
 
   return (
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
-      <MinigameMotion key={boardKey(cards)} style={styles.container}>
+      <MinigameMotion key={`${boardKey(cards)}-${completedBoards}`} style={styles.container}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
           <Text style={styles.grade}>Grade {grade} • {subject} • Boards: {completedBoards}</Text>
@@ -106,14 +158,14 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
             {subject === 'Both'
               ? 'Match each Math or Science term with its meaning.'
               : `Match each ${subject} term with its meaning.`}{' '}
-            Find all {cards.length / 2} pairs before the 90-second timer runs out.
+            Current Level: <Text style={{ color: '#4ade80', fontWeight: '900' }}>{currentDifficulty.toUpperCase()}</Text>
           </Text>
-          <Text style={styles.moves}>Moves: {moves} • Flip two cards to check a pair</Text>
+          <Text style={styles.moves}>Moves: {moves} • Clear boards before time runs out!</Text>
           <View style={styles.grid}>
             {cards.map((card, index) => {
               const visible = flipped.includes(index) || matched.includes(card.pairId);
               return (
-                <Animated.View key={card.id} style={[styles.cardSlot, { transform: [{ scale: tileScales[index] }] }]}>
+                <Animated.View key={`${card.id}-${index}`} style={[styles.cardSlot, { transform: [{ scale: tileScales[index] ?? 1 }] }]}>
                   <TouchableOpacity
                     style={[styles.tile, visible && styles.tileRevealed, matched.includes(card.pairId) && styles.tileMatched]}
                     onPress={() => reveal(index)}
@@ -130,13 +182,13 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
               );
             })}
           </View>
-          <Text style={styles.progress}>{matched.length} / {cards.length / 2} pairs found • Faster clears earn more XP (up to 200)</Text>
+          <Text style={styles.progress}>{matched.length} / {cards.length / 2} pairs found • Complete board for +{currentXP} XP</Text>
           {roundExpired && (
             <View style={styles.expiredCard}>
               <Text style={styles.expiredTitle}>Time is up!</Text>
-              <Text style={styles.expiredCopy}>You found {matched.length} of {cards.length / 2} pairs. Start another board when you’re ready.</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={startNextBoard} activeOpacity={0.85}>
-                <Text style={styles.retryButtonText}>Try another board</Text>
+              <Text style={styles.expiredCopy}>You cleared {completedBoards} board{completedBoards === 1 ? '' : 's'} total before the timer ran out.</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => startNextBoard(true)} activeOpacity={0.85}>
+                <Text style={styles.retryButtonText}>Play Again ↻</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -174,7 +226,8 @@ const styles = StyleSheet.create({
 });
 
 const boardKey = (cards: MemoryMatchCard[]): string =>
-  cards.filter((card) => card.id.startsWith('term-'))
+  cards
+    .filter((card) => card.id.startsWith('term-'))
     .map((card) => {
       const match = cards.find((candidate) => candidate.pairId === card.pairId && candidate.id.startsWith('match-'));
       return `${card.content}=${match?.content ?? ''}`;
