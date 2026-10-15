@@ -4,11 +4,31 @@ import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from '
 import { CodebreakerChallenge, generateCodebreaker, GradeLevel, Subject } from '../../data/questionGenerators';
 import { MinigameMotion } from './MinigameMotion';
 
+type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Impossible';
+
 interface Props {
   grade: GradeLevel;
   onSuccess: (xp: number) => void;
   onClose: () => void;
 }
+
+const getDifficulty = (questionNumber: number): Difficulty => {
+  if (questionNumber <= 2) return 'Easy';
+  if (questionNumber <= 5) return 'Medium';
+  if (questionNumber <= 8) return 'Hard';
+  if (questionNumber <= 11) return 'Expert';
+  return 'Impossible';
+};
+
+const getXPForDifficulty = (diff: Difficulty): number => {
+  switch (diff) {
+    case 'Easy': return 30;
+    case 'Medium': return 50;
+    case 'Hard': return 75;
+    case 'Expert': return 100;
+    case 'Impossible': return 150;
+  }
+};
 
 export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
@@ -18,9 +38,15 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   const [correctCount, setCorrectCount] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
 
+  const currentDifficulty = getDifficulty(questionNumber);
+  const currentXP = getXPForDifficulty(currentDifficulty);
+
   const startRound = (selectedSubject: Subject) => {
+    seenChallenges.current.clear();
     const nextChallenge = generateCodebreaker(grade, selectedSubject, seenChallenges.current);
-    seenChallenges.current.add(challengeKey(nextChallenge));
+    if (nextChallenge) {
+      seenChallenges.current.add(challengeKey(nextChallenge));
+    }
     setSubject(selectedSubject);
     setChallenge(nextChallenge);
     setQuestionNumber(1);
@@ -33,15 +59,28 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
     setSelected(option);
     if (challenge.options[option] === challenge.missingAnswer) {
       setCorrectCount((count) => count + 1);
-      onSuccess(50);
+      onSuccess(currentXP);
     }
   };
 
   const next = () => {
-    const nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
-    seenChallenges.current.add(challengeKey(nextChallenge));
+    const nextQuestionNum = questionNumber + 1;
+    let nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
+    let key = nextChallenge ? challengeKey(nextChallenge) : '';
+    
+    // Prevent duplicate questions or endless loading state by clearing history if pool exhausts
+    if (!nextChallenge || seenChallenges.current.has(key)) {
+      seenChallenges.current.clear();
+      nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
+      key = nextChallenge ? challengeKey(nextChallenge) : '';
+    }
+
+    if (key) {
+      seenChallenges.current.add(key);
+    }
+
     setChallenge(nextChallenge);
-    setQuestionNumber((number) => number + 1);
+    setQuestionNumber(nextQuestionNum);
     setSelected(null);
   };
 
@@ -51,20 +90,20 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
         <MinigameMotion key={`${subject}-${questionNumber}`} style={styles.container}>
           <View style={styles.topBar}><TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity></View>
           <View style={styles.content}>
-            <Text style={styles.eyebrow}>GRADE {grade} • ENDLESS PUZZLES</Text>
+            <Text style={styles.eyebrow}>GRADE {grade} • DYNAMIC PROGRESSION</Text>
             <Text style={styles.title}>🔐 Codebreaker</Text>
-            <Text style={styles.subtitle}>Choose a track to crack number patterns or nature sequences.</Text>
+            <Text style={styles.subtitle}>Solve puzzles that scale from Easy all the way to Impossible!</Text>
             <TouchableOpacity style={[styles.subjectButton, styles.math]} onPress={() => startRound('Math')}>
               <Text style={styles.subjectTitle}>🔢 Math Track</Text>
-              <Text style={styles.subjectCopy}>Skip counting, addition, and multiplication patterns</Text>
+              <Text style={styles.subjectCopy}>Skip counting, addition, and complex multiplication patterns</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.subjectButton, styles.science]} onPress={() => startRound('Science')}>
               <Text style={styles.subjectTitle}>🌿 Science Track</Text>
-              <Text style={styles.subjectCopy}>Life cycles and environmental sequences</Text>
+              <Text style={styles.subjectCopy}>Life cycles and advanced environmental sequences</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.subjectButton, styles.mixed]} onPress={() => startRound('Both')}>
               <Text style={styles.subjectTitle}>✨ Mixed Track</Text>
-              <Text style={styles.subjectCopy}>A blend of Math and Science puzzles</Text>
+              <Text style={styles.subjectCopy}>A balance of Math and Science challenges</Text>
             </TouchableOpacity>
           </View>
         </MinigameMotion>
@@ -78,10 +117,12 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => { setSubject(null); setChallenge(null); }}><Text style={styles.backText}>‹ Tracks</Text></TouchableOpacity>
           <Text style={styles.progress}>Puzzle {questionNumber} • {subject} • ✓ {correctCount}</Text>
-          <Text style={styles.xp}>+50 XP / correct</Text>
+          <Text style={styles.xp}>+{currentXP} XP / correct</Text>
         </View>
         <View style={styles.content}>
-          <Text style={styles.eyebrow}>GRADE {grade} • CODEBREAKER</Text>
+          <Text style={styles.eyebrow}>
+            GRADE {grade} • LEVEL {questionNumber} [{currentDifficulty.toUpperCase()}]
+          </Text>
           <Text style={styles.title}>Complete the sequence</Text>
           <Text style={styles.rule}>{challenge.ruleDescription}</Text>
           <View style={styles.sequence}>
