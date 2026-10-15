@@ -365,7 +365,6 @@ export default function GamesScreen() {
     return { localName, localXp };
   };
 
-  // --- SYNC XP TO SUPABASE ---
   const syncXpToSupabase = async (earnedXp: number) => {
     if (earnedXp <= 0) return;
     try {
@@ -379,19 +378,16 @@ export default function GamesScreen() {
     }
   };
 
-  // --- FETCH LIVE LEADERBOARD & COEXIST WITH BOTS ---
   const fetchLeaderboard = async () => {
     try {
       setLoadingLeaderboard(true);
 
-      // 1. Get local player stats (e.g. your 1545 XP) and sync to Supabase
       const { localName, localXp } = await getLocalPlayerStats();
       await supabase.rpc("sync_user_xp", {
         p_name: localName,
         p_xp: localXp,
       });
 
-      // 2. Fetch the top 5 profiles from Supabase (Real Users + Bots)
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, weekly_xp")
@@ -406,7 +402,6 @@ export default function GamesScreen() {
         weekly_xp: Number(row.weekly_xp) || 0,
       }));
 
-      // 3. Ensure current player coexists in the list with their latest XP
       const alreadyInList = cloudList.some(
         (p) => p.full_name.toLowerCase() === localName.toLowerCase()
       );
@@ -482,7 +477,6 @@ export default function GamesScreen() {
     paddedGames.slice(3, 6),
   ];
 
-  // Ensure podium always has 3 entries
   const podiumEntries: LeaderboardEntry[] = [
     leaderboardData[0] || { id: "empty-1", full_name: "---", weekly_xp: 0 },
     leaderboardData[1] || { id: "empty-2", full_name: "---", weekly_xp: 0 },

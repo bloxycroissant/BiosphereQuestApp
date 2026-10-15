@@ -13,8 +13,36 @@ interface Props {
 const QUESTION_COUNT = 5;
 const QUESTION_SECONDS = 15;
 
+// Helper function to guarantee 5 non-repeating questions
+const generateUniqueDeck = (grade: GradeLevel, count: number): QuizQuestion[] => {
+  const deck: QuizQuestion[] = [];
+  const seenTexts = new Set<string>();
+  let attempts = 0;
+
+  while (deck.length < count && attempts < 200) {
+    attempts++;
+    const [candidate] = generateQuizQuestions(grade, 1, new Set(seenTexts));
+    if (candidate && !seenTexts.has(candidate.question)) {
+      seenTexts.add(candidate.question);
+      deck.push(candidate);
+    }
+  }
+
+  // Safety fallback if the generator pool is very small
+  while (deck.length < count) {
+    const idx = deck.length + 1;
+    deck.push({
+      question: `Grade ${grade} Review Question #${idx}`,
+      options: ['Option A', 'Option B', 'Option C', 'Option D'],
+      answer: 'Option A',
+    });
+  }
+
+  return deck;
+};
+
 export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
-  const [questions] = useState<QuizQuestion[]>(() => generateQuizQuestions(grade, QUESTION_COUNT));
+  const [questions, setQuestions] = useState<QuizQuestion[]>(() => generateUniqueDeck(grade, QUESTION_COUNT));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(QUESTION_SECONDS);
@@ -34,11 +62,13 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const chooseAnswer = (option: string) => {
     if (selectedOption !== null) return;
     setSelectedOption(option);
-    if (option === questions[currentIndex]?.answer) setScore((current) => current + 1);
+    if (option === questions[currentIndex]?.answer) {
+      setScore((current) => current + 1);
+    }
   };
 
   const nextQuestion = () => {
-    if (currentIndex + 1 === questions.length) {
+    if (currentIndex + 1 >= questions.length) {
       setIsFinished(true);
       onSuccess(150);
       return;
@@ -48,16 +78,28 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
     setTimeLeft(QUESTION_SECONDS);
   };
 
+  const playAgain = () => {
+    setQuestions(generateUniqueDeck(grade, QUESTION_COUNT));
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setTimeLeft(QUESTION_SECONDS);
+    setScore(0);
+    setIsFinished(false);
+  };
+
   if (isFinished) {
     return (
       <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
         <MinigameMotion style={styles.container}>
           <View style={styles.card}>
-            <Text style={styles.eyebrow}>DAILY CHALLENGE COMPLETE</Text>
+            <Text style={styles.eyebrow}>QUIZ COMPLETE</Text>
             <Text style={styles.title}>🌟 Great work!</Text>
             <Text style={styles.copy}>You answered {score} of {questions.length} questions correctly.</Text>
             <Text style={styles.reward}>+150 XP</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
+            <TouchableOpacity style={styles.primaryButton} onPress={playAgain}>
+              <Text style={styles.buttonText}>Play Again ↻</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.primaryButton, { marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 0.15)' }]} onPress={onClose}>
               <Text style={styles.buttonText}>Back to Games</Text>
             </TouchableOpacity>
           </View>
@@ -76,9 +118,15 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
           <Text style={styles.progressText}>Question {currentIndex + 1} of {questions.length}</Text>
-          <Text style={[styles.timer, timeLeft <= 5 && styles.timerWarning]}>00:{String(timeLeft).padStart(2, '0')}</Text>
+          <Text style={[styles.timer, timeLeft <= 5 && styles.timerWarning]}>
+            00:{String(timeLeft).padStart(2, '0')}
+          </Text>
         </View>
-        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View>
+
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.card}>
             <Text style={styles.eyebrow}>GRADE {grade} • MATH & SCIENCE</Text>
@@ -105,8 +153,11 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
             {answered && (
               <View style={styles.feedback}>
                 <Text style={styles.feedbackText}>
-                  {selectedOption === '' ? `Time's up! Answer: ${question.answer}` :
-                    selectedOption === question.answer ? 'Correct! Nice work.' : `Not quite. The answer is ${question.answer}.`}
+                  {selectedOption === ''
+                    ? `Time's up! Answer: ${question.answer}`
+                    : selectedOption === question.answer
+                    ? 'Correct! Nice work.'
+                    : `Not quite. The answer is ${question.answer}.`}
                 </Text>
                 <TouchableOpacity style={styles.primaryButton} onPress={nextQuestion}>
                   <Text style={styles.buttonText}>{currentIndex + 1 === questions.length ? 'Finish Quiz' : 'Next Question'} →</Text>
