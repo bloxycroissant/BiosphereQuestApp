@@ -34,6 +34,8 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 
 export const FlashcardGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenCards = useRef(new Set<string>());
+  const antiCheatTimestamp = useRef<number>(Date.now());
+
   const [completedCycles, setCompletedCycles] = useState(0);
   const [deck, setDeck] = useState<Flashcard[]>(() => {
     const initialDeck = generateFlashcardDeck(grade);
@@ -66,6 +68,9 @@ export const FlashcardGame: React.FC<Props> = ({ grade, onSuccess, onClose }) =>
   };
 
   const advance = (reviewAgain: boolean) => {
+    if (Date.now() - antiCheatTimestamp.current < 150) return;
+    antiCheatTimestamp.current = Date.now();
+
     if (reviewAgain && card) {
       setDeck((cards) => [...cards, card]);
       setMasteredCards((cards) => cards.filter((front) => front !== card.front));
