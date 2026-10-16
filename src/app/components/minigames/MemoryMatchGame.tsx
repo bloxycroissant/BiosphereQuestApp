@@ -35,6 +35,7 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 
 export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, onClose }) => {
   const seenBoards = useRef(new Set<string>());
+  const antiCheatClickLimit = useRef<{ count: number; time: number }>({ count: 0, time: Date.now() });
   
   const [cards, setCards] = useState<MemoryMatchCard[]>(() => {
     const initialCards = generateMemoryPairs(grade, seenBoards.current, subject);
@@ -55,8 +56,8 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
   const currentDifficulty = getDifficulty(completedBoards);
   const currentXP = getXPForDifficulty(currentDifficulty);
 
-  // Helper to load next non-repeating board
   const startNextBoard = useCallback((isResetTimer = false) => {
+    antiCheatClickLimit.current = { count: 0, time: Date.now() };
     if (mismatchTimeout.current) {
       clearTimeout(mismatchTimeout.current);
       mismatchTimeout.current = null;
@@ -65,7 +66,6 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
     let nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
     let key = boardKey(nextCards);
 
-    // If board generator exhausts unique layouts, clear seen set to maintain infinite flow without duplicate crashes
     if (!nextCards || nextCards.length === 0 || (key && seenBoards.current.has(key))) {
       seenBoards.current.clear();
       nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
@@ -88,7 +88,6 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
     }
   }, [grade, subject]);
 
-  // Continuous timer countdown across multiple boards
   useEffect(() => {
     if (roundExpired) return;
     const timer = setInterval(() => {
@@ -112,13 +111,20 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
   const finishRound = () => {
     onSuccess(currentXP);
     setCompletedBoards((count) => count + 1);
-    // Board continues under the exact same running timer!
     startNextBoard(false);
   };
 
   const reveal = (index: number) => {
     if (roundExpired || flipped.length === 2 || flipped.includes(index) || matched.includes(cards[index].pairId)) return;
     
+    const now = Date.now();
+    if (now - antiCheatClickLimit.current.time < 1000) {
+      antiCheatClickLimit.current.count += 1;
+      if (antiCheatClickLimit.current.count > 10) return;
+    } else {
+      antiCheatClickLimit.current = { count: 1, time: now };
+    }
+
     Animated.sequence([
       Animated.timing(tileScales[index], { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(tileScales[index], { toValue: 1, friction: 4, useNativeDriver: true }),
