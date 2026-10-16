@@ -1,6 +1,6 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useAudioPlayer } from "expo-audio";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -57,6 +57,34 @@ const HIGHLIGHTER_PALETTE = [
 ];
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Isolated memoized word component to eliminate full-page re-render lag when tapped
+interface HighlightableWordProps {
+  wordKey: string;
+  word: string;
+  highlightColor?: string;
+  onPress: (wordKey: string) => void;
+}
+
+const HighlightableWord = memo(function HighlightableWord({
+  wordKey,
+  word,
+  highlightColor,
+  onPress,
+}: HighlightableWordProps) {
+  return (
+    <Text
+      {...({ "data-word-key": wordKey } as any)}
+      onPress={() => onPress(wordKey)}
+      style={[
+        styles.clickableWordText,
+        highlightColor ? { backgroundColor: highlightColor, borderRadius: 2 } : null,
+      ]}
+    >
+      {word}{" "}
+    </Text>
+  );
+});
 
 const getLessonVisualData = (
   lessonTitle: string,
@@ -561,19 +589,13 @@ export default function SubjectNotesViewer({
             const highlightColor = wordHighlights[wordKey];
 
             return (
-              <Text
+              <HighlightableWord
                 key={wIdx}
-                {...({ "data-word-key": wordKey } as any)}
-                onPress={() => toggleWordHighlight(wordKey)}
-                style={[
-                  styles.clickableWordText,
-                  highlightColor
-                    ? { backgroundColor: highlightColor, borderRadius: 2 }
-                    : null,
-                ]}
-              >
-                {word}{" "}
-              </Text>
+                wordKey={wordKey}
+                word={word}
+                highlightColor={highlightColor}
+                onPress={toggleWordHighlight}
+              />
             );
           })}
         </Text>
