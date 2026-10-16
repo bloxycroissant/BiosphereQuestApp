@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { generateQuizQuestions, GradeLevel, QuizQuestion } from '../../data/questionGenerators';
 import { MinigameMotion } from './MinigameMotion';
@@ -13,7 +13,6 @@ interface Props {
 const QUESTION_COUNT = 5;
 const QUESTION_SECONDS = 15;
 
-// Helper function to guarantee 5 non-repeating questions
 const generateUniqueDeck = (grade: GradeLevel, count: number): QuizQuestion[] => {
   const deck: QuizQuestion[] = [];
   const seenTexts = new Set<string>();
@@ -28,7 +27,6 @@ const generateUniqueDeck = (grade: GradeLevel, count: number): QuizQuestion[] =>
     }
   }
 
-  // Safety fallback if the generator pool is very small
   while (deck.length < count) {
     const idx = deck.length + 1;
     deck.push({
@@ -42,6 +40,7 @@ const generateUniqueDeck = (grade: GradeLevel, count: number): QuizQuestion[] =>
 };
 
 export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
+  const antiCheatTimestamp = useRef<number>(Date.now());
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => generateUniqueDeck(grade, QUESTION_COUNT));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -61,6 +60,10 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
 
   const chooseAnswer = (option: string) => {
     if (selectedOption !== null) return;
+
+    if (Date.now() - antiCheatTimestamp.current < 200) return;
+    antiCheatTimestamp.current = Date.now();
+
     setSelectedOption(option);
     if (option === questions[currentIndex]?.answer) {
       setScore((current) => current + 1);
@@ -68,6 +71,7 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   };
 
   const nextQuestion = () => {
+    antiCheatTimestamp.current = Date.now();
     if (currentIndex + 1 >= questions.length) {
       setIsFinished(true);
       onSuccess(150);
@@ -79,6 +83,7 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   };
 
   const playAgain = () => {
+    antiCheatTimestamp.current = Date.now();
     setQuestions(generateUniqueDeck(grade, QUESTION_COUNT));
     setCurrentIndex(0);
     setSelectedOption(null);
