@@ -90,6 +90,7 @@ const getUniqueWordScramble = (grade: GradeLevel, seenSet: Set<string>): Scrambl
 
 export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
+  const antiCheatTimestamp = useRef<number>(Date.now()); // Anti-cheat: Track user submission frequency
 
   const [challenge, setChallenge] = useState<ScrambleChallenge>(() => {
     const initial = getUniqueWordScramble(grade, seenChallenges.current);
@@ -113,6 +114,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   const answer = pickedTiles.map((index) => challenge.jumbledLetters[index]).join('');
 
   const loadNextWord = useCallback(() => {
+    antiCheatTimestamp.current = Date.now();
     const nextChallenge = getUniqueWordScramble(grade, seenChallenges.current);
     seenChallenges.current.add(nextChallenge.targetWord);
 
@@ -187,6 +189,13 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   const checkAnswer = () => {
     if (finished) return;
 
+    // Anti-cheat: Block superhuman instant bot answers (<250ms reaction threshold)
+    if (Date.now() - antiCheatTimestamp.current < 250) {
+      setMessage('Anti-cheat: Action too fast.');
+      return;
+    }
+    antiCheatTimestamp.current = Date.now();
+
     if (answer.length !== challenge.targetWord.length) {
       setMessage('Use every letter tile to make the word.');
       return;
@@ -207,6 +216,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   };
 
   const restartGame = () => {
+    antiCheatTimestamp.current = Date.now();
     seenChallenges.current.clear();
     const initial = getUniqueWordScramble(grade, seenChallenges.current);
     seenChallenges.current.add(initial.targetWord);
