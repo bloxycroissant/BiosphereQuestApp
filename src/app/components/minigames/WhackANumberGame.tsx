@@ -35,6 +35,7 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 
 export const WhackANumberGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
+  const antiCheatClickLimit = useRef<{ count: number; time: number }>({ count: 0, time: Date.now() });
 
   const [challenge, setChallenge] = useState<WhackChallenge>(() => {
     const initial = generateWhackChallenge(grade, seenChallenges.current);
@@ -60,6 +61,7 @@ export const WhackANumberGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   const isGameOver = lives <= 0;
 
   const startNextBoard = useCallback((resetEntireGame = false) => {
+    antiCheatClickLimit.current = { count: 0, time: Date.now() };
     let nextChallenge = generateWhackChallenge(grade, seenChallenges.current);
     let key = nextChallenge ? challengeKey(nextChallenge) : '';
 
@@ -109,6 +111,17 @@ export const WhackANumberGame: React.FC<Props> = ({ grade, onSuccess, onClose })
 
   const whack = (index: number) => {
     if (whacked.includes(index) || isGameOver) return;
+
+    const now = Date.now();
+    if (now - antiCheatClickLimit.current.time < 1000) {
+      antiCheatClickLimit.current.count += 1;
+      if (antiCheatClickLimit.current.count > 15) {
+        setFeedback('Anti-cheat: Tap frequency exceeded.');
+        return;
+      }
+    } else {
+      antiCheatClickLimit.current = { count: 1, time: now };
+    }
 
     triggerHammerStrike(index);
 
