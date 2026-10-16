@@ -90,7 +90,7 @@ const getUniqueWordScramble = (grade: GradeLevel, seenSet: Set<string>): Scrambl
 
 export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now()); // Anti-cheat: Track user submission frequency
+  const antiCheatTimestamp = useRef<number>(Date.now());
 
   const [challenge, setChallenge] = useState<ScrambleChallenge>(() => {
     const initial = getUniqueWordScramble(grade, seenChallenges.current);
@@ -189,7 +189,6 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
   const checkAnswer = () => {
     if (finished) return;
 
-    // Anti-cheat: Block superhuman instant bot answers (<250ms reaction threshold)
     if (Date.now() - antiCheatTimestamp.current < 250) {
       setMessage('Anti-cheat: Action too fast.');
       return;
