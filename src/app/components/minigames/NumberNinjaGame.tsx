@@ -34,6 +34,7 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 
 export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenQuestions = useRef(new Set<string>());
+  const antiCheatTimestamp = useRef<number>(Date.now());
 
   const [question, setQuestion] = useState<NinjaProblem>(() => {
     const initial = generateNinjaProblem(grade, seenQuestions.current);
@@ -50,7 +51,6 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   const currentDifficulty = getDifficulty(questionNumber);
   const currentXP = getXPForDifficulty(currentDifficulty);
 
-  // Global continuous timer until time runs out completely
   useEffect(() => {
     if (roundExpired) return;
     const timer = setInterval(() => {
@@ -69,6 +69,10 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
 
   const answer = (value: number) => {
     if (selected !== null || roundExpired) return;
+
+    if (Date.now() - antiCheatTimestamp.current < 200) return;
+    antiCheatTimestamp.current = Date.now();
+
     setSelected(value);
     if (value === question.correctAnswer) {
       setScore((current) => current + 1);
@@ -78,10 +82,10 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
 
   const next = () => {
     if (roundExpired) return;
+    antiCheatTimestamp.current = Date.now();
 
     let nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
 
-    // Reset seen pool when unique question options run out to avoid endless loop / crashes
     if (!nextQuestion || (nextQuestion.prompt && seenQuestions.current.has(nextQuestion.prompt))) {
       seenQuestions.current.clear();
       nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
@@ -97,6 +101,7 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   };
 
   const restartGame = () => {
+    antiCheatTimestamp.current = Date.now();
     seenQuestions.current.clear();
     const nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
     if (nextQuestion?.prompt) seenQuestions.current.add(nextQuestion.prompt);
