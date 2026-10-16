@@ -32,6 +32,8 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 
 export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const seenChallenges = useRef(new Set<string>());
+  const antiCheatTimestamp = useRef<number>(Date.now()); 
+
   const [subject, setSubject] = useState<Subject | null>(null);
   const [challenge, setChallenge] = useState<CodebreakerChallenge | null>(null);
   const [questionNumber, setQuestionNumber] = useState(1);
@@ -42,6 +44,7 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   const currentXP = getXPForDifficulty(currentDifficulty);
 
   const startRound = (selectedSubject: Subject) => {
+    antiCheatTimestamp.current = Date.now();
     seenChallenges.current.clear();
     const nextChallenge = generateCodebreaker(grade, selectedSubject, seenChallenges.current);
     if (nextChallenge) {
@@ -56,6 +59,10 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
 
   const choose = (option: number) => {
     if (selected !== null || !challenge) return;
+
+    if (Date.now() - antiCheatTimestamp.current < 250) return;
+    antiCheatTimestamp.current = Date.now();
+
     setSelected(option);
     if (challenge.options[option] === challenge.missingAnswer) {
       setCorrectCount((count) => count + 1);
@@ -64,11 +71,11 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   };
 
   const next = () => {
+    antiCheatTimestamp.current = Date.now();
     const nextQuestionNum = questionNumber + 1;
     let nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
     let key = nextChallenge ? challengeKey(nextChallenge) : '';
     
-    // Prevent duplicate questions or endless loading state by clearing history if pool exhausts
     if (!nextChallenge || seenChallenges.current.has(key)) {
       seenChallenges.current.clear();
       nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
