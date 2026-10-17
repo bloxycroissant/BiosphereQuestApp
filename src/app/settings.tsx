@@ -216,16 +216,6 @@ export default function SettingsScreen(): React.JSX.Element {
     }
   };
 
-  const handleDevReset = async (): Promise<void> => {
-    try {
-      await supabase.auth.signOut();
-      await AsyncStorage.clear();
-      router.replace("/" as any);
-    } catch (error) {
-      console.error("Dev reset error:", error);
-    }
-  };
-
   const handleDeleteAccount = (): void => {
     setDeletePassword("");
     setDeleteModalVisible(true);
@@ -707,32 +697,6 @@ export default function SettingsScreen(): React.JSX.Element {
             </View>
           </Pressable>
         </View>
-
-        {/* DEVELOPER TOOLS */}
-        <Text style={[styles.groupLabel, { color: "#ffaa00", marginTop: 20 }]}>
-          DEVELOPER TOOLS
-        </Text>
-        <Pressable
-          style={[
-            styles.dangerZoneCard,
-            {
-              borderColor: "#a36c00",
-              backgroundColor: "#2b1e05",
-              borderRadius: 16,
-            },
-          ]}
-          onPress={handleDevReset}
-        >
-          <View>
-            <Text style={[styles.dangerZoneText, { color: "#ffaa00" }]}>
-              Dev Factory Reset{" "}
-            </Text>
-            <Text style={[styles.dangerZoneSub, { color: "#cc8800" }]}>
-              For testing only (to be removed on final product)
-            </Text>
-          </View>
-          <Text style={[styles.dangerZoneArrow, { color: "#ffaa00" }]}> </Text>
-        </Pressable>
       </ScrollView>
     </GradientSafeAreaView>
   );
