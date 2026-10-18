@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Easing,
   Image,
   LayoutAnimation,
   Modal,
@@ -37,9 +38,21 @@ interface LocalSession {
   done: boolean;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+const MONTH_SHORT = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+];
+const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const COMPLETED_LESSONS_KEY = "@biosphere_completed_lessons_v1";
 const STUDY_SESSIONS_KEY = "@biosphere_study_sessions_v1";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ProfileScreen(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -73,6 +86,11 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const addFormAnim = useRef(new Animated.Value(40)).current;
   const addFormOpacity = useRef(new Animated.Value(0)).current;
+  const targetSlideAnim = useRef(new Animated.Value(0)).current;
+  const calendarGlowAnim = useRef(new Animated.Value(0)).current;
+
+  const mascotFloat = useRef(new Animated.Value(0)).current;
+  const badgeShimmerAnim = useRef(new Animated.Value(0)).current;
 
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
@@ -105,6 +123,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const [sessions, setSessions] = useState<LocalSession[]>([]);
 
+  const now = new Date();
   const [newTitle, setNewTitle] = useState("");
   const [newDay, setNewDay] = useState("Mon");
   const [newTime, setNewTime] = useState("9:00 AM");
@@ -113,6 +132,82 @@ export default function ProfileScreen(): React.JSX.Element {
   const [newCategory, setNewCategory] = useState("Science");
   const [newDescription, setNewDescription] = useState("");
   const [newReminder, setNewReminder] = useState("10 mins before");
+  const [targetYear, setTargetYear] = useState(now.getFullYear());
+  const [targetMonth, setTargetMonth] = useState(now.getMonth());
+  const [targetDay, setTargetDay] = useState(now.getDate());
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotFloat, {
+          toValue: -8,
+          duration: 1300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotFloat, {
+          toValue: 0,
+          duration: 1300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(badgeShimmerAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeShimmerAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(calendarGlowAnim, {
+          toValue: 1,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(calendarGlowAnim, {
+          toValue: 0,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const getDaysInMonth = (month: number, year: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfWeek = (month: number, year: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const triggerTargetSlideAnimation = (direction: "up" | "down", callback: () => void) => {
+    const startVal = direction === "up" ? 20 : -20;
+    targetSlideAnim.setValue(startVal);
+    callback();
+    Animated.spring(targetSlideAnim, {
+      toValue: 0,
+      friction: 6,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const syncFullProfileToCloud = async (): Promise<void> => {
     try {
@@ -349,6 +444,9 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const animateViewChange = (nextView: ViewMode): void => {
     if (nextView === "addSchedule") {
+      setTargetYear(now.getFullYear());
+      setTargetMonth(now.getMonth());
+      setTargetDay(now.getDate());
       addFormAnim.setValue(40);
       addFormOpacity.setValue(0);
       Animated.parallel([
@@ -368,13 +466,13 @@ export default function ProfileScreen(): React.JSX.Element {
 
     Animated.sequence([
       Animated.timing(viewTransitionAnim, {
-        toValue: 0.94,
-        duration: 80,
+        toValue: 0.95,
+        duration: 90,
         useNativeDriver: true,
       }),
       Animated.timing(viewTransitionAnim, {
         toValue: 1,
-        duration: 150,
+        duration: 160,
         useNativeDriver: true,
       }),
     ]).start();
@@ -384,7 +482,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const handleTabSwitch = (newSection: Section): void => {
     if (newSection === section) return;
 
-    const slideDirection = newSection === "schedule" ? 30 : -30;
+    const slideDirection = newSection === "schedule" ? 35 : -35;
     tabSlideAnim.setValue(slideDirection);
     tabOpacityAnim.setValue(0);
 
@@ -393,7 +491,7 @@ export default function ProfileScreen(): React.JSX.Element {
     Animated.parallel([
       Animated.spring(tabSlideAnim, {
         toValue: 0,
-        tension: 60,
+        tension: 65,
         friction: 8,
         useNativeDriver: true,
       }),
@@ -734,8 +832,13 @@ export default function ProfileScreen(): React.JSX.Element {
       if (!isNaN(mins) && mins > 0) durationStr += `${mins} mins`;
       if (!durationStr.trim()) durationStr = "30 mins";
 
+      const targetDateObj = new Date(targetYear, targetMonth, targetDay);
+      const formattedMonth = String(targetMonth + 1).padStart(2, "0");
+      const formattedDay = String(targetDay).padStart(2, "0");
+      const dateKeyStr = `${targetYear}-${formattedMonth}-${formattedDay}`;
+
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const newSessionItem: LocalSession = {
+      const newSessionItem: LocalSession & { dateStr?: string } = {
         id: Date.now().toString(),
         day: newDay.trim() || "Mon",
         title: newTitle.trim(),
@@ -745,6 +848,7 @@ export default function ProfileScreen(): React.JSX.Element {
         description: newDescription.trim(),
         reminder: newReminder.trim() || "10 mins before",
         done: false,
+        dateStr: dateKeyStr,
       };
 
       const updatedSessions = [...sessions, newSessionItem];
@@ -755,12 +859,39 @@ export default function ProfileScreen(): React.JSX.Element {
       setNewDescription("");
       animateViewChange("profile");
       setSection("schedule");
+
       await persistData({ sessions: updatedSessions });
+
+      try {
+        const homeSessionsRaw = await AsyncStorage.getItem(STUDY_SESSIONS_KEY);
+        const homeSessions = homeSessionsRaw ? JSON.parse(homeSessionsRaw) : [];
+        const mappedHomeSession = {
+          id: newSessionItem.id,
+          title: newSessionItem.title,
+          category: newSessionItem.category,
+          dateStr: dateKeyStr,
+          dayOfWeek: newSessionItem.day,
+          startTime: newSessionItem.time,
+          durationHours: hrs || 0,
+          durationMinutes: mins || 30,
+          notes: newSessionItem.description,
+          reminder: newSessionItem.reminder,
+        };
+        const updatedHomeSessions = [mappedHomeSession, ...homeSessions];
+        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updatedHomeSessions));
+      } catch (e) {
+        console.error("Failed to sync new session to home calendar storage", e);
+      }
+
       await syncFullProfileToCloud();
     });
   };
 
   const percent = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%`;
+  const animatedCalendarBorderColor = calendarGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#374b7c", "#625cff"],
+  });
 
   if (currentView === "editProfile") {
     return (
@@ -895,6 +1026,12 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   if (currentView === "addSchedule") {
+    const targetDaysInMonth = getDaysInMonth(targetMonth, targetYear);
+    const targetFirstDayOffset = getFirstDayOfWeek(targetMonth, targetYear);
+    const prevTargetMonthIndex = targetMonth === 0 ? 11 : targetMonth - 1;
+    const prevTargetMonthYear = targetMonth === 0 ? targetYear - 1 : targetYear;
+    const daysInPrevTargetMonth = getDaysInMonth(prevTargetMonthIndex, prevTargetMonthYear);
+
     return (
       <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
         <Animated.View
@@ -914,8 +1051,8 @@ export default function ProfileScreen(): React.JSX.Element {
               </Pressable>
               <View style={styles.addHeaderTitleRow}>
                 <View style={styles.miniCalendarBadge}>
-                  <Text style={styles.miniCalendarMonth}>JUL</Text>
-                  <Text style={styles.miniCalendarDay}>17</Text>
+                  <Text style={styles.miniCalendarMonth}>{MONTH_SHORT[targetMonth]}</Text>
+                  <Text style={styles.miniCalendarDay}>{targetDay}</Text>
                 </View>
                 <Text style={styles.editHeaderTitle}>Add Study Session</Text>
               </View>
@@ -945,29 +1082,115 @@ export default function ProfileScreen(): React.JSX.Element {
                 <View style={styles.chipRow}>
                   {["Science", "Math", "Ecology", "Biology", "General"].map(
                     (cat) => (
-                      <Pressable
+                      <CategoryChipItem
                         key={cat}
-                        onPress={() => setNewCategory(cat)}
-                        style={[
-                          styles.categoryChip,
-                          newCategory === cat && styles.categoryChipActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.categoryChipText,
-                            newCategory === cat &&
-                              styles.categoryChipTextActive,
-                          ]}
-                        >
-                          {cat}
-                        </Text>
-                      </Pressable>
+                        cat={cat}
+                        selectedCategory={newCategory}
+                        onSelect={setNewCategory}
+                      />
                     ),
                   )}
                 </View>
               </View>
             </View>
+
+            <Text style={styles.groupLabel}>TARGET DATE & CALENDAR</Text>
+            <Animated.View style={[styles.formGroupCard, { borderColor: animatedCalendarBorderColor }]}>
+              <View style={{ padding: 16 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 14 }}>
+                    {MONTH_NAMES[targetMonth]} {targetDay}, {targetYear}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <Pressable
+                      style={{ padding: 4 }}
+                      onPress={() => {
+                        triggerTargetSlideAnimation("up", () => {
+                          let m = targetMonth - 1;
+                          let y = targetYear;
+                          if (m < 0) { m = 11; y -= 1; }
+                          setTargetMonth(m);
+                          setTargetYear(y);
+                          setTargetDay(Math.min(targetDay, getDaysInMonth(m, y)));
+                        });
+                      }}
+                    >
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>◀ M</Text>
+                    </Pressable>
+                    <Pressable
+                      style={{ padding: 4 }}
+                      onPress={() => {
+                        triggerTargetSlideAnimation("down", () => {
+                          let m = targetMonth + 1;
+                          let y = targetYear;
+                          if (m > 11) { m = 0; y += 1; }
+                          setTargetMonth(m);
+                          setTargetYear(y);
+                          setTargetDay(Math.min(targetDay, getDaysInMonth(m, y)));
+                        });
+                      }}
+                    >
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>M ▶</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Animated.View
+                  style={{
+                    transform: [{ translateY: targetSlideAnim }],
+                    opacity: targetSlideAnim.interpolate({
+                      inputRange: [-20, 0, 20],
+                      outputRange: [0.3, 1, 0.3],
+                    }),
+                  }}
+                >
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                    {WEEKDAYS_SHORT.map((d) => (
+                      <Text key={d} style={{ flex: 1, textAlign: "center", color: "#f8fafc", fontSize: 11, fontWeight: "700" }}>{d}</Text>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
+                    {[...Array(targetFirstDayOffset)].map((_, i) => {
+                      const prevDayNum = daysInPrevTargetMonth - targetFirstDayOffset + i + 1;
+                      return (
+                        <View key={`prof-prev-${i}`} style={{ width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 }}>
+                          <Text style={{ color: "#475569", fontSize: 12, fontWeight: "400" }}>{prevDayNum}</Text>
+                        </View>
+                      );
+                    })}
+                    {[...Array(targetDaysInMonth)].map((_, i) => {
+                      const dayNum = i + 1;
+                      const isSelected = targetDay === dayNum;
+                      return (
+                        <Pressable
+                          key={`prof-day-${dayNum}`}
+                          style={[
+                            { width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 },
+                            isSelected && { backgroundColor: "#38bdf8", borderRadius: 15 },
+                          ]}
+                          onPress={() => setTargetDay(dayNum)}
+                        >
+                          <Text style={[{ color: "#f8fafc", fontSize: 12, fontWeight: "500" }, isSelected && { color: "#0f172a", fontWeight: "900" }]}>
+                            {dayNum}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    {(() => {
+                      const totalCellsSoFar = targetFirstDayOffset + targetDaysInMonth;
+                      const remainder = totalCellsSoFar % 7;
+                      const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
+
+                      return [...Array(extraSlotsNeeded)].map((_, i) => (
+                        <View key={`prof-next-${i}`} style={{ width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 }}>
+                          <Text style={{ color: "#475569", fontSize: 12, fontWeight: "400" }}>{i + 1}</Text>
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </Animated.View>
+              </View>
+            </Animated.View>
 
             <Text style={styles.groupLabel}>TIMING & SCHEDULE</Text>
             <View style={styles.formGroupCard}>
@@ -1042,23 +1265,12 @@ export default function ProfileScreen(): React.JSX.Element {
                     "10 mins before",
                     "30 mins before",
                   ].map((rem) => (
-                    <Pressable
+                    <ReminderChipItem
                       key={rem}
-                      onPress={() => setNewReminder(rem)}
-                      style={[
-                        styles.categoryChip,
-                        newReminder === rem && styles.categoryChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          newReminder === rem && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {rem}
-                      </Text>
-                    </Pressable>
+                      rem={rem}
+                      selectedReminder={newReminder}
+                      onSelect={setNewReminder}
+                    />
                   ))}
                 </View>
               </View>
@@ -1141,11 +1353,13 @@ export default function ProfileScreen(): React.JSX.Element {
               {email ? <Text style={styles.email}>{email}</Text> : null}
             </View>
 
-            <Image
-              source={stellaMascot}
-              style={styles.stellaMascot}
-              resizeMode="contain"
-            />
+            <Animated.View style={{ transform: [{ translateY: mascotFloat }] }}>
+              <Image
+                source={stellaMascot}
+                style={styles.stellaMascot}
+                resizeMode="contain"
+              />
+            </Animated.View>
           </View>
 
           <View style={styles.subHeaderRow}>
@@ -1235,6 +1449,82 @@ export default function ProfileScreen(): React.JSX.Element {
         </ScrollView>
       </Animated.View>
     </GradientSafeAreaView>
+  );
+}
+
+function CategoryChipItem({
+  cat,
+  selectedCategory,
+  onSelect,
+}: {
+  cat: string;
+  selectedCategory: string;
+  onSelect: (c: string) => void;
+}): React.JSX.Element {
+  const isSel = selectedCategory === cat;
+  const chipScale = useRef(new Animated.Value(1)).current;
+  return (
+    <AnimatedPressable
+      onPressIn={() => {
+        Animated.spring(chipScale, { toValue: 0.92, useNativeDriver: true }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(chipScale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+        onSelect(cat);
+      }}
+      style={[
+        styles.categoryChip,
+        isSel && styles.categoryChipActive,
+        { transform: [{ scale: chipScale }] },
+      ]}
+    >
+      <Text
+        style={[
+          styles.categoryChipText,
+          isSel && styles.categoryChipTextActive,
+        ]}
+      >
+        {cat}
+      </Text>
+    </AnimatedPressable>
+  );
+}
+
+function ReminderChipItem({
+  rem,
+  selectedReminder,
+  onSelect,
+}: {
+  rem: string;
+  selectedReminder: string;
+  onSelect: (r: string) => void;
+}): React.JSX.Element {
+  const isSel = selectedReminder === rem;
+  const remScale = useRef(new Animated.Value(1)).current;
+  return (
+    <AnimatedPressable
+      onPressIn={() => {
+        Animated.spring(remScale, { toValue: 0.92, useNativeDriver: true }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(remScale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+        onSelect(rem);
+      }}
+      style={[
+        styles.categoryChip,
+        isSel && styles.categoryChipActive,
+        { transform: [{ scale: remScale }] },
+      ]}
+    >
+      <Text
+        style={[
+          styles.categoryChipText,
+          isSel && styles.categoryChipTextActive,
+        ]}
+      >
+        {rem}
+      </Text>
+    </AnimatedPressable>
   );
 }
 
@@ -1413,6 +1703,7 @@ function Badges({
 
   const openBadgeModal = (badge: any) => {
     setSelectedBadge(badge);
+    badgeModalAnim.setValue(0);
     Animated.spring(badgeModalAnim, {
       toValue: 1,
       useNativeDriver: true,
@@ -1444,28 +1735,54 @@ function Badges({
     <View>
       <Text style={styles.section}>🏅 Badges & Achievements</Text>
       <View style={styles.badges}>
-        {dynamicAchievements.map((achievement) => (
-          <Pressable
-            key={achievement.id}
-            onPress={() => openBadgeModal(achievement)}
-            style={[
-              styles.badge,
-              {
-                width: badgeWidth,
-                borderColor: achievement.unlocked
-                  ? achievement.accent
-                  : "#35466e",
-              },
-            ]}
-          >
-            <Text style={styles.badgeIcon}>
-              {achievement.unlocked ? achievement.icon : "🔒"}
-            </Text>
-            <Text style={styles.badgeTitle} numberOfLines={2}>
-              {achievement.title}
-            </Text>
-          </Pressable>
-        ))}
+        {dynamicAchievements.map((achievement) => {
+          const badgePressScale = useRef(new Animated.Value(1)).current;
+
+          const handlePressIn = () => {
+            Animated.spring(badgePressScale, {
+              toValue: 0.93,
+              friction: 3,
+              tension: 200,
+              useNativeDriver: true,
+            }).start();
+          };
+
+          const handlePressOut = () => {
+            Animated.spring(badgePressScale, {
+              toValue: 1,
+              friction: 3,
+              tension: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              openBadgeModal(achievement);
+            });
+          };
+
+          return (
+            <AnimatedPressable
+              key={achievement.id}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              style={[
+                styles.badge,
+                {
+                  width: badgeWidth,
+                  borderColor: achievement.unlocked
+                    ? achievement.accent
+                    : "#35466e",
+                  transform: [{ scale: badgePressScale }],
+                },
+              ]}
+            >
+              <Text style={styles.badgeIcon}>
+                {achievement.unlocked ? achievement.icon : "🔒"}
+              </Text>
+              <Text style={styles.badgeTitle} numberOfLines={2}>
+                {achievement.title}
+              </Text>
+            </AnimatedPressable>
+          );
+        })}
       </View>
 
       <Modal

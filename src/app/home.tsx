@@ -167,6 +167,9 @@ export default function HomeScreen(): React.JSX.Element {
   const modalSlideAnim = useRef(new Animated.Value(300)).current;
   const modalFadeAnim = useRef(new Animated.Value(0)).current;
 
+  const challengePulse = useRef(new Animated.Value(1)).current;
+  const calendarGlowAnim = useRef(new Animated.Value(0)).current;
+
   const [userName, setUserName] = useState("Explorer");
   const [userGrade, setUserGrade] = useState("1");
 
@@ -205,6 +208,9 @@ export default function HomeScreen(): React.JSX.Element {
 
   const [formTitle, setFormTitle] = useState("");
   const [formCategory, setFormCategory] = useState("Science");
+  const [formTargetYear, setFormTargetYear] = useState(now.getFullYear());
+  const [formTargetMonth, setFormTargetMonth] = useState(now.getMonth());
+  const [formTargetDay, setFormTargetDay] = useState(now.getDate());
   const [formStartHour, setFormStartHour] = useState(9);
   const [formStartMin, setFormStartMin] = useState(0);
   const [formStartPeriod, setFormStartPeriod] = useState<"AM" | "PM">("AM");
@@ -260,6 +266,9 @@ export default function HomeScreen(): React.JSX.Element {
     if (isAddSessionModalOpen) {
       modalSlideAnim.setValue(300);
       modalFadeAnim.setValue(0);
+      setFormTargetYear(currentYear);
+      setFormTargetMonth(currentMonth);
+      setFormTargetDay(selectedDay);
       Animated.parallel([
         Animated.timing(modalFadeAnim, {
           toValue: 1,
@@ -299,14 +308,14 @@ export default function HomeScreen(): React.JSX.Element {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
-          toValue: -5,
-          duration: 1300,
+          toValue: -7,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
-          duration: 1300,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -316,8 +325,8 @@ export default function HomeScreen(): React.JSX.Element {
     Animated.loop(
       Animated.sequence([
         Animated.timing(bellPulseAnim, {
-          toValue: 1.18,
-          duration: 200,
+          toValue: 1.22,
+          duration: 180,
           useNativeDriver: true,
         }),
         Animated.spring(bellPulseAnim, {
@@ -325,21 +334,21 @@ export default function HomeScreen(): React.JSX.Element {
           friction: 3,
           useNativeDriver: true,
         }),
-        Animated.delay(3500),
+        Animated.delay(3000),
       ])
     ).start();
 
     Animated.loop(
       Animated.sequence([
         Animated.timing(xpPulseAnim, {
-          toValue: 0.75,
-          duration: 800,
+          toValue: 0.70,
+          duration: 750,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(xpPulseAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 750,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
@@ -349,16 +358,50 @@ export default function HomeScreen(): React.JSX.Element {
     Animated.loop(
       Animated.sequence([
         Animated.timing(modalBadgePulse, {
-          toValue: 1.1,
-          duration: 900,
+          toValue: 1.15,
+          duration: 800,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(modalBadgePulse, {
           toValue: 1,
-          duration: 900,
+          duration: 800,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(challengePulse, {
+          toValue: 1.02,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(challengePulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(calendarGlowAnim, {
+          toValue: 1,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(calendarGlowAnim, {
+          toValue: 0,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
         }),
       ])
     ).start();
@@ -415,13 +458,13 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   const triggerSlideAnimation = (direction: "up" | "down", callback: () => void) => {
-    const startVal = direction === "up" ? 18 : -18;
+    const startVal = direction === "up" ? 22 : -22;
     slideAnim.setValue(startVal);
     callback();
     Animated.spring(slideAnim, {
       toValue: 0,
-      friction: 7,
-      tension: 110,
+      friction: 6,
+      tension: 120,
       useNativeDriver: true,
     }).start();
   };
@@ -464,8 +507,8 @@ export default function HomeScreen(): React.JSX.Element {
     sessionsListAnim.setValue(0);
     Animated.spring(sessionsListAnim, {
       toValue: 1,
-      friction: 6,
-      tension: 100,
+      friction: 5,
+      tension: 110,
       useNativeDriver: true,
     }).start();
   };
@@ -479,7 +522,25 @@ export default function HomeScreen(): React.JSX.Element {
     try {
       const stored = await AsyncStorage.getItem(STUDY_SESSIONS_KEY);
       if (stored) {
-        setStudySessions(JSON.parse(stored));
+        const parsedSessions = JSON.parse(stored);
+        setStudySessions(parsedSessions);
+        
+        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedData) {
+          const profileParsed = JSON.parse(savedData);
+          profileParsed.sessions = parsedSessions.map((s: any) => ({
+            id: s.id,
+            day: s.dayOfWeek || "Mon",
+            title: s.title,
+            time: s.startTime,
+            duration: `${s.durationHours > 0 ? `${s.durationHours} hrs ` : ""}${s.durationMinutes} mins`,
+            category: s.category,
+            description: s.notes,
+            reminder: s.reminder,
+            done: false,
+          }));
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profileParsed));
+        }
       } else {
         const todayStr = formatSelectedDateKey(now.getDate(), now.getMonth(), now.getFullYear());
         const initialSample: StudySession[] = [
@@ -506,8 +567,8 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   const handleSaveStudySession = async () => {
-    const dateKey = formatSelectedDateKey(selectedDay);
-    const dateObj = new Date(currentYear, currentMonth, selectedDay);
+    const dateKey = formatSelectedDateKey(formTargetDay, formTargetMonth, formTargetYear);
+    const dateObj = new Date(formTargetYear, formTargetMonth, formTargetDay);
     const formattedStartTime = `${formStartHour}:${String(formStartMin).padStart(2, "0")} ${formStartPeriod}`;
 
     const newSession: StudySession = {
@@ -529,6 +590,22 @@ export default function HomeScreen(): React.JSX.Element {
     setStudySessions(updated);
     try {
       await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updated));
+
+      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+      const profileParsed = savedData ? JSON.parse(savedData) : {};
+      const mappedProfileSessions = updated.map((s) => ({
+        id: s.id,
+        day: s.dayOfWeek || "Mon",
+        title: s.title,
+        time: s.startTime,
+        duration: `${s.durationHours > 0 ? `${s.durationHours} hrs ` : ""}${s.durationMinutes} mins`,
+        category: s.category,
+        description: s.notes,
+        reminder: s.reminder,
+        done: false,
+      }));
+      profileParsed.sessions = mappedProfileSessions;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profileParsed));
     } catch (e) {
       console.error("Failed to save study session", e);
     }
@@ -832,8 +909,9 @@ export default function HomeScreen(): React.JSX.Element {
 
     const onPressIn = () => {
       Animated.spring(scale, {
-        toValue: 0.95,
-        friction: 4,
+        toValue: 0.93,
+        friction: 3,
+        tension: 200,
         useNativeDriver: true,
       }).start();
     };
@@ -867,7 +945,12 @@ export default function HomeScreen(): React.JSX.Element {
 
   const sessionListTranslateY = sessionsListAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [12, 0],
+    outputRange: [16, 0],
+  });
+
+  const animatedCalendarBorderColor = calendarGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#232a3f", "#4f46e5"],
   });
 
   return (
@@ -918,7 +1001,7 @@ export default function HomeScreen(): React.JSX.Element {
               {
                 translateY: appear.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [16, 0],
+                  outputRange: [20, 0],
                 }),
               },
             ],
@@ -1098,7 +1181,7 @@ export default function HomeScreen(): React.JSX.Element {
               <AnimatedPressable
                 style={[
                   styles.challenge,
-                  { transform: [{ scale: challengeHandler.scale }] },
+                  { transform: [{ scale: Animated.multiply(challengeHandler.scale, challengePulse) }] },
                 ]}
                 onPressIn={challengeHandler.onPressIn}
                 onPressOut={challengeHandler.onPressOut}
@@ -1177,7 +1260,7 @@ export default function HomeScreen(): React.JSX.Element {
           </View>
 
           <Text style={styles.section}>Study Calendar & Schedule</Text>
-          <View style={styles.calendarWidget}>
+          <Animated.View style={[styles.calendarWidget, { borderColor: animatedCalendarBorderColor }]}>
             <View style={styles.calendarTopHeader}>
               <Text style={styles.calendarTopHeaderDate}>
                 {activeDayOfWeekName}, {MONTH_NAMES[currentMonth]} {selectedDay}
@@ -1212,8 +1295,8 @@ export default function HomeScreen(): React.JSX.Element {
                   style={{
                     transform: [{ translateY: slideAnim }],
                     opacity: slideAnim.interpolate({
-                      inputRange: [-18, 0, 18],
-                      outputRange: [0.3, 1, 0.3],
+                      inputRange: [-22, 0, 22],
+                      outputRange: [0.2, 1, 0.2],
                     }),
                   }}
                 >
@@ -1268,11 +1351,9 @@ export default function HomeScreen(): React.JSX.Element {
                     })}
 
                     {(() => {
-                      const totalCellsUsed = firstDayOffset + daysInMonth;
-                      const remainingSlots = (7 - (totalCellsUsed % 7)) % 7;
-                      const extraSlotsNeeded = totalCellsUsed + remainingSlots < 35 
-                        ? remainingSlots + 7 
-                        : remainingSlots;
+                      const totalCellsSoFar = firstDayOffset + daysInMonth;
+                      const remainder = totalCellsSoFar % 7;
+                      const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
 
                       return [...Array(extraSlotsNeeded)].map((_, i) => (
                         <View key={`next-${i}`} style={styles.calendarDayCell}>
@@ -1339,7 +1420,7 @@ export default function HomeScreen(): React.JSX.Element {
                 ))
               )}
             </Animated.View>
-          </View>
+          </Animated.View>
         </Animated.View>
       </ScrollView>
 
@@ -1447,9 +1528,9 @@ export default function HomeScreen(): React.JSX.Element {
                   ]}
                 >
                   <Text style={styles.sessionModalDateBadgeMonth}>
-                    {MONTH_SHORT[currentMonth]}
+                    {MONTH_SHORT[formTargetMonth]}
                   </Text>
-                  <Text style={styles.sessionModalDateBadgeDay}>{selectedDay}</Text>
+                  <Text style={styles.sessionModalDateBadgeDay}>{formTargetDay}</Text>
                 </Animated.View>
                 <Text style={styles.sessionModalHeaderTitle}>Add Study Session</Text>
               </View>
@@ -1522,12 +1603,90 @@ export default function HomeScreen(): React.JSX.Element {
                 </ScrollView>
               </View>
 
-              <Text style={styles.formSectionHeader}>TIMING & SCHEDULE</Text>
+              <Text style={styles.formSectionHeader}>TARGET DATE & CALENDAR</Text>
               <View style={styles.formCard}>
-                <Text style={styles.formFieldLabel}>TARGET DATE</Text>
-                <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 13, marginBottom: 12 }}>
-                  {MONTH_NAMES[currentMonth]} {selectedDay}, {currentYear}
-                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 14 }}>
+                    {MONTH_NAMES[formTargetMonth]} {formTargetDay}, {formTargetYear}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <Pressable
+                      style={styles.arrowIconBtn}
+                      onPress={() => {
+                        let m = formTargetMonth - 1;
+                        let y = formTargetYear;
+                        if (m < 0) { m = 11; y -= 1; }
+                        setFormTargetMonth(m);
+                        setFormTargetYear(y);
+                        setFormTargetDay(Math.min(formTargetDay, getDaysInMonth(m, y)));
+                      }}
+                    >
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>◀ M</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.arrowIconBtn}
+                      onPress={() => {
+                        let m = formTargetMonth + 1;
+                        let y = formTargetYear;
+                        if (m > 11) { m = 0; y += 1; }
+                        setFormTargetMonth(m);
+                        setFormTargetYear(y);
+                        setFormTargetDay(Math.min(formTargetDay, getDaysInMonth(m, y)));
+                      }}
+                    >
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>M ▶</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.calendarGridHeaderRow}>
+                  {WEEKDAYS_SHORT.map((d) => (
+                    <Text key={d} style={styles.weekdayHeaderText}>{d}</Text>
+                  ))}
+                </View>
+                <View style={styles.calendarGridContainer}>
+                  {[...Array(getFirstDayOfWeek(formTargetMonth, formTargetYear))].map((_, i) => {
+                    const prevDaysInMonth = getDaysInMonth(
+                      formTargetMonth === 0 ? 11 : formTargetMonth - 1,
+                      formTargetMonth === 0 ? formTargetYear - 1 : formTargetYear
+                    );
+                    const prevDayNum = prevDaysInMonth - getFirstDayOfWeek(formTargetMonth, formTargetYear) + i + 1;
+                    return (
+                      <View key={`target-prev-${i}`} style={styles.calendarDayCell}>
+                        <Text style={styles.calendarDayCellTextDimmed}>{prevDayNum}</Text>
+                      </View>
+                    );
+                  })}
+                  {[...Array(getDaysInMonth(formTargetMonth, formTargetYear))].map((_, i) => {
+                    const dayNum = i + 1;
+                    const isSelected = formTargetDay === dayNum;
+                    return (
+                      <Pressable
+                        key={`target-day-${dayNum}`}
+                        style={[
+                          styles.calendarDayCell,
+                          isSelected && styles.calendarDayCellSelected,
+                        ]}
+                        onPress={() => setFormTargetDay(dayNum)}
+                      >
+                        <Text style={[styles.calendarDayCellText, isSelected && styles.calendarDayCellTextSelected]}>
+                          {dayNum}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {(() => {
+                    const totalCellsSoFar = getFirstDayOfWeek(formTargetMonth, formTargetYear) + getDaysInMonth(formTargetMonth, formTargetYear);
+                    const remainder = totalCellsSoFar % 7;
+                    const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
+
+                    return [...Array(extraSlotsNeeded)].map((_, i) => (
+                      <View key={`target-next-${i}`} style={styles.calendarDayCell}>
+                        <Text style={styles.calendarDayCellTextDimmed}>{i + 1}</Text>
+                      </View>
+                    ));
+                  })()}
+                </View>
 
                 <View style={styles.formDivider} />
 
@@ -1616,7 +1775,7 @@ export default function HomeScreen(): React.JSX.Element {
 
                 <View style={styles.formDivider} />
 
-                <View style={styles.durationRow}>
+                <div style={styles.durationRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
                     <View style={styles.counterControl}>
@@ -1678,7 +1837,7 @@ export default function HomeScreen(): React.JSX.Element {
                       })()}
                     </View>
                   </View>
-                </View>
+                </div>
               </View>
 
               <Text style={styles.formSectionHeader}>ADDITIONAL DETAILS</Text>
@@ -1838,7 +1997,6 @@ const styles = StyleSheet.create({
   
   calendarWidget: {
     backgroundColor: "#161c2e",
-    borderColor: "#232a3f",
     borderWidth: 1,
     borderRadius: 18,
     padding: 14,
