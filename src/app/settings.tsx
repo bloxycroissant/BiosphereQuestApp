@@ -1,4 +1,5 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
+import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -31,6 +32,7 @@ const gradeLevels = [
 ];
 
 export default function SettingsScreen(): React.JSX.Element {
+  const progress = useProgress() as any;
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [parentGateVisible, setParentGateVisible] = useState(false);
   const [gradeModalVisible, setGradeModalVisible] = useState(false);
@@ -100,7 +102,7 @@ export default function SettingsScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    syncAuth();
+    void syncAuth();
 
     const {
       data: { subscription },
@@ -124,7 +126,7 @@ export default function SettingsScreen(): React.JSX.Element {
 
   useFocusEffect(
     useCallback(() => {
-      syncAuth();
+      void syncAuth();
     }, []),
   );
 
@@ -145,6 +147,13 @@ export default function SettingsScreen(): React.JSX.Element {
         await supabase.auth.updateUser({
           data: { grade_level: newGrade.toString() },
         });
+        await supabase
+          .from("profiles")
+          .update({
+            grade_year: `Grade ${newGrade}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id);
       }
 
       setGradeModalVisible(false);
@@ -260,15 +269,25 @@ export default function SettingsScreen(): React.JSX.Element {
         }
       }
 
-      const { error: rpcError } = await supabase.rpc("delete_user");
+      const { error: rpcError } = await supabase.rpc("delete_user", {
+        p_email: userEmail,
+      });
+
       if (rpcError) {
         setIsDeleting(false);
         Alert.alert("Error Deleting Account", rpcError.message);
         return;
       }
 
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (_signOutErr) {}
+
       await AsyncStorage.clear();
+
+      if (typeof progress?.resetProgress === "function") {
+        await progress.resetProgress();
+      }
 
       setIsDeleting(false);
       setDeleteModalVisible(false);
@@ -288,6 +307,34 @@ export default function SettingsScreen(): React.JSX.Element {
     try {
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       const parsed = savedData ? JSON.parse(savedData) : {};
+      const guestUsername = await AsyncStorage.getItem("explorerUsername");
+      const guestName = await AsyncStorage.getItem("explorerName");
+
+      const targetName =
+        parsed.username || parsed.name || guestUsername || guestName || "";
+
+      try {
+        await supabase.rpc("reset_user_progress", {
+          p_name: targetName,
+        });
+      } catch (cloudErr) {
+        console.error("Cloud reset error:", cloudErr);
+      }
+
+      const allKeys = await AsyncStorage.getAllKeys();
+      const keysToRemove = allKeys.filter(
+        (key) =>
+          key !== STORAGE_KEY &&
+          key !== PARENT_CONTROLS_KEY &&
+          key !== "explorerName" &&
+          key !== "explorerUsername" &&
+          key !== "explorerGrade" &&
+          key !== "explorerSubjects" &&
+          !key.startsWith("sb-"),
+      );
+      if (keysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
 
       const resetData = {
         ...parsed,
@@ -297,26 +344,30 @@ export default function SettingsScreen(): React.JSX.Element {
         level: 0,
         nextLevelXp: 100,
         studyMinutes: 0,
+        badgeUnlockDates: {},
         lastResetDate: Date.now(),
       };
-
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(resetData));
-      await AsyncStorage.removeItem("@biosphere_completed_lessons_v1");
-      await AsyncStorage.removeItem("@biosphere_recent_lessons");
-      await AsyncStorage.removeItem("@biosphere_last_lesson_v1");
 
-      // Also wipe cloud progress in Supabase if logged in
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.rpc("reset_user_progress");
+      if (typeof progress?.resetProgress === "function") {
+        await progress.resetProgress();
+      } else if (
+        typeof progress?.leaderboardXp === "number" &&
+        progress.leaderboardXp > 0 &&
+        typeof progress?.addXp === "function"
+      ) {
+        progress.addXp(-progress.leaderboardXp);
       }
 
       setResetModalVisible(false);
-      handleBack();
+      Alert.alert(
+        "Progress Reset",
+        "Your XP, levels, badges, and completed lessons have been reset to 0.",
+      );
+      router.replace("/home" as any);
     } catch (e) {
       console.error("Failed to reset progress", e);
+      Alert.alert("Error", "Could not reset progress. Please try again.");
     }
   };
 
@@ -395,8 +446,8 @@ export default function SettingsScreen(): React.JSX.Element {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reset Progress </Text>
             <Text style={styles.modalMessage}>
-              Are you sure you want to reset your stats, study time, and streak?
-              Progress also automatically resets every 30 days.
+              Are you sure you want to reset your XP, levels, badges, completed
+              lessons, study time, and streak back to 0?
             </Text>
             <View style={styles.modalButtonRow}>
               <Pressable
@@ -529,6 +580,7 @@ export default function SettingsScreen(): React.JSX.Element {
           </View>
         </View>
       </Modal>
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

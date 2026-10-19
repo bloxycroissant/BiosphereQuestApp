@@ -118,7 +118,7 @@ export const NumberNinjaGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`challenge-${questionNumber}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
           <Text style={styles.progress}>Grade {grade} • #{questionNumber} [{currentDifficulty.toUpperCase()}]</Text>
           <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
         </View>

@@ -121,7 +121,7 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`question-${currentIndex}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
           <Text style={styles.progressText}>Question {currentIndex + 1} of {questions.length}</Text>
           <Text style={[styles.timer, timeLeft <= 5 && styles.timerWarning]}>
             00:{String(timeLeft).padStart(2, '0')}

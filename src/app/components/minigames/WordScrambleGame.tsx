@@ -252,7 +252,7 @@ export const WordScrambleGame: React.FC<Props> = ({ grade, onSuccess, onClose })
         ) : (
           <>
             <View style={styles.topBar}>
-              <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+              <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
               <Text style={styles.grade}>Grade {grade} • {currentDifficulty.toUpperCase()} • Solved: {solvedCount}</Text>
               <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
             </View>

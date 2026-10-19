@@ -121,7 +121,7 @@ export const FlashcardGame: React.FC<Props> = ({ grade, onSuccess, onClose }) =>
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`${card.front}-${index}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
           <Text style={styles.progress}>Card {index + 1} • {masteredCards.length}/{CARDS_PER_CYCLE} mastered</Text>
         </View>
         <View style={styles.content}>

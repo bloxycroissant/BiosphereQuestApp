@@ -154,7 +154,7 @@ export const MemoryMatchGame: React.FC<Props> = ({ grade, subject, onSuccess, on
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`${boardKey(cards)}-${completedBoards}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
           <Text style={styles.grade}>Grade {grade} • {subject} • Boards: {completedBoards}</Text>
           <Text style={[styles.timer, timeLeft <= 15 && styles.warning]}>⏱ {timeLeft}s</Text>
         </View>

@@ -95,7 +95,7 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
     return (
       <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
         <MinigameMotion key={`${subject}-${questionNumber}`} style={styles.container}>
-          <View style={styles.topBar}><TouchableOpacity onPress={onClose}><Text style={styles.backText}>‹ Games</Text></TouchableOpacity></View>
+          <View style={styles.topBar}><TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity></View>
           <View style={styles.content}>
             <Text style={styles.eyebrow}>GRADE {grade} • DYNAMIC PROGRESSION</Text>
             <Text style={styles.title}>🔐 Codebreaker</Text>
