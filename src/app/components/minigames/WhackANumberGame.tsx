@@ -184,7 +184,7 @@ export const WhackANumberGame: React.FC<Props> = ({ grade, onSuccess, onClose })
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`${challengeKey(challenge)}-${completedQuotas}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Return to Games</Text></TouchableOpacity>
           <Text style={styles.grade}>Grade {grade} • {currentDifficulty.toUpperCase()}</Text>
           <Text style={styles.lives}>{renderLives()}</Text>
         </View>

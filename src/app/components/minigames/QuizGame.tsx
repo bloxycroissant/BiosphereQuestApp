@@ -105,7 +105,7 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
               <Text style={styles.buttonText}>Play Again ↻</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.primaryButton, { marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 0.15)' }]} onPress={onClose}>
-              <Text style={styles.buttonText}>Back to Games</Text>
+              <Text style={styles.buttonText}>Return to Games</Text>
             </TouchableOpacity>
           </View>
         </MinigameMotion>
@@ -121,7 +121,7 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
     <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
       <MinigameMotion key={`question-${currentIndex}`} style={styles.container}>
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={styles.backText}>Return to Games</Text></TouchableOpacity>
           <Text style={styles.progressText}>Question {currentIndex + 1} of {questions.length}</Text>
           <Text style={[styles.timer, timeLeft <= 5 && styles.timerWarning]}>
             00:{String(timeLeft).padStart(2, '0')}

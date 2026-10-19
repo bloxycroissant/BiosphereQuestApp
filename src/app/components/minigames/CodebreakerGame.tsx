@@ -1,10 +1,22 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState } from 'react';
-import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { CodebreakerChallenge, generateCodebreaker, GradeLevel, Subject } from '../../data/questionGenerators';
-import { MinigameMotion } from './MinigameMotion';
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useRef, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from "react-native";
+import {
+  CodebreakerChallenge,
+  generateCodebreaker,
+  GradeLevel,
+  Subject,
+} from "../../data/questionGenerators";
+import { MinigameMotion } from "./MinigameMotion";
 
-type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Impossible';
+type Difficulty = "Easy" | "Medium" | "Hard" | "Expert" | "Impossible";
 
 interface Props {
   grade: GradeLevel;
@@ -13,26 +25,35 @@ interface Props {
 }
 
 const getDifficulty = (questionNumber: number): Difficulty => {
-  if (questionNumber <= 2) return 'Easy';
-  if (questionNumber <= 5) return 'Medium';
-  if (questionNumber <= 8) return 'Hard';
-  if (questionNumber <= 11) return 'Expert';
-  return 'Impossible';
+  if (questionNumber <= 2) return "Easy";
+  if (questionNumber <= 5) return "Medium";
+  if (questionNumber <= 8) return "Hard";
+  if (questionNumber <= 11) return "Expert";
+  return "Impossible";
 };
 
 const getXPForDifficulty = (diff: Difficulty): number => {
   switch (diff) {
-    case 'Easy': return 30;
-    case 'Medium': return 50;
-    case 'Hard': return 75;
-    case 'Expert': return 100;
-    case 'Impossible': return 150;
+    case "Easy":
+      return 30;
+    case "Medium":
+      return 50;
+    case "Hard":
+      return 75;
+    case "Expert":
+      return 100;
+    case "Impossible":
+      return 150;
   }
 };
 
-export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
+export const CodebreakerGame: React.FC<Props> = ({
+  grade,
+  onSuccess,
+  onClose,
+}) => {
   const seenChallenges = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now()); 
+  const antiCheatTimestamp = useRef<number>(Date.now());
 
   const [subject, setSubject] = useState<Subject | null>(null);
   const [challenge, setChallenge] = useState<CodebreakerChallenge | null>(null);
@@ -46,7 +67,11 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   const startRound = (selectedSubject: Subject) => {
     antiCheatTimestamp.current = Date.now();
     seenChallenges.current.clear();
-    const nextChallenge = generateCodebreaker(grade, selectedSubject, seenChallenges.current);
+    const nextChallenge = generateCodebreaker(
+      grade,
+      selectedSubject,
+      seenChallenges.current,
+    );
     if (nextChallenge) {
       seenChallenges.current.add(challengeKey(nextChallenge));
     }
@@ -73,13 +98,21 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   const next = () => {
     antiCheatTimestamp.current = Date.now();
     const nextQuestionNum = questionNumber + 1;
-    let nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
-    let key = nextChallenge ? challengeKey(nextChallenge) : '';
-    
+    let nextChallenge = generateCodebreaker(
+      grade,
+      subject ?? "Math",
+      seenChallenges.current,
+    );
+    let key = nextChallenge ? challengeKey(nextChallenge) : "";
+
     if (!nextChallenge || seenChallenges.current.has(key)) {
       seenChallenges.current.clear();
-      nextChallenge = generateCodebreaker(grade, subject ?? 'Math', seenChallenges.current);
-      key = nextChallenge ? challengeKey(nextChallenge) : '';
+      nextChallenge = generateCodebreaker(
+        grade,
+        subject ?? "Math",
+        seenChallenges.current,
+      );
+      key = nextChallenge ? challengeKey(nextChallenge) : "";
     }
 
     if (key) {
@@ -93,24 +126,50 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
 
   if (!subject || !challenge) {
     return (
-      <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
-        <MinigameMotion key={`${subject}-${questionNumber}`} style={styles.container}>
-          <View style={styles.topBar}><TouchableOpacity onPress={onClose}><Text style={styles.backText}>Games</Text></TouchableOpacity></View>
+      <LinearGradient colors={["#0a0b18", "#2b2b5c"]} style={styles.background}>
+        <MinigameMotion
+          key={`${subject}-${questionNumber}`}
+          style={styles.container}
+        >
+          <View style={styles.topBar}>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.backText}>Return to Games</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.content}>
-            <Text style={styles.eyebrow}>GRADE {grade} • DYNAMIC PROGRESSION</Text>
+            <Text style={styles.eyebrow}>
+              GRADE {grade} • DYNAMIC PROGRESSION
+            </Text>
             <Text style={styles.title}>🔐 Codebreaker</Text>
-            <Text style={styles.subtitle}>Solve puzzles that scale from Easy all the way to Impossible!</Text>
-            <TouchableOpacity style={[styles.subjectButton, styles.math]} onPress={() => startRound('Math')}>
+            <Text style={styles.subtitle}>
+              Solve puzzles that scale from Easy all the way to Impossible!
+            </Text>
+            <TouchableOpacity
+              style={[styles.subjectButton, styles.math]}
+              onPress={() => startRound("Math")}
+            >
               <Text style={styles.subjectTitle}>🔢 Math Track</Text>
-              <Text style={styles.subjectCopy}>Skip counting, addition, and complex multiplication patterns</Text>
+              <Text style={styles.subjectCopy}>
+                Skip counting, addition, and complex multiplication patterns
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.subjectButton, styles.science]} onPress={() => startRound('Science')}>
+            <TouchableOpacity
+              style={[styles.subjectButton, styles.science]}
+              onPress={() => startRound("Science")}
+            >
               <Text style={styles.subjectTitle}>🌿 Science Track</Text>
-              <Text style={styles.subjectCopy}>Life cycles and advanced environmental sequences</Text>
+              <Text style={styles.subjectCopy}>
+                Life cycles and advanced environmental sequences
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.subjectButton, styles.mixed]} onPress={() => startRound('Both')}>
+            <TouchableOpacity
+              style={[styles.subjectButton, styles.mixed]}
+              onPress={() => startRound("Both")}
+            >
               <Text style={styles.subjectTitle}>✨ Mixed Track</Text>
-              <Text style={styles.subjectCopy}>A balance of Math and Science challenges</Text>
+              <Text style={styles.subjectCopy}>
+                A balance of Math and Science challenges
+              </Text>
             </TouchableOpacity>
           </View>
         </MinigameMotion>
@@ -119,16 +178,29 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
   }
 
   return (
-    <LinearGradient colors={['#0a0b18', '#2b2b5c']} style={styles.background}>
-      <MinigameMotion key={`${subject}-${questionNumber}`} style={styles.container}>
+    <LinearGradient colors={["#0a0b18", "#2b2b5c"]} style={styles.background}>
+      <MinigameMotion
+        key={`${subject}-${questionNumber}`}
+        style={styles.container}
+      >
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => { setSubject(null); setChallenge(null); }}><Text style={styles.backText}>‹ Tracks</Text></TouchableOpacity>
-          <Text style={styles.progress}>Puzzle {questionNumber} • {subject} • ✓ {correctCount}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setSubject(null);
+              setChallenge(null);
+            }}
+          >
+            <Text style={styles.backText}> Back toTracks</Text>
+          </TouchableOpacity>
+          <Text style={styles.progress}>
+            Puzzle {questionNumber} • {subject} • ✓ {correctCount}
+          </Text>
           <Text style={styles.xp}>+{currentXP} XP / correct</Text>
         </View>
         <View style={styles.content}>
           <Text style={styles.eyebrow}>
-            GRADE {grade} • LEVEL {questionNumber} [{currentDifficulty.toUpperCase()}]
+            GRADE {grade} • LEVEL {questionNumber} [
+            {currentDifficulty.toUpperCase()}]
           </Text>
           <Text style={styles.title}>Complete the sequence</Text>
           <Text style={styles.rule}>{challenge.ruleDescription}</Text>
@@ -136,20 +208,40 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
             {challenge.sequence.map((item, index) => (
               <React.Fragment key={`${item}-${index}`}>
                 {index > 0 && <Text style={styles.arrow}>→</Text>}
-                <View style={[styles.sequenceItem, item === '?' && styles.missingItem]}>
-                  <Text style={[styles.sequenceText, item === '?' && styles.missingText]}>{item === '?' ? '🔒' : item}</Text>
+                <View
+                  style={[
+                    styles.sequenceItem,
+                    item === "?" && styles.missingItem,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sequenceText,
+                      item === "?" && styles.missingText,
+                    ]}
+                  >
+                    {item === "?" ? "🔒" : item}
+                  </Text>
                 </View>
               </React.Fragment>
             ))}
           </View>
           <View style={styles.options}>
             {challenge.options.map((option, index) => {
-              const correct = selected !== null && option === challenge.missingAnswer;
-              const incorrect = selected === index && selected !== null && challenge.options[index] !== challenge.missingAnswer;
+              const correct =
+                selected !== null && option === challenge.missingAnswer;
+              const incorrect =
+                selected === index &&
+                selected !== null &&
+                challenge.options[index] !== challenge.missingAnswer;
               return (
                 <TouchableOpacity
                   key={`${option}-${index}`}
-                  style={[styles.option, correct && styles.correctOption, incorrect && styles.incorrectOption]}
+                  style={[
+                    styles.option,
+                    correct && styles.correctOption,
+                    incorrect && styles.incorrectOption,
+                  ]}
                   onPress={() => choose(index)}
                   disabled={selected !== null}
                 >
@@ -161,7 +253,9 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
           {selected !== null && (
             <View style={styles.feedback}>
               <Text style={styles.feedbackText}>
-                {challenge.options[selected] === challenge.missingAnswer ? 'Correct pattern!' : `The missing item was ${challenge.missingAnswer}.`}
+                {challenge.options[selected] === challenge.missingAnswer
+                  ? "Correct pattern!"
+                  : `The missing item was ${challenge.missingAnswer}.`}
               </Text>
               <TouchableOpacity style={styles.primaryButton} onPress={next}>
                 <Text style={styles.buttonText}>Next Puzzle →</Text>
@@ -176,39 +270,146 @@ export const CodebreakerGame: React.FC<Props> = ({ grade, onSuccess, onClose }) 
 
 const styles = StyleSheet.create({
   background: { flex: 1 } as ViewStyle,
-  container: { flex: 1, backgroundColor: 'transparent' } as ViewStyle,
-  topBar: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' } as ViewStyle,
-  backText: { color: '#38bdf8', fontSize: 14, fontWeight: '800' } as TextStyle,
-  progress: { color: '#e2e8f0', fontSize: 12, fontWeight: '800' } as TextStyle,
-  xp: { color: '#facc15', fontSize: 10, fontWeight: '900' } as TextStyle,
-  content: { flex: 1, justifyContent: 'center', padding: 20 } as ViewStyle,
-  eyebrow: { color: '#4ade80', fontSize: 11, textAlign: 'center', fontWeight: '900', letterSpacing: 1, marginBottom: 8 } as TextStyle,
-  title: { color: '#fff', fontSize: 23, textAlign: 'center', fontWeight: '900', marginBottom: 16 } as TextStyle,
-  subtitle: { color: '#cbd5e1', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 18 } as TextStyle,
-  rule: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 20 } as TextStyle,
-  sequence: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 22, paddingHorizontal: 12, backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 18, marginBottom: 22 } as ViewStyle,
-  sequenceItem: { minWidth: 58, minHeight: 58, paddingHorizontal: 8, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 14, borderWidth: 1, borderColor: '#38bdf8', alignItems: 'center', justifyContent: 'center' } as ViewStyle,
-  missingItem: { backgroundColor: 'rgba(250, 204, 21, 0.2)', borderColor: '#facc15', borderStyle: 'dashed' } as ViewStyle,
-  sequenceText: { color: '#e0f2fe', fontSize: 13, fontWeight: '900', textAlign: 'center' } as TextStyle,
+  container: { flex: 1, backgroundColor: "transparent" } as ViewStyle,
+  topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  } as ViewStyle,
+  backText: { color: "#38bdf8", fontSize: 14, fontWeight: "800" } as TextStyle,
+  progress: { color: "#e2e8f0", fontSize: 12, fontWeight: "800" } as TextStyle,
+  xp: { color: "#facc15", fontSize: 10, fontWeight: "900" } as TextStyle,
+  content: { flex: 1, justifyContent: "center", padding: 20 } as ViewStyle,
+  eyebrow: {
+    color: "#4ade80",
+    fontSize: 11,
+    textAlign: "center",
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 8,
+  } as TextStyle,
+  title: {
+    color: "#fff",
+    fontSize: 23,
+    textAlign: "center",
+    fontWeight: "900",
+    marginBottom: 16,
+  } as TextStyle,
+  subtitle: {
+    color: "#cbd5e1",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 18,
+  } as TextStyle,
+  rule: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 20,
+  } as TextStyle,
+  sequence: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 22,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 18,
+    marginBottom: 22,
+  } as ViewStyle,
+  sequenceItem: {
+    minWidth: 58,
+    minHeight: 58,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#38bdf8",
+    alignItems: "center",
+    justifyContent: "center",
+  } as ViewStyle,
+  missingItem: {
+    backgroundColor: "rgba(250, 204, 21, 0.2)",
+    borderColor: "#facc15",
+    borderStyle: "dashed",
+  } as ViewStyle,
+  sequenceText: {
+    color: "#e0f2fe",
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "center",
+  } as TextStyle,
   missingText: { fontSize: 21 } as TextStyle,
-  arrow: { color: '#4ade80', fontSize: 18, fontWeight: '900' } as TextStyle,
+  arrow: { color: "#4ade80", fontSize: 18, fontWeight: "900" } as TextStyle,
   options: { gap: 10 } as ViewStyle,
-  option: { backgroundColor: 'rgba(255, 255, 255, 0.06)', padding: 15, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.15)', alignItems: 'center' } as ViewStyle,
-  optionText: { color: '#fff', fontSize: 15, fontWeight: '900' } as TextStyle,
-  correctOption: { backgroundColor: 'rgba(34, 197, 94, 0.25)', borderColor: '#22c55e' } as ViewStyle,
-  incorrectOption: { backgroundColor: 'rgba(251, 113, 133, 0.25)', borderColor: '#fb7185' } as ViewStyle,
-  feedback: { backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: 14, borderRadius: 14, marginTop: 14 } as ViewStyle,
-  feedbackText: { color: '#e2e8f0', textAlign: 'center', fontWeight: '800', marginBottom: 12 } as TextStyle,
-  primaryButton: { backgroundColor: '#16a34a', padding: 14, borderRadius: 12, alignItems: 'center' } as ViewStyle,
-  buttonText: { color: '#fff', fontSize: 14, fontWeight: '900' } as TextStyle,
-  subjectButton: { padding: 18, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.06)', borderWidth: 1.5, marginBottom: 12 } as ViewStyle,
-  math: { borderColor: '#38bdf8' } as ViewStyle,
-  science: { borderColor: '#4ade80' } as ViewStyle,
-  mixed: { borderColor: '#c084fc' } as ViewStyle,
-  subjectTitle: { color: '#fff', fontSize: 16, textAlign: 'center', fontWeight: '900', marginBottom: 5 } as TextStyle,
-  subjectCopy: { color: '#94a3b8', fontSize: 12, textAlign: 'center', lineHeight: 17 } as TextStyle,
+  option: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    padding: 15,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+  } as ViewStyle,
+  optionText: { color: "#fff", fontSize: 15, fontWeight: "900" } as TextStyle,
+  correctOption: {
+    backgroundColor: "rgba(34, 197, 94, 0.25)",
+    borderColor: "#22c55e",
+  } as ViewStyle,
+  incorrectOption: {
+    backgroundColor: "rgba(251, 113, 133, 0.25)",
+    borderColor: "#fb7185",
+  } as ViewStyle,
+  feedback: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 14,
+  } as ViewStyle,
+  feedbackText: {
+    color: "#e2e8f0",
+    textAlign: "center",
+    fontWeight: "800",
+    marginBottom: 12,
+  } as TextStyle,
+  primaryButton: {
+    backgroundColor: "#16a34a",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  } as ViewStyle,
+  buttonText: { color: "#fff", fontSize: 14, fontWeight: "900" } as TextStyle,
+  subjectButton: {
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1.5,
+    marginBottom: 12,
+  } as ViewStyle,
+  math: { borderColor: "#38bdf8" } as ViewStyle,
+  science: { borderColor: "#4ade80" } as ViewStyle,
+  mixed: { borderColor: "#c084fc" } as ViewStyle,
+  subjectTitle: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+    fontWeight: "900",
+    marginBottom: 5,
+  } as TextStyle,
+  subjectCopy: {
+    color: "#94a3b8",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  } as TextStyle,
   backButton: { padding: 14, marginTop: 4 } as ViewStyle,
 });
 
 const challengeKey = (challenge: CodebreakerChallenge): string =>
-  `${challenge.ruleDescription}|${challenge.sequence.join(',')}|${challenge.missingAnswer}`;
+  `${challenge.ruleDescription}|${challenge.sequence.join(",")}|${challenge.missingAnswer}`;
