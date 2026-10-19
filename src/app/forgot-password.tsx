@@ -124,11 +124,6 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={handleBack} style={styles.cancelButton}>
-            <MaterialCommunityIcons
-              name="arrow-left"
-              size={20}
-              color="#f091f8"
-            />
             <Text style={styles.cancelText}>Back</Text>
           </Pressable>
         </View>

@@ -39,12 +39,32 @@ interface LocalSession {
 }
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 const MONTH_SHORT = [
-  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
 ];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -151,7 +171,7 @@ export default function ProfileScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -168,7 +188,7 @@ export default function ProfileScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -185,7 +205,7 @@ export default function ProfileScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   }, []);
 
@@ -197,7 +217,10 @@ export default function ProfileScreen(): React.JSX.Element {
     return new Date(year, month, 1).getDay();
   };
 
-  const triggerTargetSlideAnimation = (direction: "up" | "down", callback: () => void) => {
+  const triggerTargetSlideAnimation = (
+    direction: "up" | "down",
+    callback: () => void,
+  ) => {
     const startVal = direction === "up" ? 20 : -20;
     targetSlideAnim.setValue(startVal);
     callback();
@@ -217,15 +240,16 @@ export default function ProfileScreen(): React.JSX.Element {
       if (!user) return;
 
       const savedProfileRaw = await AsyncStorage.getItem(STORAGE_KEY);
-      const completedLessonsRaw = await AsyncStorage.getItem(
-        COMPLETED_LESSONS_KEY,
-      );
-
       const localProfile = savedProfileRaw ? JSON.parse(savedProfileRaw) : {};
-      const localCompleted: string[] = completedLessonsRaw
-        ? JSON.parse(completedLessonsRaw)
-        : [];
-      const localBadges = progress.badgeUnlockDates || {};
+
+      const isSwitchingAccount =
+        localProfile.userId && localProfile.userId !== user.id;
+
+      if (isSwitchingAccount) {
+        await AsyncStorage.removeItem(COMPLETED_LESSONS_KEY);
+        await AsyncStorage.removeItem(STUDY_SESSIONS_KEY);
+        await AsyncStorage.removeItem("@biosphere_recent_lessons");
+      }
 
       const { data: cloudRow } = await supabase
         .from("profiles")
@@ -233,66 +257,104 @@ export default function ProfileScreen(): React.JSX.Element {
         .eq("id", user.id)
         .maybeSingle();
 
-      const localXpVal = normalizeXpValue(localProfile.xp ?? xp);
-      const mergedXp = Math.max(localXpVal, cloudRow?.total_xp || 0);
+      const completedLessonsRaw = await AsyncStorage.getItem(
+        COMPLETED_LESSONS_KEY,
+      );
+      const localCompleted: string[] = completedLessonsRaw
+        ? JSON.parse(completedLessonsRaw)
+        : [];
+      const localBadges = progress.badgeUnlockDates || {};
+
+      const mergedXp = isSwitchingAccount
+        ? cloudRow?.total_xp || 0
+        : Math.max(
+            normalizeXpValue(localProfile.xp ?? xp),
+            cloudRow?.total_xp || 0,
+          );
+
       const mergedLevel = Math.floor(mergedXp / 100) + 1;
       const mergedNextLevelXp = mergedLevel * 100;
 
-      const mergedStudyMinutes = Math.max(
-        localProfile.studyMinutes || 0,
-        cloudRow?.study_minutes || 0,
-      );
-      const mergedStreak = Math.max(
-        localProfile.streak ?? streak,
-        cloudRow?.streak || 0,
-      );
+      const mergedStudyMinutes = isSwitchingAccount
+        ? cloudRow?.study_minutes || 0
+        : Math.max(
+            localProfile.studyMinutes || 0,
+            cloudRow?.study_minutes || 0,
+          );
+
+      const mergedStreak = isSwitchingAccount
+        ? cloudRow?.streak || 0
+        : Math.max(localProfile.streak ?? streak, cloudRow?.streak || 0);
 
       const cloudLessons: string[] = Array.isArray(cloudRow?.completed_lessons)
         ? cloudRow.completed_lessons
         : [];
-      const mergedCompletedLessons = Array.from(
-        new Set([...cloudLessons, ...localCompleted]),
-      );
 
-      const mergedLessonsCount = Math.max(
-        localProfile.lessons ?? lessons,
-        cloudRow?.lessons_count || 0,
-        mergedCompletedLessons.length,
-      );
+      const mergedCompletedLessons = isSwitchingAccount
+        ? cloudLessons
+        : Array.from(new Set([...cloudLessons, ...localCompleted]));
 
-      const mergedBadges: Record<string, string> = {
-        ...(cloudRow?.badges || {}),
-        ...localBadges,
-      };
+      const mergedLessonsCount = isSwitchingAccount
+        ? cloudLessons.length
+        : Math.max(
+            localProfile.lessons ?? lessons,
+            cloudRow?.lessons_count || 0,
+            mergedCompletedLessons.length,
+          );
+
+      const mergedBadges: Record<string, string> = isSwitchingAccount
+        ? cloudRow?.badges || {}
+        : { ...(cloudRow?.badges || {}), ...localBadges };
+
       setCloudBadges(mergedBadges);
 
       const cloudDetails = cloudRow?.profile_data || {};
-      const mergedBio =
-        localProfile.bio ||
-        cloudDetails.bio ||
-        "Ready to learn Science and Math!";
-      const mergedSchool = localProfile.school || cloudDetails.school || "";
-      const mergedPhone = localProfile.phone || cloudDetails.phone || "";
-      const mergedWebsite = localProfile.website || cloudDetails.website || "";
+      const mergedBio = isSwitchingAccount
+        ? cloudDetails.bio || "Ready to learn Science and Math!"
+        : localProfile.bio ||
+          cloudDetails.bio ||
+          "Ready to learn Science and Math!";
 
-      const mergedSessions = Array.isArray(localProfile.sessions)
-        ? localProfile.sessions
-        : Array.isArray(cloudDetails.sessions)
-        ? cloudDetails.sessions
-        : [];
+      const mergedSchool = isSwitchingAccount
+        ? cloudDetails.school || ""
+        : localProfile.school || cloudDetails.school || "";
+
+      const mergedPhone = isSwitchingAccount
+        ? cloudDetails.phone || ""
+        : localProfile.phone || cloudDetails.phone || "";
+
+      const mergedWebsite = isSwitchingAccount
+        ? cloudDetails.website || ""
+        : localProfile.website || cloudDetails.website || "";
+
+      const mergedSessions = isSwitchingAccount
+        ? cloudDetails.sessions || []
+        : Array.isArray(localProfile.sessions) &&
+            localProfile.sessions.length > 0
+          ? localProfile.sessions
+          : cloudDetails.sessions || [];
+
+      const cloudProfileImage = cloudDetails.profileImage || null;
+      const mergedProfileImage = isSwitchingAccount
+        ? cloudProfileImage
+        : (localProfile.profileImage ?? profileImage ?? cloudProfileImage);
 
       const resolvedName =
-        localProfile.name ||
         user.user_metadata?.full_name ||
         cloudRow?.full_name ||
+        (!isSwitchingAccount ? localProfile.name : "Explorer") ||
         "Explorer";
+
       const resolvedUsername =
-        localProfile.username ||
         user.user_metadata?.username ||
         cloudRow?.username ||
+        (!isSwitchingAccount ? localProfile.username : resolvedName) ||
         resolvedName;
+
       const resolvedGradeYear =
-        localProfile.gradeYear || cloudRow?.grade_year || "Grade 1";
+        cloudRow?.grade_year ||
+        (!isSwitchingAccount ? localProfile.gradeYear : "Grade 1") ||
+        "Grade 1";
 
       setName(resolvedName);
       setUsername(resolvedUsername);
@@ -307,12 +369,17 @@ export default function ProfileScreen(): React.JSX.Element {
       setPhone(mergedPhone);
       setWebsite(mergedWebsite);
       setSessions(mergedSessions);
+      setProfileImage(mergedProfileImage);
+
+      if (progress?.refreshProgress) {
+        setTimeout(() => progress.refreshProgress(), 100);
+      }
 
       const updatedLocalProfile = {
-        ...localProfile,
+        userId: user.id,
         name: resolvedName,
         username: resolvedUsername,
-        email: user.email || localProfile.email || "",
+        email: user.email || "",
         gradeYear: resolvedGradeYear,
         xp: mergedXp,
         level: mergedLevel,
@@ -325,18 +392,17 @@ export default function ProfileScreen(): React.JSX.Element {
         phone: mergedPhone,
         website: mergedWebsite,
         sessions: mergedSessions,
+        profileImage: mergedProfileImage,
       };
 
       await AsyncStorage.setItem(
         STORAGE_KEY,
         JSON.stringify(updatedLocalProfile),
       );
-      if (mergedCompletedLessons.length > 0) {
-        await AsyncStorage.setItem(
-          COMPLETED_LESSONS_KEY,
-          JSON.stringify(mergedCompletedLessons),
-        );
-      }
+      await AsyncStorage.setItem(
+        COMPLETED_LESSONS_KEY,
+        JSON.stringify(mergedCompletedLessons),
+      );
 
       await supabase.from("profiles").upsert({
         id: user.id,
@@ -359,7 +425,7 @@ export default function ProfileScreen(): React.JSX.Element {
           phone: mergedPhone,
           website: mergedWebsite,
           sessions: mergedSessions,
-          profileImage: localProfile.profileImage ?? profileImage,
+          profileImage: mergedProfileImage,
         },
         is_bot: false,
         updated_at: new Date().toISOString(),
@@ -407,6 +473,7 @@ export default function ProfileScreen(): React.JSX.Element {
         setIsLoggedIn(false);
         setEmail("");
         setTempEmail("");
+        setProfileImage(null);
       }
     } catch (e) {
       console.error("Auth check error in profile", e);
@@ -430,6 +497,7 @@ export default function ProfileScreen(): React.JSX.Element {
         setIsLoggedIn(false);
         setEmail("");
         setTempEmail("");
+        setProfileImage(null);
       }
     });
 
@@ -779,7 +847,10 @@ export default function ProfileScreen(): React.JSX.Element {
 
         if (uploadError) {
           console.error("Upload Error:", uploadError);
-          Alert.alert("Upload Failed", "Could not save the image to the cloud.");
+          Alert.alert(
+            "Upload Failed",
+            "Could not save the image to the cloud.",
+          );
           return;
         }
         const { data: publicUrlData } = supabase.storage
@@ -788,9 +859,19 @@ export default function ProfileScreen(): React.JSX.Element {
         setTempProfileImage(publicUrlData.publicUrl);
       } catch (err) {
         console.error("Image processing error:", err);
-        Alert.alert("Error", "Something went wrong while processing the image.");
+        Alert.alert(
+          "Error",
+          "Something went wrong while processing the image.",
+        );
       }
     }
+  };
+  const removeImage = (): void => {
+    setTempProfileImage(null);
+    Alert.alert(
+      "Photo Removed",
+      "Your photo has been removed from this screen. Tap 'Save' at the top to finalize and update your profile.",
+    );
   };
 
   const completeAndDeleteSession = async (id: string): Promise<void> => {
@@ -814,11 +895,19 @@ export default function ProfileScreen(): React.JSX.Element {
       const homeSessionsRaw = await AsyncStorage.getItem(STUDY_SESSIONS_KEY);
       if (homeSessionsRaw) {
         const homeSessions = JSON.parse(homeSessionsRaw);
-        const updatedHomeSessions = homeSessions.filter((s: any) => s.id !== id);
-        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updatedHomeSessions));
+        const updatedHomeSessions = homeSessions.filter(
+          (s: any) => s.id !== id,
+        );
+        await AsyncStorage.setItem(
+          STUDY_SESSIONS_KEY,
+          JSON.stringify(updatedHomeSessions),
+        );
       }
     } catch (e) {
-      console.error("Failed to sync study session removal to home calendar:", e);
+      console.error(
+        "Failed to sync study session removal to home calendar:",
+        e,
+      );
     }
 
     try {
@@ -904,7 +993,10 @@ export default function ProfileScreen(): React.JSX.Element {
           reminder: newSessionItem.reminder,
         };
         const updatedHomeSessions = [mappedHomeSession, ...homeSessions];
-        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(updatedHomeSessions));
+        await AsyncStorage.setItem(
+          STUDY_SESSIONS_KEY,
+          JSON.stringify(updatedHomeSessions),
+        );
       } catch (e) {
         console.error("Failed to sync new session to home calendar storage", e);
       }
@@ -967,9 +1059,21 @@ export default function ProfileScreen(): React.JSX.Element {
                   <Text style={{ fontSize: 14 }}>📷</Text>
                 </View>
               </Pressable>
-              <Text style={styles.changePhotoText} onPress={pickImage}>
-                Change photo
-              </Text>
+
+              <View style={{ flexDirection: "row", gap: 20, marginTop: 10 }}>
+                <Pressable onPress={pickImage}>
+                  <Text style={styles.changePhotoText}>Change photo</Text>
+                </Pressable>
+                {tempProfileImage && (
+                  <Pressable onPress={removeImage}>
+                    <Text
+                      style={[styles.changePhotoText, { color: "#ff4d67" }]}
+                    >
+                      Remove photo
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
 
             <Text style={styles.groupLabel}>PERSONAL INFO</Text>
@@ -1056,7 +1160,10 @@ export default function ProfileScreen(): React.JSX.Element {
     const targetFirstDayOffset = getFirstDayOfWeek(targetMonth, targetYear);
     const prevTargetMonthIndex = targetMonth === 0 ? 11 : targetMonth - 1;
     const prevTargetMonthYear = targetMonth === 0 ? targetYear - 1 : targetYear;
-    const daysInPrevTargetMonth = getDaysInMonth(prevTargetMonthIndex, prevTargetMonthYear);
+    const daysInPrevTargetMonth = getDaysInMonth(
+      prevTargetMonthIndex,
+      prevTargetMonthYear,
+    );
 
     return (
       <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -1077,7 +1184,9 @@ export default function ProfileScreen(): React.JSX.Element {
               </Pressable>
               <View style={styles.addHeaderTitleRow}>
                 <View style={styles.miniCalendarBadge}>
-                  <Text style={styles.miniCalendarMonth}>{MONTH_SHORT[targetMonth]}</Text>
+                  <Text style={styles.miniCalendarMonth}>
+                    {MONTH_SHORT[targetMonth]}
+                  </Text>
                   <Text style={styles.miniCalendarDay}>{targetDay}</Text>
                 </View>
                 <Text style={styles.editHeaderTitle}>Add Study Session</Text>
@@ -1121,10 +1230,28 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
 
             <Text style={styles.groupLabel}>TARGET DATE & CALENDAR</Text>
-            <Animated.View style={[styles.formGroupCard, { borderColor: animatedCalendarBorderColor }]}>
+            <Animated.View
+              style={[
+                styles.formGroupCard,
+                { borderColor: animatedCalendarBorderColor },
+              ]}
+            >
               <View style={{ padding: 16 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 14 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#ffffff",
+                      fontWeight: "900",
+                      fontSize: 14,
+                    }}
+                  >
                     {MONTH_NAMES[targetMonth]} {targetDay}, {targetYear}
                   </Text>
                   <View style={{ flexDirection: "row", gap: 6 }}>
@@ -1134,14 +1261,21 @@ export default function ProfileScreen(): React.JSX.Element {
                         triggerTargetSlideAnimation("up", () => {
                           let m = targetMonth - 1;
                           let y = targetYear;
-                          if (m < 0) { m = 11; y -= 1; }
+                          if (m < 0) {
+                            m = 11;
+                            y -= 1;
+                          }
                           setTargetMonth(m);
                           setTargetYear(y);
-                          setTargetDay(Math.min(targetDay, getDaysInMonth(m, y)));
+                          setTargetDay(
+                            Math.min(targetDay, getDaysInMonth(m, y)),
+                          );
                         });
                       }}
                     >
-                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>◀ M</Text>
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>
+                        ◀ M
+                      </Text>
                     </Pressable>
                     <Pressable
                       style={{ padding: 4 }}
@@ -1149,14 +1283,21 @@ export default function ProfileScreen(): React.JSX.Element {
                         triggerTargetSlideAnimation("down", () => {
                           let m = targetMonth + 1;
                           let y = targetYear;
-                          if (m > 11) { m = 0; y += 1; }
+                          if (m > 11) {
+                            m = 0;
+                            y += 1;
+                          }
                           setTargetMonth(m);
                           setTargetYear(y);
-                          setTargetDay(Math.min(targetDay, getDaysInMonth(m, y)));
+                          setTargetDay(
+                            Math.min(targetDay, getDaysInMonth(m, y)),
+                          );
                         });
                       }}
                     >
-                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>M ▶</Text>
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>
+                        M ▶
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
@@ -1170,17 +1311,58 @@ export default function ProfileScreen(): React.JSX.Element {
                     }),
                   }}
                 >
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
                     {WEEKDAYS_SHORT.map((d) => (
-                      <Text key={d} style={{ flex: 1, textAlign: "center", color: "#f8fafc", fontSize: 11, fontWeight: "700" }}>{d}</Text>
+                      <Text
+                        key={d}
+                        style={{
+                          flex: 1,
+                          textAlign: "center",
+                          color: "#f8fafc",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {d}
+                      </Text>
                     ))}
                   </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     {[...Array(targetFirstDayOffset)].map((_, i) => {
-                      const prevDayNum = daysInPrevTargetMonth - targetFirstDayOffset + i + 1;
+                      const prevDayNum =
+                        daysInPrevTargetMonth - targetFirstDayOffset + i + 1;
                       return (
-                        <View key={`prof-prev-${i}`} style={{ width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 }}>
-                          <Text style={{ color: "#475569", fontSize: 12, fontWeight: "400" }}>{prevDayNum}</Text>
+                        <View
+                          key={`prof-prev-${i}`}
+                          style={{
+                            width: "14.28%",
+                            height: 30,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginVertical: 2,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#475569",
+                              fontSize: 12,
+                              fontWeight: "400",
+                            }}
+                          >
+                            {prevDayNum}
+                          </Text>
                         </View>
                       );
                     })}
@@ -1191,25 +1373,65 @@ export default function ProfileScreen(): React.JSX.Element {
                         <Pressable
                           key={`prof-day-${dayNum}`}
                           style={[
-                            { width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 },
-                            isSelected && { backgroundColor: "#38bdf8", borderRadius: 15 },
+                            {
+                              width: "14.28%",
+                              height: 30,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginVertical: 2,
+                            },
+                            isSelected && {
+                              backgroundColor: "#38bdf8",
+                              borderRadius: 15,
+                            },
                           ]}
                           onPress={() => setTargetDay(dayNum)}
                         >
-                          <Text style={[{ color: "#f8fafc", fontSize: 12, fontWeight: "500" }, isSelected && { color: "#0f172a", fontWeight: "900" }]}>
+                          <Text
+                            style={[
+                              {
+                                color: "#f8fafc",
+                                fontSize: 12,
+                                fontWeight: "500",
+                              },
+                              isSelected && {
+                                color: "#0f172a",
+                                fontWeight: "900",
+                              },
+                            ]}
+                          >
                             {dayNum}
                           </Text>
                         </Pressable>
                       );
                     })}
                     {(() => {
-                      const totalCellsSoFar = targetFirstDayOffset + targetDaysInMonth;
+                      const totalCellsSoFar =
+                        targetFirstDayOffset + targetDaysInMonth;
                       const remainder = totalCellsSoFar % 7;
-                      const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
+                      const extraSlotsNeeded =
+                        remainder === 0 ? 0 : 7 - remainder;
 
                       return [...Array(extraSlotsNeeded)].map((_, i) => (
-                        <View key={`prof-next-${i}`} style={{ width: "14.28%", height: 30, alignItems: "center", justifyContent: "center", marginVertical: 2 }}>
-                          <Text style={{ color: "#475569", fontSize: 12, fontWeight: "400" }}>{i + 1}</Text>
+                        <View
+                          key={`prof-next-${i}`}
+                          style={{
+                            width: "14.28%",
+                            height: 30,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginVertical: 2,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#475569",
+                              fontSize: 12,
+                              fontWeight: "400",
+                            }}
+                          >
+                            {i + 1}
+                          </Text>
                         </View>
                       ));
                     })()}
@@ -1492,10 +1714,17 @@ function CategoryChipItem({
   return (
     <AnimatedPressable
       onPressIn={() => {
-        Animated.spring(chipScale, { toValue: 0.92, useNativeDriver: true }).start();
+        Animated.spring(chipScale, {
+          toValue: 0.92,
+          useNativeDriver: true,
+        }).start();
       }}
       onPressOut={() => {
-        Animated.spring(chipScale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+        Animated.spring(chipScale, {
+          toValue: 1,
+          friction: 3,
+          useNativeDriver: true,
+        }).start();
         onSelect(cat);
       }}
       style={[
@@ -1530,10 +1759,17 @@ function ReminderChipItem({
   return (
     <AnimatedPressable
       onPressIn={() => {
-        Animated.spring(remScale, { toValue: 0.92, useNativeDriver: true }).start();
+        Animated.spring(remScale, {
+          toValue: 0.92,
+          useNativeDriver: true,
+        }).start();
       }}
       onPressOut={() => {
-        Animated.spring(remScale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+        Animated.spring(remScale, {
+          toValue: 1,
+          friction: 3,
+          useNativeDriver: true,
+        }).start();
         onSelect(rem);
       }}
       style={[
