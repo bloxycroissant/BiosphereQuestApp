@@ -10,7 +10,6 @@ import {
 import { supabase } from "../lib/supabase";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type StudySession = {
   id: number | string;
@@ -24,17 +23,18 @@ type Progress = {
   xp: number;
   level: number;
   nextLevelXp: number;
-  lessons: number;
-  studyMinutes: number;
-  streak: number;
-  gamesPassed: number;
-  leaderboardXp: number;
-  sessions: StudySession[];
   studyFirstLock: boolean;
   bedtimeLockEnabled: boolean;
   bedtimeHour: number;
   arcadeMinigamesEnabled: boolean;
   flashcardsEnabled: boolean;
+  lessons: number;
+  studyMinutes: number;
+  dailyStudyMinutes: number;
+  streak: number;
+  gamesPassed: number;
+  leaderboardXp: number;
+  sessions: StudySession[];
   lastResetDate: number;
   lastActiveDate: string | null;
   perfectLessons: number;
@@ -84,11 +84,12 @@ type ProgressContextValue = Progress & {
 const ProgressContext = createContext<ProgressContextValue | null>(null);
 
 const initialProgress: Progress = {
-  xp: 50,
+  xp: 0,
   level: 1,
   nextLevelXp: 100,
   lessons: 0,
   studyMinutes: 0,
+  dailyStudyMinutes: 0,
   streak: 0,
   gamesPassed: 0,
   leaderboardXp: 0,
@@ -243,7 +244,7 @@ export function ProgressProvider({ children }: PropsWithChildren) {
 
   const loadProgress = async () => {
     try {
-      const now = Date.now();
+      const todayStr = getLocalDateString();
       const savedLocal = await AsyncStorage.getItem(STORAGE_KEY);
       let localData = savedLocal ? JSON.parse(savedLocal) : null;
 
@@ -265,22 +266,22 @@ export function ProgressProvider({ children }: PropsWithChildren) {
         activeData = localData;
       }
 
-      const storedResetDate = activeData.lastResetDate || now;
-      if (now - storedResetDate >= THIRTY_DAYS_MS) {
-        const resetState = { ...initialProgress, lastResetDate: now };
-        setProgress(resetState);
-        await saveAndSync(resetState);
-        return;
-      }
-
+      let evaluatedDailyMins = activeData.dailyStudyMinutes || 0;
       let evaluatedStreak = activeData.streak || 0;
+
       if (activeData.lastActiveDate) {
+        const lastActive = new Date(activeData.lastActiveDate);
+        const currentDate = new Date(todayStr);
         const diffDays = Math.round(
-          (new Date(getLocalDateString()).getTime() -
-            new Date(activeData.lastActiveDate).getTime()) /
-            (1000 * 3600 * 24),
+          (currentDate.getTime() - lastActive.getTime()) / (1000 * 3600 * 24),
         );
-        if (diffDays > 1) evaluatedStreak = 0;
+        
+        if (diffDays > 0) {
+           evaluatedDailyMins = 0;
+        }
+        if (diffDays > 1) {
+           evaluatedStreak = 0;
+        }
       }
 
       const xp = normalizeXpValue(activeData.xp ?? initialProgress.xp);
@@ -296,7 +297,10 @@ export function ProgressProvider({ children }: PropsWithChildren) {
         xp,
         level,
         nextLevelXp,
+        leaderboardXp: activeData.leaderboardXp || 0,
         streak: evaluatedStreak,
+        studyMinutes: activeData.studyMinutes || 0,
+        dailyStudyMinutes: evaluatedDailyMins,
         perfectLessons: activeData.perfectLessons || 0,
         codebreakerPassed: activeData.codebreakerPassed || 0,
         speedMathPassed: activeData.speedMathPassed || 0,
@@ -320,10 +324,11 @@ export function ProgressProvider({ children }: PropsWithChildren) {
     await new Promise<void>((resolve) => {
       setProgress((current) => {
         const xp = current.xp + amount;
+        const leaderboardXp = (current.leaderboardXp || 0) + amount;
         const level = Math.floor(xp / 100) + 1;
         const nextLevelXp = level * 100;
-        const updated = { ...current, xp, level, nextLevelXp };
-        saveAndSync({ xp, level, nextLevelXp });
+        const updated = { ...current, xp, leaderboardXp, level, nextLevelXp };
+        saveAndSync({ xp, leaderboardXp, level, nextLevelXp });
         resolve();
         return updated;
       });
@@ -352,6 +357,14 @@ export function ProgressProvider({ children }: PropsWithChildren) {
         );
         const lessons = current.lessons + 1;
         const studyMinutes = current.studyMinutes + minutes;
+        
+        const todayStr = getLocalDateString();
+        let newDailyMins = current.dailyStudyMinutes || 0;
+        if (current.lastActiveDate !== todayStr && current.lastActiveDate !== null) {
+           newDailyMins = 0;
+        }
+        const dailyStudyMinutes = newDailyMins + minutes;
+
         const perfectLessons = current.perfectLessons + (perfect ? 1 : 0);
         const speedMathPassed = current.speedMathPassed + (speedMath ? 1 : 0);
         const speedSciencePassed =
@@ -363,6 +376,7 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           lastActiveDate,
           lessons,
           studyMinutes,
+          dailyStudyMinutes,
           perfectLessons,
           speedMathPassed,
           speedSciencePassed,
@@ -372,6 +386,7 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           lastActiveDate,
           lessons,
           studyMinutes,
+          dailyStudyMinutes,
           perfectLessons,
           speedMathPassed,
           speedSciencePassed,
@@ -395,7 +410,6 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           current.lastActiveDate,
         );
         const gamesPassed = current.gamesPassed + 1;
-        const leaderboardXp = current.leaderboardXp + amount;
         const codebreakerPassed =
           current.codebreakerPassed + (isCodebreaker ? 1 : 0);
         const dailyChallengesPassed =
@@ -406,7 +420,6 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           streak,
           lastActiveDate,
           gamesPassed,
-          leaderboardXp,
           codebreakerPassed,
           dailyChallengesPassed,
         };
@@ -414,7 +427,6 @@ export function ProgressProvider({ children }: PropsWithChildren) {
           streak,
           lastActiveDate,
           gamesPassed,
-          leaderboardXp,
           codebreakerPassed,
           dailyChallengesPassed,
         });
@@ -424,6 +436,7 @@ export function ProgressProvider({ children }: PropsWithChildren) {
     });
     await addXp(amount);
   };
+
   const markLessonCompleted = async (lessonKey: string) => {
     await new Promise<void>((resolve) => {
       setProgress((current) => {
@@ -497,7 +510,26 @@ export function ProgressProvider({ children }: PropsWithChildren) {
   };
 
   const resetProgress = async () => {
-    const resetState = { ...initialProgress, lastResetDate: Date.now() };
+    const resetState = {
+      ...initialProgress,
+      xp: 0,
+      leaderboardXp: 0,
+      level: 1,
+      nextLevelXp: 100,
+      streak: 0,
+      lessons: 0,
+      studyMinutes: 0,
+      dailyStudyMinutes: 0,
+      perfectLessons: 0,
+      codebreakerPassed: 0,
+      speedMathPassed: 0,
+      speedSciencePassed: 0,
+      dailyChallengesPassed: 0,
+      badgeUnlockDates: {},
+      completedLessons: [],
+      recentGames: [],
+      lastResetDate: Date.now(),
+    };
     setProgress(resetState);
     await saveAndSync(resetState);
   };

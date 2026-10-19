@@ -148,7 +148,7 @@ export default function SignupScreen(): React.JSX.Element {
                 router.canGoBack() ? router.back() : router.replace("/" as any)
               }
             >
-              <Text style={styles.back}>‹ Back</Text>
+              <Text style={styles.back}>Back</Text>
             </Pressable>
 
             <View style={styles.mascots}>

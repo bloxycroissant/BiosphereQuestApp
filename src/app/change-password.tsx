@@ -119,7 +119,6 @@ export default function ChangePasswordScreen() {
 
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={20} color="#f091f8" />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>

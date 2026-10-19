@@ -170,19 +170,22 @@ export default function SettingsScreen(): React.JSX.Element {
   const handleLogout = async (): Promise<void> => {
     try {
       await supabase.auth.signOut();
-
-      const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        const parsed = JSON.parse(savedData);
-        parsed.email = "";
-        parsed.authProvider = "";
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      }
+      const userKeys = [
+        STORAGE_KEY,
+        "@biosphere_completed_lessons_v1",
+        "@biosphere_study_sessions_v1",
+        "@biosphere_recent_lessons",
+        "@biosphere_recent_games_v1",
+        "explorerName",
+        "explorerUsername",
+      ];
+      await AsyncStorage.multiRemove(userKeys);
 
       setHasAccount(false);
       setUserEmail("");
       setIsGoogleAuth(false);
       Alert.alert("Logged Out", "You have been logged out of your account.");
+      router.replace("/home" as any);
     } catch (error) {
       console.error("Logout error:", error);
     }

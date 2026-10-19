@@ -20,14 +20,36 @@ import {
   ViewStyle,
 } from "react-native";
 
-let Notifications: typeof import("expo-notifications") | null = null;
+type NotificationsModule = {
+  setNotificationHandler?: (handler: {
+    handleNotification: () => Promise<{
+      shouldShowAlert: boolean;
+      shouldPlaySound: boolean;
+      shouldSetBadge: boolean;
+      shouldShowBanner: boolean;
+      shouldShowList: boolean;
+    }>;
+  }) => void;
+  requestPermissionsAsync: () => Promise<{ status: string }>;
+  scheduleNotificationAsync: (request: {
+    content: { title: string; body: string; sound: boolean };
+    trigger: { type: string; date: Date };
+  }) => Promise<unknown>;
+  SchedulableTriggerInputTypes: { DATE: string };
+};
+
+let Notifications: NotificationsModule | null = null;
 try {
-  Notifications = require("expo-notifications");
+  Notifications = require("expo-notifications") as NotificationsModule;
 } catch (e) {
   console.warn("expo-notifications is not supported in this environment", e);
 }
 
-if (Platform.OS !== "web" && Notifications && Notifications.setNotificationHandler) {
+if (
+  Platform.OS !== "web" &&
+  Notifications &&
+  Notifications.setNotificationHandler
+) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -135,15 +157,41 @@ const ALL_ARCADE_GAMES = [
 ];
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 const MONTH_SHORT = [
-  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
 ];
 const WEEKDAY_NAMES_FULL = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
 ];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const CATEGORIES = ["Science", "Math", "Ecology", "Biology", "General"];
@@ -178,6 +226,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [lessons, setLessons] = useState(0);
   const [xp, setXp] = useState(0);
   const [studyMinutes, setStudyMinutes] = useState(0);
+  const [dailyStudyMinutes, setDailyStudyMinutes] = useState(0);
 
   const prevLevelRef = useRef<number | null>(null);
   const [levelUpText, setLevelUpText] = useState("");
@@ -202,9 +251,12 @@ export default function HomeScreen(): React.JSX.Element {
 
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [isAddSessionModalOpen, setIsAddSessionModalOpen] = useState(false);
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] =
+    useState(false);
 
-  const [leaderboardNotifications, setLeaderboardNotifications] = useState<LeaderboardNotification[]>([]);
+  const [leaderboardNotifications, setLeaderboardNotifications] = useState<
+    LeaderboardNotification[]
+  >([]);
 
   const [formTitle, setFormTitle] = useState("");
   const [formCategory, setFormCategory] = useState("Science");
@@ -220,7 +272,8 @@ export default function HomeScreen(): React.JSX.Element {
   const [formReminder, setFormReminder] = useState("10 mins before");
 
   const nextLevelXp = progress.nextLevelXp || 100;
-  const width = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+  const width =
+    `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
 
   const scheduleStudyReminder = async (session: StudySession) => {
     if (Platform.OS === "web" || !Notifications) return;
@@ -240,9 +293,12 @@ export default function HomeScreen(): React.JSX.Element {
 
       const triggerDate = new Date(year, month - 1, day, hours, minutes);
 
-      if (session.reminder === "5 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 5);
-      if (session.reminder === "10 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 10);
-      if (session.reminder === "30 mins before") triggerDate.setMinutes(triggerDate.getMinutes() - 30);
+      if (session.reminder === "5 mins before")
+        triggerDate.setMinutes(triggerDate.getMinutes() - 5);
+      if (session.reminder === "10 mins before")
+        triggerDate.setMinutes(triggerDate.getMinutes() - 10);
+      if (session.reminder === "30 mins before")
+        triggerDate.setMinutes(triggerDate.getMinutes() - 30);
 
       if (triggerDate > new Date()) {
         await Notifications.scheduleNotificationAsync({
@@ -319,7 +375,7 @@ export default function HomeScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -335,13 +391,13 @@ export default function HomeScreen(): React.JSX.Element {
           useNativeDriver: true,
         }),
         Animated.delay(3000),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
       Animated.sequence([
         Animated.timing(xpPulseAnim, {
-          toValue: 0.70,
+          toValue: 0.7,
           duration: 750,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
@@ -352,7 +408,7 @@ export default function HomeScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -369,7 +425,7 @@ export default function HomeScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -386,7 +442,7 @@ export default function HomeScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.loop(
@@ -403,7 +459,7 @@ export default function HomeScreen(): React.JSX.Element {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   }, []);
 
@@ -416,14 +472,18 @@ export default function HomeScreen(): React.JSX.Element {
   useEffect(() => {
     const generateLeaderboardAlerts = () => {
       const mockRank = xp > 5000 ? 1 : xp > 3000 ? 2 : xp > 1500 ? 3 : 4;
-      
+
       const weeklyAlert: LeaderboardNotification = {
         id: "weekly-lb-1",
         type: "weekly",
-        title: mockRank === 1 ? "🏆 Weekly Champion!" : `🥇 Weekly Leaderboard: Rank #${mockRank}`,
-        message: mockRank === 1 
-          ? `Congratulations ${userName}! You finished #1 on the Weekly Champions Leaderboard with ${xp} XP!`
-          : `Great job ${userName}! You completed the week at place #${mockRank} with ${xp} XP. Keep learning to reach #1!`,
+        title:
+          mockRank === 1
+            ? "🏆 Weekly Champion!"
+            : `🥇 Weekly Leaderboard: Rank #${mockRank}`,
+        message:
+          mockRank === 1
+            ? `Congratulations ${userName}! You finished #1 on the Weekly Champions Leaderboard with ${xp} XP!`
+            : `Great job ${userName}! You completed the week at place #${mockRank} with ${xp} XP. Keep learning to reach #1!`,
         timestamp: "Weekly Summary",
         badge: mockRank === 1 ? "WINNER" : "TOP RANK",
       };
@@ -451,13 +511,20 @@ export default function HomeScreen(): React.JSX.Element {
     return new Date(year, month, 1).getDay();
   };
 
-  const formatSelectedDateKey = (dayNum: number, m = currentMonth, y = currentYear) => {
+  const formatSelectedDateKey = (
+    dayNum: number,
+    m = currentMonth,
+    y = currentYear,
+  ) => {
     const formattedMonth = String(m + 1).padStart(2, "0");
     const formattedDay = String(dayNum).padStart(2, "0");
     return `${y}-${formattedMonth}-${formattedDay}`;
   };
 
-  const triggerSlideAnimation = (direction: "up" | "down", callback: () => void) => {
+  const triggerSlideAnimation = (
+    direction: "up" | "down",
+    callback: () => void,
+  ) => {
     const startVal = direction === "up" ? 22 : -22;
     slideAnim.setValue(startVal);
     callback();
@@ -524,7 +591,7 @@ export default function HomeScreen(): React.JSX.Element {
       if (stored) {
         const parsedSessions = JSON.parse(stored);
         setStudySessions(parsedSessions);
-        
+
         const savedData = await AsyncStorage.getItem(STORAGE_KEY);
         if (savedData) {
           const profileParsed = JSON.parse(savedData);
@@ -539,10 +606,17 @@ export default function HomeScreen(): React.JSX.Element {
             reminder: s.reminder,
             done: false,
           }));
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profileParsed));
+          await AsyncStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(profileParsed),
+          );
         }
       } else {
-        const todayStr = formatSelectedDateKey(now.getDate(), now.getMonth(), now.getFullYear());
+        const todayStr = formatSelectedDateKey(
+          now.getDate(),
+          now.getMonth(),
+          now.getFullYear(),
+        );
         const initialSample: StudySession[] = [
           {
             id: "1",
@@ -558,7 +632,10 @@ export default function HomeScreen(): React.JSX.Element {
           },
         ];
         setStudySessions(initialSample);
-        await AsyncStorage.setItem(STUDY_SESSIONS_KEY, JSON.stringify(initialSample));
+        await AsyncStorage.setItem(
+          STUDY_SESSIONS_KEY,
+          JSON.stringify(initialSample),
+        );
       }
       sessionsListAnim.setValue(1);
     } catch (e) {
@@ -567,7 +644,11 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   const handleSaveStudySession = async () => {
-    const dateKey = formatSelectedDateKey(formTargetDay, formTargetMonth, formTargetYear);
+    const dateKey = formatSelectedDateKey(
+      formTargetDay,
+      formTargetMonth,
+      formTargetYear,
+    );
     const dateObj = new Date(formTargetYear, formTargetMonth, formTargetDay);
     const formattedStartTime = `${formStartHour}:${String(formStartMin).padStart(2, "0")} ${formStartPeriod}`;
 
@@ -826,6 +907,9 @@ export default function HomeScreen(): React.JSX.Element {
         setStudyMinutes(
           parsed.studyMinutes !== undefined ? parsed.studyMinutes : 0,
         );
+        setDailyStudyMinutes(
+          parsed.dailyStudyMinutes !== undefined ? parsed.dailyStudyMinutes : 0,
+        );
       } else {
         if (guestUsername && guestUsername.trim()) {
           setUserName(guestUsername.trim());
@@ -846,6 +930,7 @@ export default function HomeScreen(): React.JSX.Element {
         setLessons(0);
         setXp(0);
         setStudyMinutes(0);
+        setDailyStudyMinutes(0);
       }
 
       setLastLesson(progress.lastLesson);
@@ -941,7 +1026,9 @@ export default function HomeScreen(): React.JSX.Element {
   const activeDayOfWeekName = WEEKDAY_NAMES_FULL[activeDateObj.getDay()];
 
   const targetDateKey = formatSelectedDateKey(selectedDay);
-  const activeDaySessions = studySessions.filter((s) => s.dateStr === targetDateKey);
+  const activeDaySessions = studySessions.filter(
+    (s) => s.dateStr === targetDateKey,
+  );
 
   const sessionListTranslateY = sessionsListAnim.interpolate({
     inputRange: [0, 1],
@@ -984,10 +1071,7 @@ export default function HomeScreen(): React.JSX.Element {
           </View>
           <Pressable onPress={() => setIsNotificationsModalOpen(true)}>
             <Animated.Text
-              style={[
-                styles.bell,
-                { transform: [{ scale: bellPulseAnim }] },
-              ]}
+              style={[styles.bell, { transform: [{ scale: bellPulseAnim }] }]}
             >
               🔔
             </Animated.Text>
@@ -1019,10 +1103,7 @@ export default function HomeScreen(): React.JSX.Element {
             </View>
             <View style={styles.track}>
               <Animated.View
-                style={[
-                  styles.fill,
-                  { width, opacity: xpPulseAnim },
-                ]}
+                style={[styles.fill, { width, opacity: xpPulseAnim }]}
               />
             </View>
           </View>
@@ -1054,7 +1135,7 @@ export default function HomeScreen(): React.JSX.Element {
 
                   return displaySubjs.map((subjDef, idx) => {
                     const cardHandler = createCardPressHandler(() =>
-                      handleOpenSubjectFromHome(subjDef.title)
+                      handleOpenSubjectFromHome(subjDef.title),
                     );
 
                     return (
@@ -1116,7 +1197,7 @@ export default function HomeScreen(): React.JSX.Element {
               <View style={styles.recentLessonsStack}>
                 {recentLessons.map((lesson, index) => {
                   const cardHandler = createCardPressHandler(() =>
-                    handleOpenSubjectFromHome(lesson.subjectTitle)
+                    handleOpenSubjectFromHome(lesson.subjectTitle),
                   );
 
                   return (
@@ -1174,14 +1255,23 @@ export default function HomeScreen(): React.JSX.Element {
 
           {(() => {
             const challengeHandler = createCardPressHandler(() =>
-              launchMiniGame("quiz")
+              launchMiniGame("quiz"),
             );
 
             return (
               <AnimatedPressable
                 style={[
                   styles.challenge,
-                  { transform: [{ scale: Animated.multiply(challengeHandler.scale, challengePulse) }] },
+                  {
+                    transform: [
+                      {
+                        scale: Animated.multiply(
+                          challengeHandler.scale,
+                          challengePulse,
+                        ),
+                      },
+                    ],
+                  },
                 ]}
                 onPressIn={challengeHandler.onPressIn}
                 onPressOut={challengeHandler.onPressOut}
@@ -1193,8 +1283,14 @@ export default function HomeScreen(): React.JSX.Element {
                     5 questions • +150 XP • Tap to Start!
                   </Text>
                 </View>
-                <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
-                  <Image source={target} style={styles.target} contentFit="contain" />
+                <Animated.View
+                  style={{ transform: [{ translateY: floatAnim }] }}
+                >
+                  <Image
+                    source={target}
+                    style={styles.target}
+                    contentFit="contain"
+                  />
                 </Animated.View>
               </AnimatedPressable>
             );
@@ -1203,10 +1299,10 @@ export default function HomeScreen(): React.JSX.Element {
           <Text style={styles.section}>Study Time</Text>
           <View style={styles.study}>
             <Text style={styles.studyValue}>
-              {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m
+              {Math.floor(dailyStudyMinutes / 60)}h {dailyStudyMinutes % 60}m
             </Text>
             <Text style={styles.studyCopy}>
-              Keep learning to grow your weekly progress.
+              Keep learning to grow your daily progress.
             </Text>
           </View>
 
@@ -1214,7 +1310,7 @@ export default function HomeScreen(): React.JSX.Element {
           <View style={styles.arcadeStack}>
             {displayGames.map((game) => {
               const gameHandler = createCardPressHandler(() =>
-                launchMiniGame(game.key)
+                launchMiniGame(game.key),
               );
 
               return (
@@ -1244,7 +1340,9 @@ export default function HomeScreen(): React.JSX.Element {
                             : styles.badgeFeatured,
                         ]}
                       >
-                        <Text style={styles.gameBadgePillText}>{game.badge}</Text>
+                        <Text style={styles.gameBadgePillText}>
+                          {game.badge}
+                        </Text>
                       </View>
                     </View>
                     <Text style={styles.arcadeGameDesc} numberOfLines={1}>
@@ -1260,7 +1358,12 @@ export default function HomeScreen(): React.JSX.Element {
           </View>
 
           <Text style={styles.section}>Study Calendar & Schedule</Text>
-          <Animated.View style={[styles.calendarWidget, { borderColor: animatedCalendarBorderColor }]}>
+          <Animated.View
+            style={[
+              styles.calendarWidget,
+              { borderColor: animatedCalendarBorderColor },
+            ]}
+          >
             <View style={styles.calendarTopHeader}>
               <Text style={styles.calendarTopHeaderDate}>
                 {activeDayOfWeekName}, {MONTH_NAMES[currentMonth]} {selectedDay}
@@ -1282,10 +1385,16 @@ export default function HomeScreen(): React.JSX.Element {
                     {MONTH_NAMES[currentMonth]} {currentYear}
                   </Text>
                   <View style={styles.monthNavArrowsGroup}>
-                    <Pressable style={styles.arrowIconBtn} onPress={handlePrevMonth}>
+                    <Pressable
+                      style={styles.arrowIconBtn}
+                      onPress={handlePrevMonth}
+                    >
                       <Text style={styles.caretIconText}>▲</Text>
                     </Pressable>
-                    <Pressable style={styles.arrowIconBtn} onPress={handleNextMonth}>
+                    <Pressable
+                      style={styles.arrowIconBtn}
+                      onPress={handleNextMonth}
+                    >
                       <Text style={styles.caretIconText}>▼</Text>
                     </Pressable>
                   </View>
@@ -1310,7 +1419,8 @@ export default function HomeScreen(): React.JSX.Element {
 
                   <View style={styles.calendarGridContainer}>
                     {[...Array(firstDayOffset)].map((_, i) => {
-                      const prevDayNum = daysInPrevMonth - firstDayOffset + i + 1;
+                      const prevDayNum =
+                        daysInPrevMonth - firstDayOffset + i + 1;
                       return (
                         <View key={`prev-${i}`} style={styles.calendarDayCell}>
                           <Text style={styles.calendarDayCellTextDimmed}>
@@ -1324,7 +1434,9 @@ export default function HomeScreen(): React.JSX.Element {
                       const dayNum = i + 1;
                       const isSelected = selectedDay === dayNum;
                       const dateKey = formatSelectedDateKey(dayNum);
-                      const hasSession = studySessions.some((s) => s.dateStr === dateKey);
+                      const hasSession = studySessions.some(
+                        (s) => s.dateStr === dateKey,
+                      );
 
                       return (
                         <Pressable
@@ -1353,7 +1465,8 @@ export default function HomeScreen(): React.JSX.Element {
                     {(() => {
                       const totalCellsSoFar = firstDayOffset + daysInMonth;
                       const remainder = totalCellsSoFar % 7;
-                      const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
+                      const extraSlotsNeeded =
+                        remainder === 0 ? 0 : 7 - remainder;
 
                       return [...Array(extraSlotsNeeded)].map((_, i) => (
                         <View key={`next-${i}`} style={styles.calendarDayCell}>
@@ -1369,9 +1482,7 @@ export default function HomeScreen(): React.JSX.Element {
             )}
 
             <View style={styles.agendaHeaderRow}>
-              <Text style={styles.selectedDateHeadline}>
-                Study Sessions
-              </Text>
+              <Text style={styles.selectedDateHeadline}>Study Sessions</Text>
               <Pressable
                 style={styles.addScheduleBtn}
                 onPress={() => setIsAddSessionModalOpen(true)}
@@ -1391,7 +1502,8 @@ export default function HomeScreen(): React.JSX.Element {
             >
               {activeDaySessions.length === 0 ? (
                 <Text style={styles.noSessionsText}>
-                  No study sessions planned for this date. Tap "+ Schedule" to add one!
+                  No study sessions planned for this date. Tap "+ Schedule" to
+                  add one!
                 </Text>
               ) : (
                 activeDaySessions.map((session) => (
@@ -1402,7 +1514,9 @@ export default function HomeScreen(): React.JSX.Element {
                           {session.category}
                         </Text>
                       </View>
-                      <Text style={styles.sessionTitleText}>{session.title}</Text>
+                      <Text style={styles.sessionTitleText}>
+                        {session.title}
+                      </Text>
                       {session.notes ? (
                         <Text style={styles.sessionNotesText} numberOfLines={1}>
                           {session.notes}
@@ -1410,9 +1524,13 @@ export default function HomeScreen(): React.JSX.Element {
                       ) : null}
                     </View>
                     <View style={styles.sessionCardRight}>
-                      <Text style={styles.sessionTimeText}>{session.startTime}</Text>
+                      <Text style={styles.sessionTimeText}>
+                        {session.startTime}
+                      </Text>
                       <Text style={styles.sessionDurationText}>
-                        {session.durationHours > 0 ? `${session.durationHours}h ` : ""}
+                        {session.durationHours > 0
+                          ? `${session.durationHours}h `
+                          : ""}
                         {session.durationMinutes}m
                       </Text>
                     </View>
@@ -1433,7 +1551,9 @@ export default function HomeScreen(): React.JSX.Element {
         <View style={styles.sessionModalBackdrop}>
           <View style={styles.sessionModalContainer}>
             <View style={styles.sessionModalHeader}>
-              <Text style={styles.sessionModalHeaderTitle}>🔔 Notifications</Text>
+              <Text style={styles.sessionModalHeaderTitle}>
+                🔔 Notifications
+              </Text>
               <Pressable
                 style={styles.sessionModalSaveBtn}
                 onPress={() => setIsNotificationsModalOpen(false)}
@@ -1449,24 +1569,53 @@ export default function HomeScreen(): React.JSX.Element {
               <Text style={styles.formSectionHeader}>LEADERBOARD UPDATES</Text>
               {leaderboardNotifications.map((lb) => (
                 <View key={lb.id} style={styles.formCard}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <View style={styles.lbBadgePill}>
                       <Text style={styles.lbBadgePillText}>{lb.badge}</Text>
                     </View>
-                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
+                    <Text
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: 10,
+                        fontWeight: "700",
+                      }}
+                    >
                       {lb.timestamp}
                     </Text>
                   </View>
-                  <Text style={{ color: "#ffffff", fontSize: 15, fontWeight: "900", marginTop: 6 }}>
+                  <Text
+                    style={{
+                      color: "#ffffff",
+                      fontSize: 15,
+                      fontWeight: "900",
+                      marginTop: 6,
+                    }}
+                  >
                     {lb.title}
                   </Text>
-                  <Text style={{ color: "#cbd5e1", fontSize: 12, fontWeight: "600", marginTop: 4, lineHeight: 18 }}>
+                  <Text
+                    style={{
+                      color: "#cbd5e1",
+                      fontSize: 12,
+                      fontWeight: "600",
+                      marginTop: 4,
+                      lineHeight: 18,
+                    }}
+                  >
                     {lb.message}
                   </Text>
                 </View>
               ))}
 
-              <Text style={styles.formSectionHeader}>UPCOMING STUDY REMINDERS</Text>
+              <Text style={styles.formSectionHeader}>
+                UPCOMING STUDY REMINDERS
+              </Text>
               {studySessions.length === 0 ? (
                 <View style={styles.formCard}>
                   <Text style={styles.noSessionsText}>
@@ -1476,19 +1625,55 @@ export default function HomeScreen(): React.JSX.Element {
               ) : (
                 studySessions.map((session) => (
                   <View key={session.id} style={styles.formCard}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={{ color: "#38bdf8", fontWeight: "900", fontSize: 11 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#38bdf8",
+                          fontWeight: "900",
+                          fontSize: 11,
+                        }}
+                      >
                         {session.category.toUpperCase()} • {session.reminder}
                       </Text>
-                      <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700" }}>
+                      <Text
+                        style={{
+                          color: "#94a3b8",
+                          fontSize: 10,
+                          fontWeight: "700",
+                        }}
+                      >
                         {session.dateStr}
                       </Text>
                     </View>
-                    <Text style={{ color: "#ffffff", fontSize: 15, fontWeight: "900", marginTop: 4 }}>
+                    <Text
+                      style={{
+                        color: "#ffffff",
+                        fontSize: 15,
+                        fontWeight: "900",
+                        marginTop: 4,
+                      }}
+                    >
                       {session.title}
                     </Text>
-                    <Text style={{ color: "#818cf8", fontSize: 12, fontWeight: "800", marginTop: 2 }}>
-                      ⏰ Start Time: {session.startTime} ({session.durationHours > 0 ? `${session.durationHours}h ` : ""}{session.durationMinutes}m)
+                    <Text
+                      style={{
+                        color: "#818cf8",
+                        fontSize: 12,
+                        fontWeight: "800",
+                        marginTop: 2,
+                      }}
+                    >
+                      ⏰ Start Time: {session.startTime} (
+                      {session.durationHours > 0
+                        ? `${session.durationHours}h `
+                        : ""}
+                      {session.durationMinutes}m)
                     </Text>
                   </View>
                 ))
@@ -1505,10 +1690,7 @@ export default function HomeScreen(): React.JSX.Element {
         onRequestClose={() => closeAddSessionModal()}
       >
         <Animated.View
-          style={[
-            styles.sessionModalBackdrop,
-            { opacity: modalFadeAnim },
-          ]}
+          style={[styles.sessionModalBackdrop, { opacity: modalFadeAnim }]}
         >
           <Animated.View
             style={[
@@ -1530,12 +1712,18 @@ export default function HomeScreen(): React.JSX.Element {
                   <Text style={styles.sessionModalDateBadgeMonth}>
                     {MONTH_SHORT[formTargetMonth]}
                   </Text>
-                  <Text style={styles.sessionModalDateBadgeDay}>{formTargetDay}</Text>
+                  <Text style={styles.sessionModalDateBadgeDay}>
+                    {formTargetDay}
+                  </Text>
                 </Animated.View>
-                <Text style={styles.sessionModalHeaderTitle}>Add Study Session</Text>
+                <Text style={styles.sessionModalHeaderTitle}>
+                  Add Study Session
+                </Text>
               </View>
               {(() => {
-                const saveHandler = createCardPressHandler(handleSaveStudySession);
+                const saveHandler = createCardPressHandler(
+                  handleSaveStudySession,
+                );
                 return (
                   <AnimatedPressable
                     style={[
@@ -1557,7 +1745,9 @@ export default function HomeScreen(): React.JSX.Element {
             >
               <Text style={styles.formSectionHeader}>CORE INFORMATION</Text>
               <View style={styles.formCard}>
-                <Text style={styles.formFieldLabel}>SESSION TITLE / TOPIC *</Text>
+                <Text style={styles.formFieldLabel}>
+                  SESSION TITLE / TOPIC *
+                </Text>
                 <TextInput
                   style={styles.formTextInput}
                   placeholder="e.g. Biosphere Lab Quiz Review"
@@ -1576,7 +1766,9 @@ export default function HomeScreen(): React.JSX.Element {
                 >
                   {CATEGORIES.map((cat) => {
                     const isSel = formCategory === cat;
-                    const chipHandler = createCardPressHandler(() => setFormCategory(cat));
+                    const chipHandler = createCardPressHandler(() =>
+                      setFormCategory(cat),
+                    );
 
                     return (
                       <AnimatedPressable
@@ -1603,11 +1795,27 @@ export default function HomeScreen(): React.JSX.Element {
                 </ScrollView>
               </View>
 
-              <Text style={styles.formSectionHeader}>TARGET DATE & CALENDAR</Text>
+              <Text style={styles.formSectionHeader}>
+                TARGET DATE & CALENDAR
+              </Text>
               <View style={styles.formCard}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 14 }}>
-                    {MONTH_NAMES[formTargetMonth]} {formTargetDay}, {formTargetYear}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#ffffff",
+                      fontWeight: "900",
+                      fontSize: 14,
+                    }}
+                  >
+                    {MONTH_NAMES[formTargetMonth]} {formTargetDay},{" "}
+                    {formTargetYear}
                   </Text>
                   <View style={{ flexDirection: "row", gap: 6 }}>
                     <Pressable
@@ -1615,49 +1823,82 @@ export default function HomeScreen(): React.JSX.Element {
                       onPress={() => {
                         let m = formTargetMonth - 1;
                         let y = formTargetYear;
-                        if (m < 0) { m = 11; y -= 1; }
+                        if (m < 0) {
+                          m = 11;
+                          y -= 1;
+                        }
                         setFormTargetMonth(m);
                         setFormTargetYear(y);
-                        setFormTargetDay(Math.min(formTargetDay, getDaysInMonth(m, y)));
+                        setFormTargetDay(
+                          Math.min(formTargetDay, getDaysInMonth(m, y)),
+                        );
                       }}
                     >
-                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>◀ M</Text>
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>
+                        ◀ M
+                      </Text>
                     </Pressable>
                     <Pressable
                       style={styles.arrowIconBtn}
                       onPress={() => {
                         let m = formTargetMonth + 1;
                         let y = formTargetYear;
-                        if (m > 11) { m = 0; y += 1; }
+                        if (m > 11) {
+                          m = 0;
+                          y += 1;
+                        }
                         setFormTargetMonth(m);
                         setFormTargetYear(y);
-                        setFormTargetDay(Math.min(formTargetDay, getDaysInMonth(m, y)));
+                        setFormTargetDay(
+                          Math.min(formTargetDay, getDaysInMonth(m, y)),
+                        );
                       }}
                     >
-                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>M ▶</Text>
+                      <Text style={{ color: "#38bdf8", fontWeight: "900" }}>
+                        M ▶
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
 
                 <View style={styles.calendarGridHeaderRow}>
                   {WEEKDAYS_SHORT.map((d) => (
-                    <Text key={d} style={styles.weekdayHeaderText}>{d}</Text>
+                    <Text key={d} style={styles.weekdayHeaderText}>
+                      {d}
+                    </Text>
                   ))}
                 </View>
                 <View style={styles.calendarGridContainer}>
-                  {[...Array(getFirstDayOfWeek(formTargetMonth, formTargetYear))].map((_, i) => {
+                  {[
+                    ...Array(
+                      getFirstDayOfWeek(formTargetMonth, formTargetYear),
+                    ),
+                  ].map((_, i) => {
                     const prevDaysInMonth = getDaysInMonth(
                       formTargetMonth === 0 ? 11 : formTargetMonth - 1,
-                      formTargetMonth === 0 ? formTargetYear - 1 : formTargetYear
+                      formTargetMonth === 0
+                        ? formTargetYear - 1
+                        : formTargetYear,
                     );
-                    const prevDayNum = prevDaysInMonth - getFirstDayOfWeek(formTargetMonth, formTargetYear) + i + 1;
+                    const prevDayNum =
+                      prevDaysInMonth -
+                      getFirstDayOfWeek(formTargetMonth, formTargetYear) +
+                      i +
+                      1;
                     return (
-                      <View key={`target-prev-${i}`} style={styles.calendarDayCell}>
-                        <Text style={styles.calendarDayCellTextDimmed}>{prevDayNum}</Text>
+                      <View
+                        key={`target-prev-${i}`}
+                        style={styles.calendarDayCell}
+                      >
+                        <Text style={styles.calendarDayCellTextDimmed}>
+                          {prevDayNum}
+                        </Text>
                       </View>
                     );
                   })}
-                  {[...Array(getDaysInMonth(formTargetMonth, formTargetYear))].map((_, i) => {
+                  {[
+                    ...Array(getDaysInMonth(formTargetMonth, formTargetYear)),
+                  ].map((_, i) => {
                     const dayNum = i + 1;
                     const isSelected = formTargetDay === dayNum;
                     return (
@@ -1669,20 +1910,33 @@ export default function HomeScreen(): React.JSX.Element {
                         ]}
                         onPress={() => setFormTargetDay(dayNum)}
                       >
-                        <Text style={[styles.calendarDayCellText, isSelected && styles.calendarDayCellTextSelected]}>
+                        <Text
+                          style={[
+                            styles.calendarDayCellText,
+                            isSelected && styles.calendarDayCellTextSelected,
+                          ]}
+                        >
                           {dayNum}
                         </Text>
                       </Pressable>
                     );
                   })}
                   {(() => {
-                    const totalCellsSoFar = getFirstDayOfWeek(formTargetMonth, formTargetYear) + getDaysInMonth(formTargetMonth, formTargetYear);
+                    const totalCellsSoFar =
+                      getFirstDayOfWeek(formTargetMonth, formTargetYear) +
+                      getDaysInMonth(formTargetMonth, formTargetYear);
                     const remainder = totalCellsSoFar % 7;
-                    const extraSlotsNeeded = remainder === 0 ? 0 : 7 - remainder;
+                    const extraSlotsNeeded =
+                      remainder === 0 ? 0 : 7 - remainder;
 
                     return [...Array(extraSlotsNeeded)].map((_, i) => (
-                      <View key={`target-next-${i}`} style={styles.calendarDayCell}>
-                        <Text style={styles.calendarDayCellTextDimmed}>{i + 1}</Text>
+                      <View
+                        key={`target-next-${i}`}
+                        style={styles.calendarDayCell}
+                      >
+                        <Text style={styles.calendarDayCellTextDimmed}>
+                          {i + 1}
+                        </Text>
                       </View>
                     ));
                   })()}
@@ -1696,10 +1950,15 @@ export default function HomeScreen(): React.JSX.Element {
                     <Text style={styles.formFieldSubLabel}>HOUR</Text>
                     <View style={styles.counterControl}>
                       {(() => {
-                        const subBtn = createCardPressHandler(() => setFormStartHour((h) => (h <= 1 ? 12 : h - 1)));
+                        const subBtn = createCardPressHandler(() =>
+                          setFormStartHour((h) => (h <= 1 ? 12 : h - 1)),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: subBtn.scale }] },
+                            ]}
                             onPressIn={subBtn.onPressIn}
                             onPressOut={subBtn.onPressOut}
                           >
@@ -1707,12 +1966,19 @@ export default function HomeScreen(): React.JSX.Element {
                           </AnimatedPressable>
                         );
                       })()}
-                      <Text style={styles.counterValueText}>{formStartHour}</Text>
+                      <Text style={styles.counterValueText}>
+                        {formStartHour}
+                      </Text>
                       {(() => {
-                        const addBtn = createCardPressHandler(() => setFormStartHour((h) => (h >= 12 ? 1 : h + 1)));
+                        const addBtn = createCardPressHandler(() =>
+                          setFormStartHour((h) => (h >= 12 ? 1 : h + 1)),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: addBtn.scale }] },
+                            ]}
                             onPressIn={addBtn.onPressIn}
                             onPressOut={addBtn.onPressOut}
                           >
@@ -1727,10 +1993,15 @@ export default function HomeScreen(): React.JSX.Element {
                     <Text style={styles.formFieldSubLabel}>MINUTE</Text>
                     <View style={styles.counterControl}>
                       {(() => {
-                        const subBtn = createCardPressHandler(() => setFormStartMin((m) => (m <= 0 ? 45 : m - 15)));
+                        const subBtn = createCardPressHandler(() =>
+                          setFormStartMin((m) => (m <= 0 ? 45 : m - 15)),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: subBtn.scale }] },
+                            ]}
                             onPressIn={subBtn.onPressIn}
                             onPressOut={subBtn.onPressOut}
                           >
@@ -1742,10 +2013,15 @@ export default function HomeScreen(): React.JSX.Element {
                         {String(formStartMin).padStart(2, "0")}
                       </Text>
                       {(() => {
-                        const addBtn = createCardPressHandler(() => setFormStartMin((m) => (m >= 45 ? 0 : m + 15)));
+                        const addBtn = createCardPressHandler(() =>
+                          setFormStartMin((m) => (m >= 45 ? 0 : m + 15)),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: addBtn.scale }] },
+                            ]}
                             onPressIn={addBtn.onPressIn}
                             onPressOut={addBtn.onPressOut}
                           >
@@ -1759,14 +2035,21 @@ export default function HomeScreen(): React.JSX.Element {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldSubLabel}>AM / PM</Text>
                     {(() => {
-                      const periodBtn = createCardPressHandler(() => setFormStartPeriod((p) => (p === "AM" ? "PM" : "AM")));
+                      const periodBtn = createCardPressHandler(() =>
+                        setFormStartPeriod((p) => (p === "AM" ? "PM" : "AM")),
+                      );
                       return (
                         <AnimatedPressable
-                          style={[styles.periodToggleBtn, { transform: [{ scale: periodBtn.scale }] }]}
+                          style={[
+                            styles.periodToggleBtn,
+                            { transform: [{ scale: periodBtn.scale }] },
+                          ]}
                           onPressIn={periodBtn.onPressIn}
                           onPressOut={periodBtn.onPressOut}
                         >
-                          <Text style={styles.periodToggleText}>{formStartPeriod}</Text>
+                          <Text style={styles.periodToggleText}>
+                            {formStartPeriod}
+                          </Text>
                         </AnimatedPressable>
                       );
                     })()}
@@ -1775,15 +2058,22 @@ export default function HomeScreen(): React.JSX.Element {
 
                 <View style={styles.formDivider} />
 
-                <div style={styles.durationRow}>
+                <View style={styles.durationRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
                     <View style={styles.counterControl}>
                       {(() => {
-                        const subBtn = createCardPressHandler(() => setFormDurationHours(Math.max(0, formDurationHours - 1)));
+                        const subBtn = createCardPressHandler(() =>
+                          setFormDurationHours(
+                            Math.max(0, formDurationHours - 1),
+                          ),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: subBtn.scale }] },
+                            ]}
                             onPressIn={subBtn.onPressIn}
                             onPressOut={subBtn.onPressOut}
                           >
@@ -1791,12 +2081,19 @@ export default function HomeScreen(): React.JSX.Element {
                           </AnimatedPressable>
                         );
                       })()}
-                      <Text style={styles.counterValueText}>{formDurationHours}</Text>
+                      <Text style={styles.counterValueText}>
+                        {formDurationHours}
+                      </Text>
                       {(() => {
-                        const addBtn = createCardPressHandler(() => setFormDurationHours(formDurationHours + 1));
+                        const addBtn = createCardPressHandler(() =>
+                          setFormDurationHours(formDurationHours + 1),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: addBtn.scale }] },
+                            ]}
                             onPressIn={addBtn.onPressIn}
                             onPressOut={addBtn.onPressOut}
                           >
@@ -1808,13 +2105,22 @@ export default function HomeScreen(): React.JSX.Element {
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.formFieldLabel}>DURATION (MINUTES)</Text>
+                    <Text style={styles.formFieldLabel}>
+                      DURATION (MINUTES)
+                    </Text>
                     <View style={styles.counterControl}>
                       {(() => {
-                        const subBtn = createCardPressHandler(() => setFormDurationMins(Math.max(0, formDurationMins - 15)));
+                        const subBtn = createCardPressHandler(() =>
+                          setFormDurationMins(
+                            Math.max(0, formDurationMins - 15),
+                          ),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: subBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: subBtn.scale }] },
+                            ]}
                             onPressIn={subBtn.onPressIn}
                             onPressOut={subBtn.onPressOut}
                           >
@@ -1822,12 +2128,19 @@ export default function HomeScreen(): React.JSX.Element {
                           </AnimatedPressable>
                         );
                       })()}
-                      <Text style={styles.counterValueText}>{formDurationMins}</Text>
+                      <Text style={styles.counterValueText}>
+                        {formDurationMins}
+                      </Text>
                       {(() => {
-                        const addBtn = createCardPressHandler(() => setFormDurationMins(formDurationMins + 15));
+                        const addBtn = createCardPressHandler(() =>
+                          setFormDurationMins(formDurationMins + 15),
+                        );
                         return (
                           <AnimatedPressable
-                            style={[styles.counterBtn, { transform: [{ scale: addBtn.scale }] }]}
+                            style={[
+                              styles.counterBtn,
+                              { transform: [{ scale: addBtn.scale }] },
+                            ]}
                             onPressIn={addBtn.onPressIn}
                             onPressOut={addBtn.onPressOut}
                           >
@@ -1837,7 +2150,7 @@ export default function HomeScreen(): React.JSX.Element {
                       })()}
                     </View>
                   </View>
-                </div>
+                </View>
               </View>
 
               <Text style={styles.formSectionHeader}>ADDITIONAL DETAILS</Text>
@@ -1862,7 +2175,9 @@ export default function HomeScreen(): React.JSX.Element {
                 >
                   {REMINDERS.map((r) => {
                     const isSel = formReminder === r;
-                    const remHandler = createCardPressHandler(() => setFormReminder(r));
+                    const remHandler = createCardPressHandler(() =>
+                      setFormReminder(r),
+                    );
 
                     return (
                       <AnimatedPressable
@@ -1994,7 +2309,7 @@ const styles = StyleSheet.create({
   xp: { color: "#edaa39", fontWeight: "900" },
   track: { backgroundColor: "#000", height: 7, borderRadius: 5, marginTop: 5 },
   fill: { height: "100%", backgroundColor: "#df6ce8", borderRadius: 5 },
-  
+
   calendarWidget: {
     backgroundColor: "#161c2e",
     borderWidth: 1,
