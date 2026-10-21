@@ -214,8 +214,11 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
               if (step > 1) {
                 setStep(step - 1);
               } else {
-                setStep(1);
-                setFullName("");
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/login" as any);
+                }
               }
             }}
           >
