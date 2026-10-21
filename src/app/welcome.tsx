@@ -47,7 +47,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [selectedGrade, setSelectedGrade] = useState(3);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]); 
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -161,8 +161,8 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const handleLaunch = async (): Promise<void> => {
     if (selectedSubjects.length < 2) {
       Alert.alert(
-        "Choose Your Path!", 
-        "Please select at least 2 subjects to begin your adventure."
+        "Choose Your Path!",
+        "Please select at least 2 subjects to begin your adventure.",
       );
       return;
     }
@@ -219,7 +219,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
               }
             }}
           >
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={styles.back}>Back</Text>
           </Pressable>
           <Text style={styles.stepIndicator}>Step {step} of 4</Text>
         </View>
@@ -415,11 +415,13 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                     onPress={handleLaunch}
                     style={[
                       styles.primaryLaunch,
-                      selectedSubjects.length < 2 && { opacity: 0.5 }
+                      selectedSubjects.length < 2 && { opacity: 0.5 },
                     ]}
                   >
                     <Text style={styles.primaryText}>
-                      {selectedSubjects.length < 2 ? `Pick ${2 - selectedSubjects.length} more...` : "🚀 Launch App"}
+                      {selectedSubjects.length < 2
+                        ? `Pick ${2 - selectedSubjects.length} more...`
+                        : "🚀 Launch App"}
                     </Text>
                   </Pressable>
                 </Animated.View>
