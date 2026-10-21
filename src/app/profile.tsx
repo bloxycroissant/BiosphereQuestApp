@@ -1555,7 +1555,22 @@ export default function ProfileScreen(): React.JSX.Element {
               <Text style={styles.title}>Profile</Text>
             </View>
             <View style={{ flexDirection: "row", gap: 6 }}>
-              {!isLoggedIn && (
+              {isLoggedIn ? (
+                <Pressable
+                  onPress={async () => {
+                    setIsLoggedIn(false);
+                    try {
+                      await supabase.auth.signOut();
+                    } catch (e) {
+                      console.error("Signout error:", e);
+                    }
+                    router.replace("/login" as any);
+                  }}
+                  style={styles.loginBtn}
+                >
+                  <Text style={styles.loginBtnText}>Logout</Text>
+                </Pressable>
+              ) : (
                 <Pressable
                   onPress={() => router.push("/login" as any)}
                   style={styles.loginBtn}
