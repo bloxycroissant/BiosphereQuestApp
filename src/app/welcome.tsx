@@ -211,7 +211,12 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
         <View style={styles.header}>
           <Pressable
             onPress={() => {
-              step > 1 ? setStep(step - 1) : router.back();
+              if (step > 1) {
+                setStep(step - 1);
+              } else {
+                setStep(1);
+                setFullName("");
+              }
             }}
           >
             <Text style={styles.back}>‹ Back</Text>
@@ -410,7 +415,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                     onPress={handleLaunch}
                     style={[
                       styles.primaryLaunch,
-                      selectedSubjects.length < 2 && { opacity: 0.5 } // Visual feedback if not enough selected
+                      selectedSubjects.length < 2 && { opacity: 0.5 }
                     ]}
                   >
                     <Text style={styles.primaryText}>
