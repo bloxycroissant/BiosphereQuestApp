@@ -807,14 +807,23 @@ export default function SubjectNotesViewer({
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
-          {isChildTheme
-            ? `🌈 ${subject.title} Field Guide`
-            : `📑 ${subject.title} Comprehensive Journal`}
-        </Text>
-        <Text style={styles.pageSubtitle}>
-          Grade {gradeLevel} Explorer's Master Notebook
-        </Text>
+        <View style={styles.introHeaderRow}>
+          <Image
+            source={stellaMascotImage}
+            style={styles.introMascotBadge}
+            resizeMode="contain"
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              {isChildTheme
+                ? `🌈 ${subject.title} Field Guide`
+                : `📑 ${subject.title} Comprehensive Journal`}
+            </Text>
+            <Text style={styles.pageSubtitle}>
+              Grade {gradeLevel} Explorer's Master Notebook
+            </Text>
+          </View>
+        </View>
         <View
           style={[styles.divider, { backgroundColor: theme.dividerColor }]}
         />
@@ -1672,6 +1681,13 @@ const styles = StyleSheet.create({
   pageContentWrapper: { flex: 1, justifyContent: "space-between" },
   pageContent: { flex: 1 },
   scrollContentContainer: { paddingBottom: 20 },
+  introHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 4,
+  },
+  introMascotBadge: { width: 38, height: 38 },
   pageTitle: {
     color: "#1e293b",
     fontWeight: "900",
