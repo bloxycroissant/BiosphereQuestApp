@@ -37,6 +37,7 @@ interface LessonTopic {
   title: string;
   story: string;
   howItWorks: string;
+  visualIllustration: string;
   demonstration: string;
   questions: QuizQuestion[];
 }
@@ -71,6 +72,7 @@ const buildQuestion = (
 const buildLessonContent = (
   lesson: Lesson,
   subjectTitle: string,
+  gradeLevel: number,
 ): { topics: LessonTopic[]; recapQuestions: QuizQuestion[] } => {
   const isScience =
     subjectTitle.toLowerCase().includes("science") ||
@@ -78,235 +80,309 @@ const buildLessonContent = (
       subjectTitle.toLowerCase().includes(s),
     );
 
-  const t1QuestionCount = Math.floor(Math.random() * 3) + 1;
-  const t1Pool = [
-    buildQuestion(
-      "What is the primary idea behind " + lesson.title + "?",
-      lesson.meaning,
-      [
-        "It is a random guess without any underlying pattern.",
-        "It means ignoring evidence and picking whatever looks easy.",
-      ],
-      "Exactly! That is the core rule of this lesson.",
-    ),
-    buildQuestion(
-      "Why do we study " + lesson.title + "?",
-      isScience
-        ? "To explain observations and understand natural phenomena."
-        : "To calculate amounts accurately and solve quantitative problems.",
-      [
-        "Only to memorize long words for an exam.",
-        "It has no connection to how things actually work.",
-      ],
-      "Great job! That connects our lesson directly to real life.",
-    ),
-    buildQuestion(
-      "True or False: Understanding the rules helps us predict results.",
-      "True, rules give us dependable ways to find answers.",
-      [
-        "False, things happen by complete chance with no rules.",
-        "False, you should never check your work twice.",
-      ],
-      "Spot on! Knowing the concept gives you predictable results.",
-    ),
-  ];
+  const cleanSubject = subjectTitle.toLowerCase();
+  const cleanLesson = lesson.title.toLowerCase();
 
-  const t2QuestionCount = Math.floor(Math.random() * 3) + 1;
-  const t2Pool = [
-    buildQuestion(
-      "In our example, what evidence or action was shown?",
-      lesson.example,
-      [
-        "Nothing changed or happened in the example.",
-        "The example did the exact opposite of the lesson rule.",
-      ],
-      "Correct! You identified the key details from the demonstration.",
-    ),
-    buildQuestion(
-      "How does this example prove the lesson's main idea?",
-      "It shows the concept happening step by step in a real situation.",
-      [
-        "It does not relate to the lesson at all.",
-        "It tells us to ignore what we observe.",
-      ],
-      "Awesome deduction! Examples prove the theoretical rule.",
-    ),
-    buildQuestion(
-      "What should an explorer do first when working through a problem like this?",
-      "Look at what is known and identify the important parts.",
-      [
-        "Jump immediately to a wild guess without reading.",
-        "Skip all the clues and look for a shortcut.",
-      ],
-      "Smart thinking! Careful observation is always step one.",
-    ),
-  ];
+  // Matatag Curriculum & Grade-Specific Pedagogical Content Generator
+  let visualIllustration = "";
+  let howItWorks = "";
+  let storyText = "";
+  let demoText = "";
+  let t1Pool: QuizQuestion[] = [];
+  let t2Pool: QuizQuestion[] = [];
+  let t3Pool: QuizQuestion[] = [];
 
-  const t3QuestionCount = Math.floor(Math.random() * 3) + 1;
-  const t3Pool = [
-    buildQuestion(
-      "How can an explorer use " + lesson.title + " outside of school?",
-      isScience
-        ? "To notice patterns, care for nature, and explain everyday changes."
-        : "To measure, share items fairly, and budget time or supplies.",
-      [
-        "It is strictly for classroom homework and nowhere else.",
-        "It should be forgotten as soon as the test is done.",
-      ],
-      "That is it! Real knowledge travels with you everywhere.",
-    ),
-    buildQuestion(
-      "When comparing two different problems on this topic, what stays the same?",
-      "The underlying rule and logical relationship.",
-      [
-        "The numbers and words will always be identical.",
-        "Nothing stays the same; every problem has random rules.",
-      ],
-      "Spot on! The numbers or objects change, but the rule remains constant.",
-    ),
-    buildQuestion(
-      "What is the best way to verify that your answer is reasonable?",
-      "Re-check the clues to see if the outcome makes logical sense.",
-      [
-        "Assume the first fast guess is always right.",
-        "Stop thinking once an option is selected.",
-      ],
-      "Well done! Checking your answer confirms your mastery.",
-    ),
-  ];
+  if (!isScience && cleanSubject.includes("math")) {
+    if (gradeLevel === 1) {
+      if (/count|number|sense|ordinal/.test(cleanLesson)) {
+        visualIllustration =
+          "🍎 🍎 🍎 🍎 🍎  (5 Apples)   >   🔵 🔵 🔵  (3 Blues)";
+        storyText =
+          "Welcome to Grade 1 Math! In our Matatag classroom, we count real objects like fruits, bottle caps, and fingers to understand quantities up to 100.";
+        howItWorks =
+          "Point your finger at each object one by one from left to right. The last number you say tells the exact total count!";
+        demoText =
+          "Example: Counting 5 calamansi fruits on the table and comparing them with 3 mangoes.";
+        t1Pool = [
+          buildQuestion(
+            "How do we correctly count a set of objects on our desk?",
+            "Touch and count each object one by one from left to right.",
+            ["Guess a random number quickly.", "Look away and clap."],
+            "Correct! One-to-one correspondence ensures an accurate count.",
+          ),
+          buildQuestion(
+            "If you have 4 red counters and add 2 more, what does the final number mean?",
+            "It represents the total quantity of the entire set.",
+            ["It means zero items are left.", "It is just a random label."],
+            "Spot on! The last counting word states the total quantity.",
+          ),
+        ];
+        t2Pool = [
+          buildQuestion(
+            "Look at the visual set: [🍎 🍎 🍎] vs [🍎 🍎]. Which group has more?",
+            "The group with 3 apples.",
+            ["The group with 2 apples.", "Both groups have equal amounts."],
+            "Great job! 3 is greater than 2.",
+          ),
+        ];
+        t3Pool = [
+          buildQuestion(
+            "Where do we use counting skills outside the classroom?",
+            "When sharing snacks or counting our toys at home.",
+            ["Nowhere, numbers only live in books.", "Only when sleeping."],
+            "Wonderful! Math is part of our everyday life.",
+          ),
+        ];
+      } else if (/shape|pattern/.test(cleanLesson)) {
+        visualIllustration =
+          "🔴 Circle ➔ 🟦 Square ➔ 🔺 Triangle ➔ 🔴 Circle ➔ [?]";
+        storyText =
+          "Shapes and patterns are all around our classroom! We trace flat shapes and discover repeating color and shape sequences.";
+        howItWorks =
+          "Look closely at the repeating order (A-B-C or A-B-A-B) to find out which shape comes next in the row.";
+        demoText =
+          "Example: Completing a shape train with Circles, Squares, and Triangles.";
+        t1Pool = [
+          buildQuestion(
+            "What comes next in the pattern: Circle, Square, Circle, Square, [?]",
+            "Circle",
+            ["Triangle", "Rectangle"],
+            "Correct! The repeating pattern alternates between Circle and Square.",
+          ),
+        ];
+        t2Pool = [
+          buildQuestion(
+            "How many straight sides does a triangle have?",
+            "3 straight sides",
+            ["4 straight sides", "0 straight sides"],
+            "Spot on! Triangles always have 3 straight sides and 3 corners.",
+          ),
+        ];
+        t3Pool = [
+          buildQuestion(
+            "Why do we study repeating patterns?",
+            "To predict what comes next in designs and sequences.",
+            ["To confuse our classmates.", "Patterns have no purpose."],
+            "Exactly! Recognizing patterns helps us make logical predictions.",
+          ),
+        ];
+      } else {
+        visualIllustration = "🟢 🟢 🟢 + 🟢 🟢 = 5 Green Counters";
+        storyText = `In Grade 1 Matatag Math, we explore ${lesson.title} using physical counters and visual grouping.`;
+        howItWorks =
+          "Combine physical sets together to add, or take away items to subtract!";
+        demoText = lesson.example;
+        t1Pool = [
+          buildQuestion(
+            `What is the main focus of ${lesson.title}?`,
+            lesson.meaning,
+            ["Ignoring all numbers.", "Guessing without looking."],
+            "Correct! Understanding the foundational meaning is key.",
+          ),
+        ];
+        t2Pool = [
+          buildQuestion(
+            `In our example (${lesson.example}), what action was performed?`,
+            lesson.example,
+            ["No action was done.", "Everything was destroyed."],
+            "Spot on! Following classroom examples builds mastery.",
+          ),
+        ];
+        t3Pool = [
+          buildQuestion(
+            "How does practicing with concrete objects help us learn math?",
+            "It lets us see and touch quantities so math makes sense.",
+            ["It makes math invisible.", "It wastes time."],
+            "Wonderful! Tangible objects bridge the gap to abstract thinking.",
+          ),
+        ];
+      }
+    } else if (gradeLevel === 2) {
+      visualIllustration =
+        "🟦 (100-Flat)  |  🟩 🟩 (20-Rods)  |  🟨 🟨 🟨 (3-Units)  ➔  123";
+      storyText = `Grade 2 Matatag Math: Exploring ${lesson.title} with Base-10 blocks, arrays, and standard units.`;
+      howItWorks =
+        "Group hundreds, tens, and ones together. Regroup 10 ones into a ten when counting past 9!";
+      demoText = lesson.example;
+      t1Pool = [
+        buildQuestion(
+          `What rule applies to ${lesson.title}?`,
+          lesson.meaning,
+          ["Random number assignment.", "Ignoring place values."],
+          "Correct! Place value organization is fundamental.",
+        ),
+      ];
+      t2Pool = [
+        buildQuestion(
+          `Based on our example (${lesson.example}), how do we solve it?`,
+          lesson.example,
+          ["By guessing blindly.", "By skipping steps."],
+          "Great job following the systematic method!",
+        ),
+      ];
+      t3Pool = [
+        buildQuestion(
+          "Why is regrouping important in addition and subtraction?",
+          "It allows us to manage values across columns correctly.",
+          ["It makes numbers smaller for no reason.", "It is optional."],
+          "Spot on! Regrouping maintains mathematical equality.",
+        ),
+      ];
+    } else if (gradeLevel === 3) {
+      visualIllustration =
+        "⭐⭐⭐⭐ / ⭐⭐⭐⭐ / ⭐⭐⭐⭐  (3 Rows of 4 = 12 Arrays)";
+      storyText = `Grade 3 Matatag Math: Mastering multiplication arrays, fractions, and perimeter grids for ${lesson.title}.`;
+      howItWorks =
+        "Multiplication combines equal rows and columns. Fractions represent equal parts of a whole unit.";
+      demoText = lesson.example;
+      t1Pool = [
+        buildQuestion(
+          `What is the foundational principle of ${lesson.title}?`,
+          lesson.meaning,
+          ["Guessing random factors.", "Ignoring equal partitions."],
+          "Correct! Equal groups and arrays form the basis of multiplication.",
+        ),
+      ];
+      t2Pool = [
+        buildQuestion(
+          `In our worked example (${lesson.example}), what is the result?`,
+          lesson.example,
+          ["An incorrect calculation.", "Zero."],
+          "Spot on! Careful calculation yields the correct product or fraction.",
+        ),
+      ];
+      t3Pool = [
+        buildQuestion(
+          "How does understanding multiplication arrays help in daily life?",
+          "It helps calculate large groups of items quickly and fairly.",
+          ["It has no real-world use.", "Only for tests."],
+          "Wonderful! Arrays make counting large quantities efficient.",
+        ),
+      ];
+    } else {
+      // Grades 4-6 Math
+      visualIllustration =
+        "📊 [X, Y Coordinate Grid & Ratio Proportions Model]";
+      storyText = `Grade ${gradeLevel} Matatag Math: Advanced problem solving for ${lesson.title}.`;
+      howItWorks =
+        "Analyze given variables, apply standard mathematical algorithms, and verify solutions.";
+      demoText = lesson.example;
+      t1Pool = [
+        buildQuestion(
+          `What mathematical rule defines ${lesson.title}?`,
+          lesson.meaning,
+          ["Random estimation.", "Ignoring equation balance."],
+          "Correct! Precise operational rules govern this topic.",
+        ),
+      ];
+      t2Pool = [
+        buildQuestion(
+          `How do we solve problems like: ${lesson.example}?`,
+          lesson.example,
+          ["Guessing without formula.", "Discarding negative signs."],
+          "Spot on! Systematic step-by-step execution ensures accuracy.",
+        ),
+      ];
+      t3Pool = [
+        buildQuestion(
+          "Why is verifying your calculated result essential?",
+          "It confirms that your solution satisfies the original problem constraints.",
+          ["It is never necessary.", "To waste time."],
+          "Exact proof! Verification guarantees mathematical correctness.",
+        ),
+      ];
+    }
+  } else {
+    // Science Curriculum (Grades 1-6 Matatag)
+    visualIllustration =
+      "🌱 Roots (Water) ➔ 🌿 Stem (Transport) ➔ ☀️ Leaves (Food)";
+    storyText = `Matatag Science Exploration: ${lesson.title} and its impact on our natural environment.`;
+    howItWorks =
+      "Scientists observe phenomena, record empirical data, and test hypotheses systematically.";
+    demoText = lesson.example;
+    t1Pool = [
+      buildQuestion(
+        `What scientific principle explains ${lesson.title}?`,
+        lesson.meaning,
+        ["Unproven myths.", "Random guessing."],
+        "Correct! Science relies on verifiable empirical laws.",
+      ),
+    ];
+    t2Pool = [
+      buildQuestion(
+        `In our observation example (${lesson.example}), what was demonstrated?`,
+        lesson.example,
+        ["An impossible event.", "Nothing."],
+        "Spot on! Empirical evidence proves scientific concepts.",
+      ),
+    ];
+    t3Pool = [
+      buildQuestion(
+        "Why is studying science important for our community?",
+        "It helps us understand nature, protect resources, and solve real problems.",
+        ["It has no practical value.", "Only for indoor experiments."],
+        "Wonderful! Science empowers us to care for our world.",
+      ),
+    ];
+  }
 
   const topics: LessonTopic[] = [
     {
-      title: "Foundations & Core Idea",
-      story:
-        lesson.title +
-        " helps explorers understand foundational concepts. " +
-        lesson.meaning,
-      howItWorks: isScience
-        ? "Scientists look for clues, test what happens when variables change, and connect observations to reliable rules."
-        : "Mathematicians look at what quantities are given, break larger values into manageable parts, and apply reliable operations.",
-      demonstration: lesson.example,
-      questions: t1Pool.slice(0, t1QuestionCount),
+      title: "1. Core Concept & Classroom Guide",
+      story: storyText,
+      howItWorks: howItWorks,
+      visualIllustration: visualIllustration,
+      demonstration: demoText,
+      questions: t1Pool,
     },
     {
-      title: "Real-World Demonstration",
+      title: "2. Worked Classroom Demonstration",
       story:
-        "Learning a rule is great, but seeing it in motion makes it stick in your mind!",
-      howItWorks:
-        "Watch how the rule behaves when applied to everyday objects, creatures, or numbers:",
-      demonstration: lesson.example,
-      questions: t2Pool.slice(0, t2QuestionCount),
+        "Let's examine how this works in a real classroom setting step by step.",
+      howItWorks: "Follow the visual representation and breakdown below:",
+      visualIllustration: visualIllustration,
+      demonstration: demoText,
+      questions: t2Pool,
     },
     {
-      title: "Connecting the Dots",
-      story:
-        "Now that you understand the rule and saw it work, let's explore why this matters in the broader world of " +
-        subjectTitle +
-        ".",
+      title: "3. Real-World Explorer Mission",
+      story: `Now let's see how ${lesson.title} connects to our everyday environment.`,
       howItWorks:
-        "Everyday problems become easier when you identify which concepts connect together. Once you master this rule, you can unlock more advanced missions!",
-      demonstration:
-        "Explorers use this logic every single day to measure, discover, and build.",
-      questions: t3Pool.slice(0, t3QuestionCount),
+        "Apply what you observed to answer the final checkpoint question.",
+      visualIllustration: visualIllustration,
+      demonstration: demoText,
+      questions: t3Pool,
     },
   ];
 
   const recapPool: QuizQuestion[] = [
     buildQuestion(
-      "Mastery Check: What is the primary definition of " + lesson.title + "?",
+      `Mastery Check: What is the primary definition of ${lesson.title}?`,
       lesson.meaning,
-      [
-        "An unproven hypothesis with no evidence.",
-        "A temporary trick that only works sometimes.",
-      ],
+      ["An unproven guess.", "A temporary trick."],
       "Accurate recall of the core rule!",
     ),
     buildQuestion(
-      "Scenario: If a fellow explorer asks what " +
-        lesson.title +
-        " is about, you say:",
+      `Scenario: If asked to explain ${lesson.title}, you should state:`,
       lesson.meaning,
-      [
-        "It is too complicated to explain in words.",
-        "It is just a bunch of random guesses.",
-      ],
+      ["It is too complex to understand.", "It happens by pure chance."],
       "Clear communication of knowledge!",
     ),
     buildQuestion(
-      'Recall the example: "' + lesson.example + '". What concept was that?',
+      `Recall our example: "${lesson.example}". What did it illustrate?`,
       lesson.title,
-      ["A completely unrelated subject.", "An accidental mistake."],
+      ["An unrelated topic.", "An error."],
       "Great recognition of worked examples!",
     ),
     buildQuestion(
-      "True or False: Paying attention to details leads to more accurate answers.",
-      "True, observant learners find better solutions.",
-      [
-        "False, rushing fast is better than being accurate.",
-        "False, details do not matter in learning.",
-      ],
+      "True or False: Paying attention to details leads to accurate solutions.",
+      "True, observant learners find correct answers.",
+      ["False, rushing is better.", "False, details do not matter."],
       "Observant thinking is key!",
-    ),
-    buildQuestion(
-      "Which of the following is the best example of " + lesson.title + "?",
-      lesson.example,
-      [
-        "Ignoring all given measurements and rules.",
-        "Choosing numbers without reading the problem.",
-      ],
-      "Excellent application skills!",
-    ),
-    buildQuestion(
-      isScience
-        ? "In science, what do we call information collected through our senses?"
-        : "In math, what do we call breaking numbers into easier parts?",
-      isScience ? "Observations and Evidence" : "Decomposition and Strategies",
-      ["Pure Guesses", "Distractions"],
-      "Mastery of scientific and mathematical vocabulary!",
-    ),
-    buildQuestion(
-      "What should you do if an answer does not seem to make sense?",
-      "Review the core rule and check your steps again.",
-      [
-        "Ignore the error and move forward anyway.",
-        "Erase everything and give up on the mission.",
-      ],
-      "Resilient learners always double-check!",
-    ),
-    buildQuestion(
-      "Why is " +
-        lesson.title +
-        " considered an essential topic for " +
-        subjectTitle +
-        "?",
-      "It forms the building blocks for more advanced topics.",
-      [
-        "It is just filler content to make books longer.",
-        "It will never be used again in higher grades.",
-      ],
-      "Foundational understanding achieved!",
-    ),
-    buildQuestion(
-      "When solving challenges, what is the best order to work in?",
-      "Read carefully, identify the rule, then solve and verify.",
-      [
-        "Guess immediately, skip reading, and check nothing.",
-        "Give up, pick randomly, and move on.",
-      ],
-      "A systematic approach guarantees success!",
-    ),
-    buildQuestion(
-      "How do we know a concept is mastered?",
-      "When we can explain it simply and use it in a new situation.",
-      [
-        "Only when we memorize words without understanding.",
-        "When we copy an answer without thinking.",
-      ],
-      "True mastery demonstrated!",
     ),
   ];
 
-  return { topics, recapQuestions: recapPool };
+  return { topics, recapQuestions: shuffle(recapPool) };
 };
 
 export default function InteractiveLessonViewer({
@@ -334,8 +410,8 @@ export default function InteractiveLessonViewer({
   const storageKey = getStorageKey(gradeLevel, subject.title, lesson.title);
 
   const { topics, recapQuestions } = useMemo(
-    () => buildLessonContent(lesson, subject.title),
-    [lesson, subject.title],
+    () => buildLessonContent(lesson, subject.title, gradeLevel),
+    [lesson, subject.title, gradeLevel],
   );
 
   const [stage, setStage] = useState<
@@ -370,7 +446,6 @@ export default function InteractiveLessonViewer({
 
   const startTimeRef = useRef(Date.now());
   const timeSavedRef = useRef(false);
-
   const quizStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -553,7 +628,7 @@ export default function InteractiveLessonViewer({
   ]);
 
   const handleSelectOption = (idx: number) => {
-    if (isAnswered && isCorrect) return;
+    if (isAnswered) return;
     if (!activeQuiz) return;
 
     setSelectedOption(idx);
@@ -717,7 +792,6 @@ export default function InteractiveLessonViewer({
               </Animated.View>
             </View>
 
-            {/* The Rocket sliding on the bar! */}
             <Animated.View
               style={[
                 styles.rocketContainer,
@@ -733,7 +807,6 @@ export default function InteractiveLessonViewer({
             </Animated.View>
           </View>
 
-          {/* The Moon at the finish line! */}
           <View style={styles.moonContainer}>
             <Text style={styles.moonIcon}>🌕</Text>
           </View>
@@ -741,7 +814,7 @@ export default function InteractiveLessonViewer({
 
         <View style={[styles.heroCard, { borderColor: subject.color }]}>
           <Text style={styles.subjectPill}>
-            {subject.icon} {subject.title}
+            {subject.icon} {subject.title} (Grade {gradeLevel})
           </Text>
           <Text style={styles.lessonTitle}>{lesson.title}</Text>
           <Text style={styles.topicSubtitle}>
@@ -767,20 +840,31 @@ export default function InteractiveLessonViewer({
             <Text style={styles.storyText}>{currentTopic.story}</Text>
 
             <View style={styles.conceptBox}>
-              <Text style={styles.conceptBoxHeader}>How It Works</Text>
+              <Text style={styles.conceptBoxHeader}>
+                Core Pedagogical Guide
+              </Text>
               <Text style={styles.conceptBoxBody}>
                 {currentTopic.howItWorks}
               </Text>
             </View>
 
+            <View style={styles.visualDemoBox}>
+              <Text style={styles.visualDemoTag}>
+                👀 Visual Classroom Demonstration
+              </Text>
+              <Text style={styles.visualDemoText}>
+                {currentTopic.visualIllustration}
+              </Text>
+            </View>
+
             <View style={styles.demonstrationBox}>
-              <Text style={styles.demoTag}>Key Demonstration</Text>
+              <Text style={styles.demoTag}>Key Worked Example</Text>
               <Text style={styles.demoText}>{currentTopic.demonstration}</Text>
             </View>
 
             <Pressable style={styles.actionButton} onPress={handleNextAction}>
               <Text style={styles.actionButtonText}>
-                Practice This Concept 🎯
+                Take Topic Checkpoint 🎯
               </Text>
             </Pressable>
           </View>
@@ -812,10 +896,12 @@ export default function InteractiveLessonViewer({
                 const isThisSelected = selectedOption === idx;
                 let optStyle: any = styles.optionButton;
 
-                if (isAnswered && isThisSelected) {
-                  optStyle = isCorrect
-                    ? styles.optionCorrect
-                    : styles.optionWrong;
+                if (isAnswered) {
+                  if (idx === activeQuiz.correctIndex) {
+                    optStyle = styles.optionCorrect;
+                  } else if (isThisSelected) {
+                    optStyle = styles.optionWrong;
+                  }
                 }
 
                 return (
@@ -823,6 +909,7 @@ export default function InteractiveLessonViewer({
                     key={idx}
                     style={optStyle}
                     onPress={() => handleSelectOption(idx)}
+                    disabled={isAnswered}
                   >
                     <View style={styles.optionNumberCircle}>
                       <Text style={styles.optionNumberText}>{idx + 1}</Text>
@@ -835,12 +922,14 @@ export default function InteractiveLessonViewer({
 
             {isAnswered && isCorrect && (
               <View style={styles.successBanner}>
-                <Text style={styles.feedbackTitle}>🌟 Excellent Work!</Text>
+                <Text style={styles.feedbackTitle}>
+                  🌟 Correct! Excellent Work!
+                </Text>
                 <Text style={styles.feedbackSubtitle}>
                   {activeQuiz.explanation}
                 </Text>
                 <Pressable style={styles.nextButton} onPress={handleNextAction}>
-                  <Text style={styles.nextButtonText}>Continue</Text>
+                  <Text style={styles.nextButtonText}>Continue 🚀</Text>
                 </Pressable>
               </View>
             )}
@@ -904,12 +993,23 @@ export default function InteractiveLessonViewer({
               style={styles.finishMissionBtn}
               onPress={() => {
                 const isPerfect = mistakesCount === 0;
-                const isScience = subject.title.toLowerCase().includes("science") || ["matter", "living", "force", "earth"].some((s) => subject.title.toLowerCase().includes(s));
-                
-                const quizTimeSecs = quizStartTimeRef.current ? (Date.now() - quizStartTimeRef.current) / 1000 : 999;
+                const isScience =
+                  subject.title.toLowerCase().includes("science") ||
+                  ["matter", "living", "force", "earth"].some((s) =>
+                    subject.title.toLowerCase().includes(s),
+                  );
+
+                const quizTimeSecs = quizStartTimeRef.current
+                  ? (Date.now() - quizStartTimeRef.current) / 1000
+                  : 999;
                 const isSpeedy = quizTimeSecs < 45;
 
-                onComplete(totalXpEarned, isPerfect, isSpeedy && !isScience, isSpeedy && isScience);
+                onComplete(
+                  totalXpEarned,
+                  isPerfect,
+                  isSpeedy && !isScience,
+                  isSpeedy && isScience,
+                );
               }}
             >
               <Text style={styles.finishMissionBtnText}>
@@ -1021,7 +1121,7 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     justifyContent: "center",
-    paddingVertical: 10, 
+    paddingVertical: 10,
   },
   progressTrack: {
     height: 14,
@@ -1040,7 +1140,7 @@ const styles = StyleSheet.create({
   },
   rocketContainer: {
     position: "absolute",
-    marginLeft: -14, 
+    marginLeft: -14,
     zIndex: 10,
   },
   rocketIcon: {
@@ -1129,6 +1229,26 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     lineHeight: 22,
     fontWeight: "500",
+  },
+  visualDemoBox: {
+    backgroundColor: "#143336",
+    borderColor: "#22c55e",
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  visualDemoTag: {
+    color: "#4ade80",
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  visualDemoText: {
+    color: "#ffffff",
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "700",
   },
   demonstrationBox: {
     backgroundColor: "#172b5c",
