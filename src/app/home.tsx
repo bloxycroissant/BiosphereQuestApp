@@ -211,11 +211,6 @@ export default function HomeScreen(): React.JSX.Element {
       bgmPlayer.volume = 0.5;
       bgmPlayer.play();
     }
-    return () => {
-      if (bgmPlayer) {
-        bgmPlayer.pause();
-      }
-    };
   }, [bgmPlayer]);
 
   const progress = useProgress();
