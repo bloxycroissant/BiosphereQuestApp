@@ -6,6 +6,7 @@ import {
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -87,6 +88,18 @@ const learnerOutcomes: Record<string, string[]> = {
 };
 
 export default function ExploreScreen(): React.JSX.Element {
+  const bgmPlayer = useAudioPlayer(
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Relaxing Animal Crossing City Folk Music to study chill relax to.mp3"),
+  );
+
+  useEffect(() => {
+    if (bgmPlayer) {
+      bgmPlayer.loop = true;
+      bgmPlayer.volume = 0.5;
+      bgmPlayer.play();
+    }
+  }, [bgmPlayer]);
+
   const params = useLocalSearchParams<{ autoOpenSubject?: string }>();
   const [grade, setGrade] = useState(1);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -408,7 +421,6 @@ export default function ExploreScreen(): React.JSX.Element {
 
           {activeSubject && (
             <View style={styles.missionsContainer}>
-              {/* BIG CONTINUE HERO BUTTON */}
               {(() => {
                 let nextIdx = activeSubject.lessons.findIndex(
                   (lesson) =>
@@ -456,7 +468,6 @@ export default function ExploreScreen(): React.JSX.Element {
                 );
               })()}
 
-              {/* LEARNER OUTCOMES */}
               <LinearGradient
                 colors={[
                   activeSubject.color + "35",
@@ -499,7 +510,6 @@ export default function ExploreScreen(): React.JSX.Element {
                 ))}
               </LinearGradient>
 
-              {/* --- STUDY MATERIALS BUTTON --- */}
               <Text style={styles.sectionHeading}>STUDY MATERIALS</Text>
               <Pressable
                 style={styles.openNotesCard}
@@ -657,7 +667,6 @@ export default function ExploreScreen(): React.JSX.Element {
         {!activeSubject && <BottomNavigation />}
       </SafeAreaView>
 
-      {/* --- SINGLE PAGE NOTEBOOK VIEWER --- */}
       {showNotes && activeSubject && (
         <Animated.View style={styles.screenLayer}>
           <SubjectNotesViewer
@@ -668,7 +677,6 @@ export default function ExploreScreen(): React.JSX.Element {
         </Animated.View>
       )}
 
-      {/* --- INTERACTIVE LESSON VIEWER --- */}
       {selected && (
         <Animated.View
           style={[

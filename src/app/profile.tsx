@@ -1,6 +1,7 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -75,6 +76,17 @@ const STUDY_SESSIONS_KEY = "@biosphere_study_sessions_v1";
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ProfileScreen(): React.JSX.Element {
+  const bgmPlayer = useAudioPlayer(
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 🌌 30 Min Study, Focus & Relax Beats.mp3"),
+  );
+
+  useEffect(() => {
+    if (bgmPlayer) {
+      bgmPlayer.loop = true;
+      bgmPlayer.volume = 0.5;
+      bgmPlayer.play();
+    }
+  }, [bgmPlayer]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   if (
