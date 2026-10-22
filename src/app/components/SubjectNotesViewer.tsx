@@ -58,7 +58,6 @@ const HIGHLIGHTER_PALETTE = [
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Isolated memoized word component to eliminate full-page re-render lag when tapped
 interface HighlightableWordProps {
   wordKey: string;
   word: string;
@@ -78,7 +77,9 @@ const HighlightableWord = memo(function HighlightableWord({
       onPress={() => onPress(wordKey)}
       style={[
         styles.clickableWordText,
-        highlightColor ? { backgroundColor: highlightColor, borderRadius: 2 } : null,
+        highlightColor
+          ? { backgroundColor: highlightColor, borderRadius: 2 }
+          : null,
       ]}
     >
       {word}{" "}
@@ -89,6 +90,7 @@ const HighlightableWord = memo(function HighlightableWord({
 const getLessonVisualData = (
   lessonTitle: string,
   isScience: boolean,
+  gradeLevel: number,
 ): LessonVisualData => {
   const title = (lessonTitle || "").toLowerCase();
   let steps: LessonVisualStep[];
@@ -99,17 +101,20 @@ const getLessonVisualData = (
         {
           icon: "🌱",
           label: "Plant Germination",
-          detail: "Start with a healthy seed or young plant embedded in fertile soil.",
+          detail:
+            "Start with a healthy seed or young plant embedded in fertile soil.",
         },
         {
           icon: "☀️",
           label: "Resource Absorption",
-          detail: "Provide plenty of sunlight, clean water, and rich organic minerals.",
+          detail:
+            "Provide plenty of sunlight, clean water, and rich organic minerals.",
         },
         {
           icon: "🌼",
           label: "Full Maturity",
-          detail: "Watch as it blossoms into a mature, adult organism capable of reproduction!",
+          detail:
+            "Watch as it blossoms into a mature, adult organism capable of reproduction!",
         },
       ];
     } else if (/life cycle|metamorph|animal/.test(title)) {
@@ -117,17 +122,20 @@ const getLessonVisualData = (
         {
           icon: "🥚",
           label: "Initial Stage",
-          detail: "Life begins inside a protective egg membrane or as a newborn juvenile.",
+          detail:
+            "Life begins inside a protective egg membrane or as a newborn juvenile.",
         },
         {
           icon: "🐛",
           label: "Developmental Phase",
-          detail: "The animal feeds continuously, grows rapidly, and undergoes structural change.",
+          detail:
+            "The animal feeds continuously, grows rapidly, and undergoes structural change.",
         },
         {
           icon: "🦋",
           label: "Adult Stage",
-          detail: "The organism reaches full biological maturity and passes on genetic traits.",
+          detail:
+            "The organism reaches full biological maturity and passes on genetic traits.",
         },
       ];
     } else if (/matter|solid|liquid|gas|mixture|melting/.test(title)) {
@@ -135,17 +143,20 @@ const getLessonVisualData = (
         {
           icon: "🧊",
           label: "Solid State",
-          detail: "Molecules remain tightly packed together, holding a fixed shape and volume.",
+          detail:
+            "Molecules remain tightly packed together, holding a fixed shape and volume.",
         },
         {
           icon: "💧",
           label: "Liquid State",
-          detail: "Thermal energy loosens molecular bonds, allowing fluid movement and flow.",
+          detail:
+            "Thermal energy loosens molecular bonds, allowing fluid movement and flow.",
         },
         {
           icon: "☁️",
           label: "Gas State",
-          detail: "High temperature drives particles apart, expanding to fill any container space.",
+          detail:
+            "High temperature drives particles apart, expanding to fill any container space.",
         },
       ];
     } else {
@@ -153,45 +164,160 @@ const getLessonVisualData = (
         {
           icon: "🔎",
           label: "Observation",
-          detail: "Examine key physical phenomena and record empirical field data.",
+          detail:
+            "Examine key physical phenomena and record empirical field data.",
         },
         {
           icon: "📝",
           label: "Documentation",
-          detail: "Log all findings carefully inside a structured research framework.",
+          detail:
+            "Log all findings carefully inside a structured research framework.",
         },
         {
           icon: "💡",
           label: "Conclusion",
-          detail: "Formulate a sound scientific rule supported by verifiable evidence.",
+          detail:
+            "Formulate a sound scientific rule supported by verifiable evidence.",
         },
       ];
     }
   } else {
-    steps = [
-      {
-        icon: "📘",
-        label: "Rule Identification",
-        detail: "Read and analyze the core mathematical rule or algebraic principle.",
-      },
-      {
-        icon: "🧩",
-        label: "Variable Alignment",
-        detail: "Substitute given numerical values into the target equation correctly.",
-      },
-      {
-        icon: "✅",
-        label: "Verification",
-        detail: "Execute steps systematically and double-check units and calculations.",
-      },
-    ];
+    if (gradeLevel <= 3) {
+      if (/count|number|sense|ordinal/.test(title)) {
+        steps = [
+          {
+            icon: "🖐️",
+            label: "Finger & Object Counting",
+            detail:
+              "Count actual physical objects or fingers one by one from left to right.",
+          },
+          {
+            icon: "🔴",
+            label: "Visual Counters",
+            detail:
+              "Group counters into sets to see which group has more or fewer items.",
+          },
+          {
+            icon: "⭐",
+            label: "Total Amount",
+            detail: "State the final counted number clearly out loud!",
+          },
+        ];
+      } else if (/shape|pattern/.test(title)) {
+        steps = [
+          {
+            icon: "🔺",
+            label: "Identify Shapes",
+            detail:
+              "Trace the straight sides and corners of circles, squares, and triangles.",
+          },
+          {
+            icon: "🔄",
+            label: "Spot the Pattern",
+            detail:
+              "Look at the repeating sequence order (A-B-A-B) to find what comes next.",
+          },
+          {
+            icon: "🎨",
+            label: "Complete the Sequence",
+            detail:
+              "Draw or place the correct missing shape to finish the pattern!",
+          },
+        ];
+      } else if (/addition|subtraction|sum|difference/.test(title)) {
+        steps = [
+          {
+            icon: "🍎",
+            label: "Gather Objects",
+            detail:
+              "Put two groups of fruits or blocks together to add (+) them up.",
+          },
+          {
+            icon: "🤲",
+            label: "Take Away",
+            detail:
+              "Remove items from the group to find what is left over (-).",
+          },
+          {
+            icon: "✅",
+            label: "Count the Total",
+            detail:
+              "Count all remaining items together to get your final answer.",
+          },
+        ];
+      } else if (/place value|block|thousand|hundred/.test(title)) {
+        steps = [
+          {
+            icon: "🟦",
+            label: "Base-10 Flats & Rods",
+            detail:
+              "Use 100-flats, 10-rods, and 1-units to build numbers visually.",
+          },
+          {
+            icon: "📊",
+            label: "Group Tens and Ones",
+            detail: "Regroup 10 ones into a ten block when counting past 9.",
+          },
+          {
+            icon: "🔢",
+            label: "Read the Number",
+            detail:
+              "Combine hundreds, tens, and ones to say the full 3-digit number.",
+          },
+        ];
+      } else {
+        steps = [
+          {
+            icon: "👁️",
+            label: "Observe Objects",
+            detail:
+              "Look closely at the pictures, counters, or shapes on your desk.",
+          },
+          {
+            icon: "➕",
+            label: "Work with Items",
+            detail:
+              "Use physical items or drawings to solve the math puzzle step by step.",
+          },
+          {
+            icon: "🌟",
+            label: "Check Your Work",
+            detail:
+              "Count your objects again to make sure your answer is correct!",
+          },
+        ];
+      }
+    } else {
+      steps = [
+        {
+          icon: "📘",
+          label: "Rule Identification",
+          detail: "Read and analyze the core mathematical rule or principle.",
+        },
+        {
+          icon: "🧩",
+          label: "Variable Alignment",
+          detail:
+            "Substitute given numerical values into the target equation correctly.",
+        },
+        {
+          icon: "✅",
+          label: "Verification",
+          detail:
+            "Execute steps systematically and double-check units and calculations.",
+        },
+      ];
+    }
   }
 
   return {
-    title: "Visual Concept Map",
-    summary: isScience
-      ? "Observe key physical components, trace fundamental interactions, and conclude with verified empirical evidence."
-      : "Identify given variables, apply mathematical formulas step-by-step, and verify your results against core rules.",
+    title: gradeLevel <= 3 ? "Visual Math Guide" : "Visual Concept Map",
+    summary:
+      gradeLevel <= 3
+        ? "Use physical objects, visual counting, and block groups to understand math concepts easily."
+        : isScience
+          ? "Observe key physical components, trace fundamental interactions, and conclude with verified empirical evidence."
+          : "Identify given variables, apply mathematical formulas step-by-step, and verify your results against core rules.",
     steps,
   };
 };
@@ -274,14 +400,20 @@ const buildLessonExpansion = (
     definition: meaningText,
     explanation: isScience
       ? `In-Depth Scientific Analysis of ${keyword}:\n\n1. Structural Properties & Observations: When examining ${keyword}, scientists begin by documenting physical attributes, thermal changes, and environmental interactions. Every physical system operates according to fixed scientific laws that govern energy conservation, molecular behavior, and system equilibrium.\n\n2. Key Mechanisms & Relationships: Observing ${keyword} requires analyzing cause-and-effect patterns. For instance, changes in temperature, pressure, forces, or biological resources directly alter how the system behaves. Identifying these variables allows us to predict future outcomes accurately.\n\n3. Empirical Rules to Remember: Always distinguish between directly observable traits (such as color, mass, or velocity) and inferred properties (such as chemical composition or potential energy). Verifiable scientific conclusions are built on reproducible, empirical evidence.\n\nAcademic Guidance Note:\n${gradeHint}`
-      : `Comprehensive Mathematical Explanation of ${keyword}:\n\n1. Foundational Rules & Principles: The mathematical framework of ${keyword} relies on fundamental axioms, formulas, and operational definitions. Understanding this topic requires recognizing how numerical quantities interact within structured equations.\n\n2. Systematic Problem Approach: When solving problems involving ${keyword}, always follow a clear three-step process:\n- Step A: Carefully identify all given information and denote unknown target variables.\n- Step B: Select the appropriate formula or operational rule that relates the known values to the target unknown.\n- Step C: Perform arithmetic calculations systematically, ensuring proper order of operations and maintaining exact units of measure.\n\n3. Proof and Validation Protocols: Never accept a calculated result without verification. Substitute your calculated value back into the original expression to verify equality and ensure that your result is logically reasonable.\n\nAcademic Guidance Note:\n${gradeHint}`,
+      : gradeLevel <= 3
+        ? `Primary Classroom Approach for ${keyword}:\n\n1. Visual & Hands-On Learning: In Grade ${gradeLevel}, math is taught using tangible objects, finger counting, visual counters, and block groups rather than abstract formulas. Touching and seeing quantities helps young explorers build strong number sense.\n\n2. Step-by-Step Problem Solving:\n- Step A: Read the problem and look at the visual counters, shapes, or items.\n- Step B: Use physical items or drawings to group, add, or take away items.\n- Step C: Count aloud to find your final answer and verify with your classmates or teacher!\n\n3. Real-World Connection: Math is all around us—whether sharing snacks, counting toys, or measuring lengths with a ruler.\n\nExplorer Tip:\n${gradeHint}`
+        : `Comprehensive Mathematical Explanation of ${keyword}:\n\n1. Foundational Rules & Principles: The mathematical framework of ${keyword} relies on fundamental axioms, formulas, and operational definitions.\n\n2. Systematic Problem Approach: When solving problems involving ${keyword}, always follow a clear three-step process:\n- Step A: Carefully identify all given information and denote unknown target variables.\n- Step B: Select the appropriate formula or operational rule.\n- Step C: Perform arithmetic calculations systematically.\n\n3. Proof and Validation Protocols: Substitute your calculated value back into the original expression to verify equality.\n\nAcademic Guidance Note:\n${gradeHint}`,
     example: exampleText,
     exampleExplanation: isScience
-      ? `Detailed Breakdown of the Example:\n\nAnalyze the scenario provided above regarding ${keyword}. Observe how each physical component operates in harmony with scientific principles. The key evidence lies in noticing specific physical interactions and identifying how energy or mass transfers between states.\n\nCore Principles Illustrated:\n• Observation: Identify the initial conditions and physical properties presented in the real-world setup.\n• Analysis: Connect these initial conditions directly to the definition: "${meaningText}".\n• Conclusion: Synthesize these findings to understand how natural systems remain balanced and governed by natural laws.`
-      : `Detailed Breakdown of the Example:\n\nExamine the mathematical context established in the example above. Every number, symbol, and geometric representation corresponds to a precise quantitative relationship. By decomposing the example into discrete operational steps, we can easily see how the abstract rule translates into a practical solution.\n\nCore Principles Illustrated:\n• Setup: Match the numbers from the example with their corresponding operational positions.\n• Calculation: Execute each operation step-by-step while adhering strictly to algebraic rules.\n• Verification: Re-check that your computed result satisfies the overarching rule: "${meaningText}".`,
+      ? `Detailed Breakdown of the Example:\n\nAnalyze the scenario provided above regarding ${keyword}. Observe how each physical component operates in harmony with scientific principles.`
+      : gradeLevel <= 3
+        ? `Detailed Breakdown of the Example:\n\nLook at how ${keyword} is shown in the example above using everyday objects and pictures. Counting items together or organizing shapes helps make math fun and easy to understand!`
+        : `Detailed Breakdown of the Example:\n\nExamine the mathematical context established in the example above. By decomposing the example into discrete operational steps, we can easily see how the abstract rule translates into a practical solution.`,
     computation: isScience
-      ? `Step-by-Step Practical Demonstration:\n\n1. Observation Phase: Examine the example details carefully: "${exampleText}". Identify the primary objects, forces, or biological entities involved in the process.\n\n2. Evidence Identification: Locate key details that demonstrate scientific principles in action. Note any changes in energy, state of matter, or physical structure.\n\n3. Analytical Explanation: Connect the empirical evidence directly back to the scientific laws governing ${keyword}. Formulate a concise summary explaining why the outcome occurred based on verifiable physical properties.`
-      : `Step-by-Step Computational Procedure:\n\n1. Read & Deconstruct: Review the problem statement: "${exampleText}". Extract all given quantities, operational conditions, and required target units.\n\n2. Operational Setup: Arrange the numbers in logical order according to the standard formula for ${keyword}. Ensure all measurement units are uniform prior to calculation.\n\n3. Execute Calculation: Perform the required arithmetic operations step-by-step. Work cleanly from left to right while respecting formal order of operations.\n\n4. Logical Check: Verify that the computed numerical output falls within reasonable physical or numerical bounds.`,
+      ? `Step-by-Step Practical Demonstration:\n\n1. Observation Phase: Examine the example details carefully: "${exampleText}".\n\n2. Evidence Identification: Locate key details that demonstrate scientific principles in action.\n\n3. Analytical Explanation: Connect the empirical evidence directly back to the scientific laws governing ${keyword}.`
+      : gradeLevel <= 3
+        ? `Step-by-Step Classroom Activity:\n\n1. Look at the Pictures: Examine the visual counters, fruit items, or shapes shown in "${exampleText}".\n\n2. Count Aloud: Use your fingers or touch each item one by one to count them out loud.\n\n3. Find the Answer: Put groups together (add) or take items away (subtract) to find your final count!`
+        : `Step-by-Step Computational Procedure:\n\n1. Read & Deconstruct: Review the problem statement: "${exampleText}". Extract all given quantities.\n\n2. Operational Setup: Arrange numbers in logical order according to the standard formula.\n\n3. Execute Calculation: Perform arithmetic operations step-by-step.`,
     practice: `Comprehensive Activity Exercise:\n\nIn your own words, explain the core meaning of ${keyword}. Next, construct a complete original example that illustrates this concept in action.\n\nExercise Tasks:\n1. Write out the primary definition using clear, formal academic language.\n2. Detail a practical scenario where this concept applies.\n3. Write a short explanation demonstrating step-by-step how your scenario proves the rule!`,
   };
 };
@@ -292,17 +424,24 @@ export default function SubjectNotesViewer({
   onClose,
 }: SubjectNotesViewerProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedHighlighter, setSelectedHighlighter] = useState<string | null>(null);
-  const [wordHighlights, setWordHighlights] = useState<Record<string, string>>({});
-  const [bookmarkedPages, setBookmarkedPages] = useState<Record<number, BookmarkOption>>({});
-  const [currentBookmarkDesign, setCurrentBookmarkDesign] = useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
+  const [selectedHighlighter, setSelectedHighlighter] = useState<string | null>(
+    null,
+  );
+  const [wordHighlights, setWordHighlights] = useState<Record<string, string>>(
+    {},
+  );
+  const [bookmarkedPages, setBookmarkedPages] = useState<
+    Record<number, BookmarkOption>
+  >({});
+  const [currentBookmarkDesign, setCurrentBookmarkDesign] =
+    useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
 
   const flipAnim = useRef(new Animated.Value(0)).current;
   const bookmarkDropAnim = useRef(new Animated.Value(-80)).current;
   const bookmarkScaleAnim = useRef(new Animated.Value(0.2)).current;
   const bookmarkBtnScale = useRef(new Animated.Value(1)).current;
   const bookmarkTextOpacity = useRef(new Animated.Value(1)).current;
-  
+
   const closeNotebookScale = useRef(new Animated.Value(1)).current;
   const closeNotebookRotate = useRef(new Animated.Value(0)).current;
   const closeNotebookOffsetY = useRef(new Animated.Value(0)).current;
@@ -311,7 +450,9 @@ export default function SubjectNotesViewer({
   const mascotFloatAnim = useRef(new Animated.Value(0)).current;
 
   const swatchAnimValues = useRef<Record<string, Animated.Value>>({}).current;
-  const stickyTabAnimValues = useRef<Record<number, Animated.Value>>({}).current;
+  const stickyTabAnimValues = useRef<Record<number, Animated.Value>>(
+    {},
+  ).current;
 
   const pageTurnAudio = useAudioPlayer(pageTurnSoundFile);
 
@@ -335,19 +476,52 @@ export default function SubjectNotesViewer({
   };
 
   const CARTOON_CHARACTERS = [
-    { avatar: "🦉", name: "Ollie the Owl", tip: "Great reading! Swipe or tap to keep going!", isStella: false },
-    { avatar: "🦊", name: "Felix the Fox", tip: "You're doing super awesome!", isStella: false },
-    { avatar: "🐼", name: "Pippin Panda", tip: "Spot any fun ideas on this page?", isStella: false },
-    { avatar: "", name: "Stella (Biosphere Quest Mascot)", tip: "Keep exploring, cosmic learner!", isStella: true },
+    {
+      avatar: "🦉",
+      name: "Ollie the Owl",
+      tip: "Great reading! Swipe or tap to keep going!",
+      isStella: false,
+    },
+    {
+      avatar: "🦊",
+      name: "Felix the Fox",
+      tip: "You're doing super awesome!",
+      isStella: false,
+    },
+    {
+      avatar: "🐼",
+      name: "Pippin Panda",
+      tip: "Spot any fun ideas on this page?",
+      isStella: false,
+    },
+    {
+      avatar: "",
+      name: "Stella (Biosphere Quest Mascot)",
+      tip: "Keep exploring, cosmic learner!",
+      isStella: true,
+    },
   ];
 
   const LAB_STAMPS = [
-    { icon: "🔬", title: "LAB PRO-TIP", tip: "Analyze the core evidence before forming your hypothesis." },
-    { icon: "💡", title: "KEY INSIGHT", tip: "Notice how this principle connects to real-world models." },
-    { icon: "📊", title: "FIELD NOTE", tip: "Verify all units and check your steps for consistency." },
+    {
+      icon: "🔬",
+      title: "LAB PRO-TIP",
+      tip: "Analyze the core evidence before forming your hypothesis.",
+    },
+    {
+      icon: "💡",
+      title: "KEY INSIGHT",
+      tip: "Notice how this principle connects to real-world models.",
+    },
+    {
+      icon: "📊",
+      title: "FIELD NOTE",
+      tip: "Verify all units and check your steps for consistency.",
+    },
   ];
 
-  const activeCharacter = CARTOON_CHARACTERS[currentPage % CARTOON_CHARACTERS.length];
+  const activeCharacter =
+    CARTOON_CHARACTERS[currentPage % CARTOON_CHARACTERS.length];
   const activeLabStamp = LAB_STAMPS[currentPage % LAB_STAMPS.length];
 
   useEffect(() => {
@@ -365,7 +539,7 @@ export default function SubjectNotesViewer({
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
 
     Animated.timing(headerFadeAnim, {
@@ -387,8 +561,16 @@ export default function SubjectNotesViewer({
     }
 
     Animated.sequence([
-      Animated.timing(backBtnScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
-      Animated.spring(backBtnScale, { toValue: 1.1, friction: 3, useNativeDriver: true }),
+      Animated.timing(backBtnScale, {
+        toValue: 0.85,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(backBtnScale, {
+        toValue: 1.1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     Animated.parallel([
@@ -412,13 +594,13 @@ export default function SubjectNotesViewer({
             useNativeDriver: true,
           }),
           Animated.timing(closeNotebookRotate, {
-            toValue: -8, 
+            toValue: -8,
             duration: 320,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(closeNotebookOffsetY, {
-            toValue: 120, 
+            toValue: 120,
             duration: 320,
             easing: Easing.in(Easing.quad),
             useNativeDriver: true,
@@ -490,7 +672,15 @@ export default function SubjectNotesViewer({
 
   const stickyTabs = useMemo(() => {
     const tabs: Array<{ pageIndex: number; label: string; color: string }> = [];
-    const colors = ["#FF5252", "#FF7043", "#FFA726", "#66BB6A", "#26A69A", "#42A5F5", "#AB47BC"];
+    const colors = [
+      "#FF5252",
+      "#FF7043",
+      "#FFA726",
+      "#66BB6A",
+      "#26A69A",
+      "#42A5F5",
+      "#AB47BC",
+    ];
 
     chapterList.forEach((_, index) => {
       const startPageIndex = 1 + index * 2;
@@ -542,10 +732,14 @@ export default function SubjectNotesViewer({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gestureState) => {
-        return !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 10;
+        return (
+          !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 10
+        );
       },
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 15;
+        return (
+          !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 15
+        );
       },
       onPanResponderGrant: (evt) => {
         if (selectedHighlighterRef.current) {
@@ -569,7 +763,7 @@ export default function SubjectNotesViewer({
           }
         }
       },
-    })
+    }),
   ).current;
 
   const renderParagraphs = (text: string, prefix: string) => {
@@ -614,18 +808,32 @@ export default function SubjectNotesViewer({
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
-          {isChildTheme ? `🌈 ${subject.title} Field Guide` : `📑 ${subject.title} Comprehensive Journal`}
+          {isChildTheme
+            ? `🌈 ${subject.title} Field Guide`
+            : `📑 ${subject.title} Comprehensive Journal`}
         </Text>
         <Text style={styles.pageSubtitle}>
           Grade {gradeLevel} Explorer's Master Notebook
         </Text>
-        <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
+        <View
+          style={[styles.divider, { backgroundColor: theme.dividerColor }]}
+        />
         <Text style={styles.sectionHeading}>
-          {isChildTheme ? "🎈 Welcome Explorer!" : "🔬 Academic Research Notebook"}
+          {isChildTheme
+            ? "🎈 Welcome Explorer!"
+            : "🔬 Academic Research Notebook"}
         </Text>
-        {renderParagraphs(`Welcome to the master field notebook for ${subject.title}! This study guide is meticulously designed to provide complete conceptual clarity across 7 full chapters: rigorous scientific and mathematical definitions, step-by-step worked examples, and interactive activity exercises.`, "intro-1")}
-        <Text style={styles.sectionHeading}>📖 Notebook Structural Organization</Text>
-        {renderParagraphs("• Chapters 1–4 (Theoretical Foundations): Focus purely on extensive explanations, formal definitions, and deep descriptions of core principles.\n\n• Chapters 5–7 (Practical Applications): Focus on comprehensive real-world worked examples, step-by-step computation models, and guided activity exercises.\n\nHighlighter Tool Usage: Choose a color from the toolbar above to mark important text. Select 'Off' to clear highlights. Use the sticky arrow tabs on the right margin to jump directly across chapters.", "intro-2")}
+        {renderParagraphs(
+          `Welcome to the master field notebook for ${subject.title}! This study guide is meticulously designed to provide complete conceptual clarity across 7 full chapters: rigorous scientific and mathematical definitions, step-by-step worked examples, and interactive activity exercises.`,
+          "intro-1",
+        )}
+        <Text style={styles.sectionHeading}>
+          📖 Notebook Structural Organization
+        </Text>
+        {renderParagraphs(
+          "• Chapters 1–4 (Theoretical Foundations): Focus purely on extensive explanations, formal definitions, and deep descriptions of core principles.\n\n• Chapters 5–7 (Practical Applications): Focus on comprehensive real-world worked examples, step-by-step computation models, and guided activity exercises.\n\nHighlighter Tool Usage: Choose a color from the toolbar above to mark important text. Select 'Off' to clear highlights. Use the sticky arrow tabs on the right margin to jump directly across chapters.",
+          "intro-2",
+        )}
       </ScrollView>,
     );
 
@@ -637,7 +845,11 @@ export default function SubjectNotesViewer({
         chap.meaning,
         chap.example,
       );
-      const visualData = getLessonVisualData(chap.title, expansion.isScience);
+      const visualData = getLessonVisualData(
+        chap.title,
+        expansion.isScience,
+        gradeLevel,
+      );
       const isExplanationChapter = index < 4;
       const includeVisualMap = index < 2;
 
@@ -649,12 +861,22 @@ export default function SubjectNotesViewer({
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Theoretical Foundations (Part 1)</Text>
-            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>{chap.title}</Text>
-            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
-            <Text style={styles.sectionHeading}>📖 Core Axiom & Definition</Text>
+            <Text style={styles.pageSubtitle}>
+              Chapter {index + 1} of 7 • Theoretical Foundations (Part 1)
+            </Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              {chap.title}
+            </Text>
+            <View
+              style={[styles.divider, { backgroundColor: theme.dividerColor }]}
+            />
+            <Text style={styles.sectionHeading}>
+              📖 Core Axiom & Definition
+            </Text>
             {renderParagraphs(expansion.definition, `c${index}-p1`)}
-            <Text style={styles.sectionHeading}>🧠 Comprehensive Theoretical Breakdown</Text>
+            <Text style={styles.sectionHeading}>
+              🧠 Comprehensive Theoretical Breakdown
+            </Text>
             {renderParagraphs(expansion.explanation, `c${index}-p2`)}
           </ScrollView>,
         );
@@ -666,21 +888,39 @@ export default function SubjectNotesViewer({
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Theoretical Foundations (Part 2)</Text>
-            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
-              {includeVisualMap ? "Visual Concept Map" : "Structural Rules & Analysis"}
+            <Text style={styles.pageSubtitle}>
+              Chapter {index + 1} of 7 • Theoretical Foundations (Part 2)
             </Text>
-            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
-            
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              {includeVisualMap
+                ? gradeLevel <= 3
+                  ? "Visual Math Guide"
+                  : "Visual Concept Map"
+                : "Structural Rules & Analysis"}
+            </Text>
+            <View
+              style={[styles.divider, { backgroundColor: theme.dividerColor }]}
+            />
+
             {includeVisualMap ? (
               <>
-                {renderParagraphs(`Examine the flow diagram below to understand the key sequential steps of ${chap.title.toLowerCase()}.`, `c${index}-map-desc`)}
+                {renderParagraphs(
+                  gradeLevel <= 3
+                    ? `Examine the visual guide below to understand how ${chap.title.toLowerCase()} is explored using objects and pictures.`
+                    : `Examine the flow diagram below to understand the key sequential steps of ${chap.title.toLowerCase()}.`,
+                  `c${index}-map-desc`,
+                )}
                 <LessonVisual data={visualData} />
               </>
             ) : (
               <>
-                <Text style={styles.sectionHeading}>🔬 Deep Structural Rules & Mechanics</Text>
-                {renderParagraphs(`Mastering ${chap.title.toLowerCase()} requires analyzing how each rule fits into the overarching academic system.\n\n• Axiom 1 (Fundamental Definition): Always start by anchoring your analysis in the primary definition. Identify all core properties and governing rules before attempting complex problems.\n\n• Axiom 2 (System Interactions): Observe how internal variables interact with external influences. Changing one element shifts the equilibrium of the entire mathematical or physical framework.\n\n• Axiom 3 (Verification Protocols): Always cross-examine your observational or computational data against established scientific laws and mathematical proofs. Consistency across multiple test conditions ensures true mastery!`, `c${index}-deep-desc`)}
+                <Text style={styles.sectionHeading}>
+                  🔬 Deep Structural Rules & Mechanics
+                </Text>
+                {renderParagraphs(
+                  `Mastering ${chap.title.toLowerCase()} requires analyzing how each rule fits into the overarching academic system.\n\n• Axiom 1 (Fundamental Definition): Always start by anchoring your analysis in the primary definition. Identify all core properties and governing rules before attempting complex problems.\n\n• Axiom 2 (System Interactions): Observe how internal variables interact with external influences. Changing one element shifts the equilibrium of the entire framework.\n\n• Axiom 3 (Verification Protocols): Always cross-examine your observational or computational data against established rules. Consistency across multiple test conditions ensures true mastery!`,
+                  `c${index}-deep-desc`,
+                )}
               </>
             )}
           </ScrollView>,
@@ -693,13 +933,25 @@ export default function SubjectNotesViewer({
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Practical Application (Part 1)</Text>
-            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>{chap.title}</Text>
-            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
-            <Text style={styles.sectionHeading}>⭐ Worked Real-World Example</Text>
+            <Text style={styles.pageSubtitle}>
+              Chapter {index + 1} of 7 • Practical Application (Part 1)
+            </Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              {chap.title}
+            </Text>
+            <View
+              style={[styles.divider, { backgroundColor: theme.dividerColor }]}
+            />
+            <Text style={styles.sectionHeading}>
+              ⭐ Worked Real-World Example
+            </Text>
             {renderParagraphs(expansion.example, `c${index}-ex`)}
             <Text style={styles.sectionHeading}>
-              {expansion.isScience ? "🔬 Step-by-Step Empirical Solution" : "🧮 Step-by-Step Computation Model"}
+              {expansion.isScience
+                ? "🔬 Step-by-Step Empirical Solution"
+                : gradeLevel <= 3
+                  ? "🔢 Step-by-Step Classroom Activity"
+                  : "🧮 Step-by-Step Computation Model"}
             </Text>
             {renderParagraphs(expansion.computation, `c${index}-comp`)}
           </ScrollView>,
@@ -712,27 +964,56 @@ export default function SubjectNotesViewer({
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.pageSubtitle}>Chapter {index + 1} of 7 • Practical Application (Part 2)</Text>
-            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>Activity Practice Exercise</Text>
-            <View style={[styles.divider, { backgroundColor: theme.dividerColor }]} />
-            <Text style={styles.sectionHeading}>🎯 Guided Activity Exercise</Text>
+            <Text style={styles.pageSubtitle}>
+              Chapter {index + 1} of 7 • Practical Application (Part 2)
+            </Text>
+            <Text style={[styles.pageTitle, { fontSize: theme.titleSize }]}>
+              Activity Practice Exercise
+            </Text>
+            <View
+              style={[styles.divider, { backgroundColor: theme.dividerColor }]}
+            />
+            <Text style={styles.sectionHeading}>
+              🎯 Guided Activity Exercise
+            </Text>
             {renderParagraphs(expansion.practice, `c${index}-prac`)}
-            <Text style={styles.sectionHeading}>💡 Analytical Breakdown & Solution Notes</Text>
+            <Text style={styles.sectionHeading}>
+              💡 Analytical Breakdown & Solution Notes
+            </Text>
             {renderParagraphs(expansion.exampleExplanation, `c${index}-why`)}
-            <Text style={styles.sectionHeading}>🚀 Explorer's Mission Strategy</Text>
-            {renderParagraphs("Apply the foundational rules and theoretical descriptions from Chapters 1–4 to complete this activity exercise. Always check your steps against the definition to verify complete correctness!", `c${index}-tip`)}
+            <Text style={styles.sectionHeading}>
+              🚀 Explorer's Mission Strategy
+            </Text>
+            {renderParagraphs(
+              "Apply the foundational rules and theoretical descriptions from Chapters 1–4 to complete this activity exercise. Always check your steps against the definition to verify complete correctness!",
+              `c${index}-tip`,
+            )}
           </ScrollView>,
         );
       }
     });
 
     return generatedPages;
-  }, [subject, gradeLevel, chapterList, selectedHighlighter, wordHighlights, currentPage, isChildTheme, theme]);
+  }, [
+    subject,
+    gradeLevel,
+    chapterList,
+    selectedHighlighter,
+    wordHighlights,
+    currentPage,
+    isChildTheme,
+    theme,
+  ]);
 
   const totalPages = pages.length;
 
   const jumpToPage = (newPage: number) => {
-    if (newPage < 0 || newPage >= totalPages || newPage === currentPageRef.current) return;
+    if (
+      newPage < 0 ||
+      newPage >= totalPages ||
+      newPage === currentPageRef.current
+    )
+      return;
 
     if (pageTurnAudio) {
       try {
@@ -746,8 +1027,16 @@ export default function SubjectNotesViewer({
 
     const tabAnim = getStickyTabAnim(newPage);
     Animated.sequence([
-      Animated.timing(tabAnim, { toValue: -12, duration: 100, useNativeDriver: true }),
-      Animated.spring(tabAnim, { toValue: 0, friction: 5, useNativeDriver: true }),
+      Animated.timing(tabAnim, {
+        toValue: -12,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(tabAnim, {
+        toValue: 0,
+        friction: 5,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     if (newPage > currentPageRef.current) {
@@ -778,7 +1067,11 @@ export default function SubjectNotesViewer({
 
   const toggleBookmark = () => {
     Animated.sequence([
-      Animated.timing(bookmarkBtnScale, { toValue: 0.82, duration: 70, useNativeDriver: true }),
+      Animated.timing(bookmarkBtnScale, {
+        toValue: 0.82,
+        duration: 70,
+        useNativeDriver: true,
+      }),
       Animated.spring(bookmarkBtnScale, {
         toValue: 1.15,
         friction: 3,
@@ -794,8 +1087,16 @@ export default function SubjectNotesViewer({
     ]).start();
 
     Animated.sequence([
-      Animated.timing(bookmarkTextOpacity, { toValue: 0.2, duration: 60, useNativeDriver: true }),
-      Animated.timing(bookmarkTextOpacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.timing(bookmarkTextOpacity, {
+        toValue: 0.2,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bookmarkTextOpacity, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     setBookmarkedPages((prev) => {
@@ -804,8 +1105,16 @@ export default function SubjectNotesViewer({
 
       if (isAlreadyBookmarked) {
         Animated.parallel([
-          Animated.timing(bookmarkDropAnim, { toValue: -80, duration: 180, useNativeDriver: true }),
-          Animated.timing(bookmarkScaleAnim, { toValue: 0.1, duration: 160, useNativeDriver: true }),
+          Animated.timing(bookmarkDropAnim, {
+            toValue: -80,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.timing(bookmarkScaleAnim, {
+            toValue: 0.1,
+            duration: 160,
+            useNativeDriver: true,
+          }),
         ]).start(() => {
           delete next[currentPage];
           setBookmarkedPages({ ...next });
@@ -867,7 +1176,11 @@ export default function SubjectNotesViewer({
         </Animated.View>
 
         <View style={styles.toolbarRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.toolbarScroll}
+          >
             <Text style={styles.toolbarLabel}>Highlighter:</Text>
             <AnimatedPressable
               style={[
@@ -900,7 +1213,8 @@ export default function SubjectNotesViewer({
                 key={design.id}
                 style={[
                   styles.designBadge,
-                  currentBookmarkDesign.id === design.id && styles.designBadgeSelected,
+                  currentBookmarkDesign.id === design.id &&
+                    styles.designBadgeSelected,
                 ]}
                 onPress={() => setCurrentBookmarkDesign(design)}
               >
@@ -964,7 +1278,9 @@ export default function SubjectNotesViewer({
                   },
                 ]}
               >
-                <Text style={styles.bookmarkIconTextLarge}>{activeBookmark.icon}</Text>
+                <Text style={styles.bookmarkIconTextLarge}>
+                  {activeBookmark.icon}
+                </Text>
               </Animated.View>
             )}
 
@@ -979,7 +1295,12 @@ export default function SubjectNotesViewer({
             >
               {pages[currentPage]}
 
-              <View style={[styles.paginationFooter, { borderTopColor: theme.dividerColor }]}>
+              <View
+                style={[
+                  styles.paginationFooter,
+                  { borderTopColor: theme.dividerColor },
+                ]}
+              >
                 <Text style={styles.pageIndicator}>
                   Page {currentPage + 1} of {totalPages}
                 </Text>
@@ -988,7 +1309,9 @@ export default function SubjectNotesViewer({
                   onPress={toggleBookmark}
                   style={[
                     styles.bookmarkToggleBtn,
-                    activeBookmark ? styles.bookmarkedActiveBtn : styles.unbookmarkedBtn,
+                    activeBookmark
+                      ? styles.bookmarkedActiveBtn
+                      : styles.unbookmarkedBtn,
                     { transform: [{ scale: bookmarkBtnScale }] },
                   ]}
                 >
@@ -1021,11 +1344,15 @@ export default function SubjectNotesViewer({
                     resizeMode="contain"
                   />
                 ) : (
-                  <Text style={styles.cartoonAvatar}>{activeCharacter.avatar}</Text>
+                  <Text style={styles.cartoonAvatar}>
+                    {activeCharacter.avatar}
+                  </Text>
                 )}
                 <View style={styles.cartoonSpeechBubble}>
                   <Text style={styles.cartoonName}>{activeCharacter.name}</Text>
-                  <Text style={styles.cartoonTipText}>{activeCharacter.tip}</Text>
+                  <Text style={styles.cartoonTipText}>
+                    {activeCharacter.tip}
+                  </Text>
                 </View>
               </Animated.View>
             )}
@@ -1040,8 +1367,12 @@ export default function SubjectNotesViewer({
               >
                 <Text style={styles.labStampIcon}>{activeLabStamp.icon}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.labStampTitle}>{activeLabStamp.title}</Text>
-                  <Text style={styles.labStampTipText}>{activeLabStamp.tip}</Text>
+                  <Text style={styles.labStampTitle}>
+                    {activeLabStamp.title}
+                  </Text>
+                  <Text style={styles.labStampTipText}>
+                    {activeLabStamp.tip}
+                  </Text>
                 </View>
               </Animated.View>
             )}
@@ -1058,7 +1389,8 @@ export default function SubjectNotesViewer({
                 {stickyTabs.map((tab, idx) => {
                   const isActive =
                     currentPage >= tab.pageIndex &&
-                    (idx === stickyTabs.length - 1 || currentPage < stickyTabs[idx + 1].pageIndex);
+                    (idx === stickyTabs.length - 1 ||
+                      currentPage < stickyTabs[idx + 1].pageIndex);
                   const animVal = getStickyTabAnim(tab.pageIndex);
 
                   return (
@@ -1076,7 +1408,10 @@ export default function SubjectNotesViewer({
                       onPress={() => jumpToPage(tab.pageIndex)}
                     >
                       <Text
-                        style={[styles.stickyFlagText, { fontSize: dynamicFontSize }]}
+                        style={[
+                          styles.stickyFlagText,
+                          { fontSize: dynamicFontSize },
+                        ]}
                         numberOfLines={1}
                       >
                         {tab.label}
@@ -1153,7 +1488,12 @@ const styles = StyleSheet.create({
   },
   toolbarScroll: { flexDirection: "row", alignItems: "center", gap: 8 },
   toolbarLabel: { color: "#94a3b8", fontSize: 11, fontWeight: "700" },
-  toolbarDivider: { width: 1, height: 16, backgroundColor: "#334155", marginHorizontal: 4 },
+  toolbarDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: "#334155",
+    marginHorizontal: 4,
+  },
   colorSwatch: {
     width: 22,
     height: 22,
@@ -1170,13 +1510,17 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#1e293b",
   },
-  designBadgeSelected: { backgroundColor: "#334155", borderWidth: 1, borderColor: "#e2e8f0" },
+  designBadgeSelected: {
+    backgroundColor: "#334155",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
 
-  notebookWrapper: { 
-    flex: 1, 
-    padding: 18, 
-    paddingRight: 64, 
-    paddingBottom: 40 
+  notebookWrapper: {
+    flex: 1,
+    padding: 18,
+    paddingRight: 64,
+    paddingBottom: 40,
   },
   notebookPage: {
     borderTopLeftRadius: 4,
@@ -1271,7 +1615,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   labStampIcon: { fontSize: 16 },
-  labStampTitle: { fontSize: 10, fontWeight: "900", color: "#334155", letterSpacing: 0.5 },
+  labStampTitle: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#334155",
+    letterSpacing: 0.5,
+  },
   labStampTipText: { fontSize: 10.5, fontWeight: "600", color: "#64748b" },
 
   stickyTabsContainer: {
