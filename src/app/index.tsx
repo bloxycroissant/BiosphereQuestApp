@@ -32,13 +32,28 @@ export default function WelcomeScreen() {
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        const hasName = await AsyncStorage.getItem("explorerName");
-        const hasProfile = await AsyncStorage.getItem(
-          "@biosphere_profile_data_v1"
-        );
+        const [hasName, hasProfile, subjectsRaw] = await Promise.all([
+          AsyncStorage.getItem("explorerName"),
+          AsyncStorage.getItem("@biosphere_profile_data_v1"),
+          AsyncStorage.getItem("explorerSubjects"),
+        ]);
 
-        if (hasName || hasProfile) {
-          router.replace("/home");
+        let parsedSubjects: string[] = [];
+        if (subjectsRaw) {
+          try {
+            parsedSubjects = JSON.parse(subjectsRaw);
+          } catch {
+            parsedSubjects = [];
+          }
+        }
+
+        if (
+          hasName &&
+          hasProfile &&
+          Array.isArray(parsedSubjects) &&
+          parsedSubjects.length >= 2
+        ) {
+          router.replace("/home" as any);
         } else {
           setIsChecking(false);
         }
@@ -102,7 +117,7 @@ export default function WelcomeScreen() {
         }),
       ])
     ).start();
-  }, [isChecking]);
+  }, [isChecking, astroY, stellaY, buttonScale]);
 
   if (isChecking) {
     return <SafeAreaView style={styles.safeArea} />;
@@ -132,7 +147,9 @@ export default function WelcomeScreen() {
           </Animated.View>
         </View>
 
-        <Text style={styles.brand} pointerEvents="none">Biosphere Quest</Text>
+        <Text style={styles.brand} pointerEvents="none">
+          Biosphere Quest
+        </Text>
         <Text style={styles.tagline} pointerEvents="none">
           Rocket your knowledge from Grade 1 to Grade 6
         </Text>
@@ -181,8 +198,12 @@ export default function WelcomeScreen() {
 }
 
 function FloatingElement({ emoji, size }: { emoji: string; size: number }) {
-  const posX = useRef(new Animated.Value(Math.random() * (SCREEN_WIDTH - 40))).current;
-  const posY = useRef(new Animated.Value(Math.random() * (SCREEN_HEIGHT - 60))).current;
+  const posX = useRef(
+    new Animated.Value(Math.random() * (SCREEN_WIDTH - 40))
+  ).current;
+  const posY = useRef(
+    new Animated.Value(Math.random() * (SCREEN_HEIGHT - 60))
+  ).current;
   const scale = useRef(new Animated.Value(Math.random() * 0.4 + 0.7)).current;
   const opacity = useRef(new Animated.Value(Math.random() * 0.6 + 0.4)).current;
   const [isPopped, setIsPopped] = useState(false);
@@ -222,7 +243,7 @@ function FloatingElement({ emoji, size }: { emoji: string; size: number }) {
     return () => {
       isMounted = false;
     };
-  }, [isPopped]);
+  }, [isPopped, posX, posY]);
 
   const handlePop = () => {
     if (isPopped) return;

@@ -2,11 +2,10 @@ import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
-  Dimensions,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,7 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 
 interface GradeLevel {
@@ -22,12 +21,62 @@ interface GradeLevel {
   label: string;
 }
 
-const subjectsList: string[] = [
-  "Math",
-  "Matter",
-  "Living Things & Environment",
-  "Force, Motion, & Energy",
-  "Earth & Space",
+interface SubjectMeta {
+  name: string;
+  icon: string;
+  subtitle: string;
+  activeBg: string;
+  activeBorder: string;
+  badgeBg: string;
+  accentText: string;
+}
+
+const SUBJECT_META: SubjectMeta[] = [
+  {
+    name: "Math",
+    icon: "🧮",
+    subtitle: "Numbers, Logic & Problem Solving",
+    activeBg: "#1e40af",
+    activeBorder: "#60a5fa",
+    badgeBg: "#3b82f6",
+    accentText: "#dbeafe",
+  },
+  {
+    name: "Matter",
+    icon: "🧪",
+    subtitle: "Atoms, Elements & Reactions",
+    activeBg: "#5b21b6",
+    activeBorder: "#c084fc",
+    badgeBg: "#8b5cf6",
+    accentText: "#f3e8ff",
+  },
+  {
+    name: "Living Things & Environment",
+    icon: "🌿",
+    subtitle: "Biology, Ecosystems & Nature",
+    activeBg: "#065f46",
+    activeBorder: "#34d399",
+    badgeBg: "#10b981",
+    accentText: "#d1fae5",
+  },
+  {
+    name: "Force, Motion, & Energy",
+    icon: "⚡",
+    subtitle: "Physics, Mechanics & Power",
+    activeBg: "#9a3412",
+    activeBorder: "#fb923c",
+    badgeBg: "#f97316",
+    accentText: "#ffedd5",
+  },
+  {
+    name: "Earth & Space",
+    icon: "🪐",
+    subtitle: "Planets, Geology & The Cosmos",
+    activeBg: "#155e75",
+    activeBorder: "#22d3ee",
+    badgeBg: "#06b6d4",
+    accentText: "#cffafe",
+  },
 ];
 
 const gradeLevels: GradeLevel[] = [
@@ -46,8 +95,9 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [selectedGrade, setSelectedGrade] = useState(3);
+  const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -68,7 +118,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
     const animValue = getBoxScale(key);
     Animated.sequence([
       Animated.timing(animValue, {
-        toValue: 0.94,
+        toValue: 0.95,
         duration: 70,
         useNativeDriver: true,
       }),
@@ -79,6 +129,29 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
       }),
     ]).start(() => callback());
   };
+
+  // Intercept both UI Back button and Android hardware back press
+  const handleBackNavigation = useCallback(() => {
+    setErrorMessage(null);
+    if (step > 1) {
+      setStep((prev) => prev - 1);
+    } else {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/" as any);
+      }
+    }
+    return true;
+  }, [step]);
+
+  useEffect(() => {
+    const backSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackNavigation,
+    );
+    return () => backSubscription.remove();
+  }, [handleBackNavigation]);
 
   useEffect(() => {
     Animated.loop(
@@ -131,6 +204,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   };
 
   const toggleSubject = (subject: string): void => {
+    setErrorMessage(null);
     animateItemPress(subject, () => {
       setSelectedSubjects((current) =>
         current.includes(subject)
@@ -141,6 +215,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   };
 
   const handleSelectGrade = (level: number) => {
+    setErrorMessage(null);
     animateItemPress(level, () => {
       setSelectedGrade(level);
     });
@@ -148,29 +223,46 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
 
   const handleNextStep = (): void => {
     if (step === 1 && !fullName.trim()) {
-      Alert.alert("Hold on!", "Please enter your full name to continue.");
+      setErrorMessage("⚠️ Please input or enter your full name to continue.");
       return;
     }
     if (step === 2 && !username.trim()) {
-      Alert.alert("Hold on!", "We need your Explorer Username to continue.");
+      setErrorMessage(
+        "⚠️ Please input or enter your Explorer Username to continue.",
+      );
       return;
     }
-    animateButtonPress(() => setStep(step + 1));
-  };
-
-  const handleLaunch = async (): Promise<void> => {
-    if (selectedSubjects.length < 2) {
-      Alert.alert(
-        "Choose Your Path!",
-        "Please select at least 2 subjects to begin your adventure.",
+    if (step === 3 && selectedGrade === null) {
+      setErrorMessage(
+        "⚠️ Please choose your grade level first before moving to Step 4.",
       );
       return;
     }
 
+    setErrorMessage(null);
+    animateButtonPress(() => setStep(step + 1));
+  };
+
+  const handleLaunch = async (): Promise<void> => {
+    if (selectedGrade === null) {
+      setErrorMessage("⚠️ Please go back and select your grade level.");
+      return;
+    }
+    if (selectedSubjects.length < 2) {
+      setErrorMessage(
+        "⚠️ Please select at least 2 mission subjects to begin your adventure.",
+      );
+      return;
+    }
+    if (!fullName.trim() || !username.trim()) {
+      setErrorMessage("⚠️ Please complete your name and username first.");
+      return;
+    }
+
+    setErrorMessage(null);
+
     animateButtonPress(async () => {
       try {
-        await AsyncStorage.removeItem("@biosphere_profile_data_v1");
-
         await AsyncStorage.removeItem(STORAGE_KEY);
 
         await AsyncStorage.setItem("explorerName", fullName.trim());
@@ -198,6 +290,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
         router.replace("/home" as any);
       } catch (e) {
         console.error("Failed to save local data", e);
+        setErrorMessage("⚠️ Failed to save your profile. Please try again.");
       }
     });
   };
@@ -230,14 +323,15 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <Animated.View
             style={{
               transform: [{ translateY: floatAnim }],
               alignSelf: "center",
-              marginBottom: 20,
+              marginBottom: 16,
               width: "40%",
-              maxHeight: 140,
+              maxHeight: 130,
             }}
           >
             <Image source={astro} style={styles.mascot} contentFit="contain" />
@@ -260,10 +354,22 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   Enter your full name for your official profile.
                 </Text>
 
+                {errorMessage && (
+                  <View style={styles.warningBanner}>
+                    <Text style={styles.warningText}>{errorMessage}</Text>
+                  </View>
+                )}
+
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    errorMessage ? styles.inputError : null,
+                  ]}
                   value={fullName}
-                  onChangeText={setFullName}
+                  onChangeText={(text) => {
+                    setFullName(text);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
                   placeholder="e.g. Alex Johnson"
                   placeholderTextColor="#aebee0"
                   autoFocus
@@ -276,7 +382,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   }}
                 >
                   <Pressable onPress={handleNextStep} style={styles.primary}>
-                    <Text style={styles.primaryText}>Next Step </Text>
+                    <Text style={styles.primaryText}>Next Step</Text>
                   </Pressable>
                 </Animated.View>
               </View>
@@ -290,10 +396,22 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   Choose an Explorer username for your quests and rankings.
                 </Text>
 
+                {errorMessage && (
+                  <View style={styles.warningBanner}>
+                    <Text style={styles.warningText}>{errorMessage}</Text>
+                  </View>
+                )}
+
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    errorMessage ? styles.inputError : null,
+                  ]}
                   value={username}
-                  onChangeText={setUsername}
+                  onChangeText={(text) => {
+                    setUsername(text);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
                   placeholder="e.g. CaptainAlex"
                   placeholderTextColor="#aebee0"
                   autoCapitalize="none"
@@ -301,9 +419,16 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   autoFocus
                 />
 
-                <Pressable onPress={handleNextStep} style={styles.primary}>
-                  <Text style={styles.primaryText}>Next Step </Text>
-                </Pressable>
+                <Animated.View
+                  style={{
+                    transform: [{ scale: scaleButtonAnim }],
+                    width: "100%",
+                  }}
+                >
+                  <Pressable onPress={handleNextStep} style={styles.primary}>
+                    <Text style={styles.primaryText}>Next Step</Text>
+                  </Pressable>
+                </Animated.View>
               </View>
             )}
 
@@ -314,6 +439,12 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                 <Text style={styles.subtitle}>
                   What grade level are you currently in?
                 </Text>
+
+                {errorMessage && (
+                  <View style={styles.warningBanner}>
+                    <Text style={styles.warningText}>{errorMessage}</Text>
+                  </View>
+                )}
 
                 <View style={styles.grid}>
                   {gradeLevels.map((g) => {
@@ -362,7 +493,7 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   }}
                 >
                   <Pressable onPress={handleNextStep} style={styles.primary}>
-                    <Text style={styles.primaryText}>Next Step </Text>
+                    <Text style={styles.primaryText}>Next Step</Text>
                   </Pressable>
                 </Animated.View>
               </View>
@@ -376,32 +507,79 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                   Choose at least 2 topics you want to master first.
                 </Text>
 
-                <View style={styles.grid}>
-                  {subjectsList.map((subject) => {
-                    const isSelected = selectedSubjects.includes(subject);
+                <View style={styles.counterPill}>
+                  <Text style={styles.counterPillText}>
+                    {selectedSubjects.length} of {SUBJECT_META.length} Missions
+                    Selected
+                  </Text>
+                </View>
+
+                {errorMessage && (
+                  <View style={styles.warningBanner}>
+                    <Text style={styles.warningText}>{errorMessage}</Text>
+                  </View>
+                )}
+
+                <View style={styles.missionList}>
+                  {SUBJECT_META.map((item) => {
+                    const isSelected = selectedSubjects.includes(item.name);
                     return (
                       <Animated.View
-                        key={subject}
+                        key={item.name}
                         style={{
-                          width: "47%",
-                          transform: [{ scale: getBoxScale(subject) }],
+                          width: "100%",
+                          transform: [{ scale: getBoxScale(item.name) }],
                         }}
                       >
                         <Pressable
-                          onPress={() => toggleSubject(subject)}
+                          onPress={() => toggleSubject(item.name)}
                           style={[
-                            styles.selectionBox,
-                            isSelected && styles.selectionBoxActive,
+                            styles.missionCard,
+                            isSelected && {
+                              backgroundColor: item.activeBg,
+                              borderColor: item.activeBorder,
+                              borderWidth: 2,
+                              shadowColor: item.activeBorder,
+                              shadowOpacity: 0.45,
+                              shadowRadius: 8,
+                              elevation: 6,
+                            },
                           ]}
                         >
-                          <Text
+                          <View
                             style={[
-                              styles.boxSubjectText,
-                              isSelected && styles.boxTextActive,
+                              styles.missionIconWrap,
+                              isSelected && { backgroundColor: item.badgeBg },
                             ]}
                           >
-                            {subject}
-                          </Text>
+                            <Text style={styles.missionIcon}>{item.icon}</Text>
+                          </View>
+
+                          <View style={styles.missionTextWrap}>
+                            <Text style={styles.missionTitle}>{item.name}</Text>
+                            <Text
+                              style={[
+                                styles.missionSubtitle,
+                                isSelected && { color: item.accentText },
+                              ]}
+                            >
+                              {item.subtitle}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.missionCheckCircle,
+                              isSelected && {
+                                backgroundColor: item.activeBorder,
+                                borderColor: "#ffffff",
+                              },
+                            ]}
+                          >
+                            {isSelected && (
+                              <Text style={styles.missionCheckMark}>✓</Text>
+                            )}
+                          </View>
                         </Pressable>
                       </Animated.View>
                     );
@@ -418,13 +596,15 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
                     onPress={handleLaunch}
                     style={[
                       styles.primaryLaunch,
-                      selectedSubjects.length < 2 && { opacity: 0.5 },
+                      selectedSubjects.length >= 2 && styles.primaryLaunchReady,
                     ]}
                   >
                     <Text style={styles.primaryText}>
                       {selectedSubjects.length < 2
-                        ? `Pick ${2 - selectedSubjects.length} more...`
-                        : "🚀 Launch App"}
+                        ? `Pick ${2 - selectedSubjects.length} more mission${
+                            2 - selectedSubjects.length === 1 ? "" : "s"
+                          }...`
+                        : "🚀 Launch Adventure"}
                     </Text>
                   </Pressable>
                 </Animated.View>
@@ -436,8 +616,6 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
     </SafeAreaView>
   );
 }
-
-const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#091426" },
@@ -481,7 +659,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 14,
     marginTop: 8,
-    marginBottom: 30,
+    marginBottom: 18,
+  },
+  warningBanner: {
+    backgroundColor: "rgba(255, 107, 129, 0.16)",
+    borderColor: "#ff6b81",
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    width: "100%",
+  },
+  warningText: {
+    color: "#ff8fa3",
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
   },
   input: {
     backgroundColor: "#36377e",
@@ -494,6 +688,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     width: "100%",
+  },
+  inputError: {
+    borderColor: "#ff6b81",
+    borderWidth: 1.5,
   },
   grid: {
     flexDirection: "row",
@@ -515,6 +713,7 @@ const styles = StyleSheet.create({
   selectionBoxActive: {
     backgroundColor: "#f5cd47",
     borderColor: "#fff",
+    borderWidth: 2,
   },
   boxNumber: { color: "#fff", fontSize: 20, fontWeight: "900" },
   boxLabel: {
@@ -524,19 +723,84 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
   },
-  boxSubjectText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-  },
   boxTextActive: { color: "#1c2b59" },
+  counterPill: {
+    backgroundColor: "rgba(98, 92, 255, 0.25)",
+    borderColor: "#625cff",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+  },
+  counterPillText: {
+    color: "#d8d4ff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  missionList: {
+    width: "100%",
+    gap: 11,
+  },
+  missionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#232958",
+    borderColor: "#484d96",
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    width: "100%",
+  },
+  missionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  missionIcon: {
+    fontSize: 22,
+  },
+  missionTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  missionTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  missionSubtitle: {
+    color: "#9aa8c7",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  missionCheckCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#6c78a8",
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  missionCheckMark: {
+    color: "#091426",
+    fontSize: 13,
+    fontWeight: "900",
+  },
   primary: {
     backgroundColor: "#5857e4",
     borderRadius: 12,
     alignItems: "center",
     padding: 16,
-    marginTop: 35,
+    marginTop: 30,
     width: "100%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -545,17 +809,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryLaunch: {
-    backgroundColor: "#6258ff",
+    backgroundColor: "#3e4274",
     borderRadius: 12,
     alignItems: "center",
     padding: 16,
-    marginTop: 35,
+    marginTop: 26,
     width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+  },
+  primaryLaunchReady: {
+    backgroundColor: "#10b981",
+    shadowColor: "#34d399",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   primaryText: { color: "#fff", fontSize: 16, fontWeight: "900" },
 });
