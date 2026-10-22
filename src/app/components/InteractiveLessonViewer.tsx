@@ -1,5 +1,6 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -15,6 +16,7 @@ import {
 import { Lesson, Subject } from "./curriculum";
 
 const stellaMascotImage = require("../../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
+const lessonBgmFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 🌌 30 Min Study, Focus & Relax Beats.mp3");
 
 interface InteractiveLessonViewerProps {
   gradeLevel?: number;
@@ -478,6 +480,15 @@ export default function InteractiveLessonViewer({
   const lesson = initialLesson || fallbackLesson;
   const storageKey = getStorageKey(gradeLevel, subject.title, lesson.title);
 
+  const bgmPlayer = useAudioPlayer(lessonBgmFile);
+
+  useEffect(() => {
+    if (bgmPlayer) {
+      bgmPlayer.loop = true;
+      bgmPlayer.volume = 0.2;
+      bgmPlayer.play();
+    }
+  }, [bgmPlayer]);
   const { topics, recapQuestions } = useMemo(
     () => buildLessonContent(lesson, subject.title, gradeLevel),
     [lesson, subject.title, gradeLevel],
