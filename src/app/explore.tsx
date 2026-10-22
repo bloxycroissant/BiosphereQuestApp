@@ -88,18 +88,6 @@ const learnerOutcomes: Record<string, string[]> = {
 };
 
 export default function ExploreScreen(): React.JSX.Element {
-  const bgmPlayer = useAudioPlayer(
-    require("../../assets/BiosphereQuestSoundEffectsandMusic/Relaxing Animal Crossing City Folk Music to study chill relax to.mp3"),
-  );
-
-  useEffect(() => {
-    if (bgmPlayer) {
-      bgmPlayer.loop = true;
-      bgmPlayer.volume = 0.5;
-      bgmPlayer.play();
-    }
-  }, [bgmPlayer]);
-
   const params = useLocalSearchParams<{ autoOpenSubject?: string }>();
   const [grade, setGrade] = useState(1);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -108,6 +96,33 @@ export default function ExploreScreen(): React.JSX.Element {
     subject: Subject;
     lesson: Lesson;
   } | null>(null);
+
+  const exploreBgm = useAudioPlayer(
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Relaxing Animal Crossing City Folk Music to study chill relax to.mp3"),
+  );
+
+  const lessonLofiBgm = useAudioPlayer(
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 🌌 30 Min Study, Focus & Relax Beats.mp3"),
+  );
+
+  useEffect(() => {
+    if (!exploreBgm || !lessonLofiBgm) return;
+
+    exploreBgm.loop = true;
+    exploreBgm.volume = 0.5;
+
+    lessonLofiBgm.loop = true;
+    lessonLofiBgm.volume = 0.5;
+
+    if (selected) {
+      exploreBgm.pause();
+      lessonLofiBgm.play();
+    } else {
+      lessonLofiBgm.pause();
+      exploreBgm.play();
+    }
+  }, [exploreBgm, lessonLofiBgm, selected]);
+
   const {
     completeLesson,
     completedLessons: completedLessonKeys,
@@ -120,6 +135,10 @@ export default function ExploreScreen(): React.JSX.Element {
 
   const openLesson = (subject: Subject, lesson: Lesson): void => {
     if (transitionInProgress.current || selected) return;
+
+    // Explicitly pause explore music immediately when clicking play
+    if (exploreBgm) exploreBgm.pause();
+
     transitionInProgress.current = true;
     screenTransition.setValue(0);
     setSelected({ subject, lesson });
@@ -421,6 +440,7 @@ export default function ExploreScreen(): React.JSX.Element {
 
           {activeSubject && (
             <View style={styles.missionsContainer}>
+              {/* BIG CONTINUE HERO BUTTON */}
               {(() => {
                 let nextIdx = activeSubject.lessons.findIndex(
                   (lesson) =>
@@ -468,6 +488,7 @@ export default function ExploreScreen(): React.JSX.Element {
                 );
               })()}
 
+              {/* LEARNER OUTCOMES */}
               <LinearGradient
                 colors={[
                   activeSubject.color + "35",
@@ -510,6 +531,7 @@ export default function ExploreScreen(): React.JSX.Element {
                 ))}
               </LinearGradient>
 
+              {/* --- STUDY MATERIALS BUTTON --- */}
               <Text style={styles.sectionHeading}>STUDY MATERIALS</Text>
               <Pressable
                 style={styles.openNotesCard}
@@ -667,6 +689,7 @@ export default function ExploreScreen(): React.JSX.Element {
         {!activeSubject && <BottomNavigation />}
       </SafeAreaView>
 
+      {/* --- SINGLE PAGE NOTEBOOK VIEWER --- */}
       {showNotes && activeSubject && (
         <Animated.View style={styles.screenLayer}>
           <SubjectNotesViewer
@@ -677,6 +700,7 @@ export default function ExploreScreen(): React.JSX.Element {
         </Animated.View>
       )}
 
+      {/* --- INTERACTIVE LESSON VIEWER --- */}
       {selected && (
         <Animated.View
           style={[
