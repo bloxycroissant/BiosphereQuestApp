@@ -2,6 +2,7 @@ import { curriculum, type Subject } from "@/app/components/curriculum";
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -200,6 +201,23 @@ const REMINDERS = ["None", "5 mins before", "10 mins before", "30 mins before"];
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function HomeScreen(): React.JSX.Element {
+  const bgmPlayer = useAudioPlayer(
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Marimba Upbeat Kids Fun (No Copyright Music) by MokkaMusic Junior.mp3"),
+  );
+
+  useEffect(() => {
+    if (bgmPlayer) {
+      bgmPlayer.loop = true;
+      bgmPlayer.volume = 0.5;
+      bgmPlayer.play();
+    }
+    return () => {
+      if (bgmPlayer) {
+        bgmPlayer.pause();
+      }
+    };
+  }, [bgmPlayer]);
+
   const progress = useProgress();
   const appear = useRef(new Animated.Value(0)).current;
   const levelUpAnim = useRef(new Animated.Value(-120)).current;

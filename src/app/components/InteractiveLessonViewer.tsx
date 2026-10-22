@@ -380,7 +380,6 @@ const buildLessonContent = (
     },
   ];
 
-  // Up to 10 unique non-repeating recap questions based on MATATAG Curriculum standards
   const fullRecapPool: QuizQuestion[] = [
     buildQuestion(
       `Mastery Check 1: What is the primary definition of ${lesson.title}?`,
@@ -450,7 +449,6 @@ const buildLessonContent = (
     ),
   ];
 
-  // Maximum of 10 questions, shuffled and non-repeating
   const recapQuestions = shuffle(fullRecapPool).slice(0, 10);
 
   return { topics, recapQuestions };
