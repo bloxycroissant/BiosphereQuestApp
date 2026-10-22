@@ -843,41 +843,11 @@ export default function ProfileScreen(): React.JSX.Element {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      try {
-        const localUri = result.assets[0].uri;
-        const response = await fetch(localUri);
-        const blob = await response.blob();
-        const { data: authData } = await supabase.auth.getUser();
-        const userId = authData.user?.id || "guest";
-        const fileName = `${userId}-${Date.now()}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(fileName, blob, {
-            contentType: "image/jpeg",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error("Upload Error:", uploadError);
-          Alert.alert(
-            "Upload Failed",
-            "Could not save the image to the cloud.",
-          );
-          return;
-        }
-        const { data: publicUrlData } = supabase.storage
-          .from("avatars")
-          .getPublicUrl(fileName);
-        setTempProfileImage(publicUrlData.publicUrl);
-      } catch (err) {
-        console.error("Image processing error:", err);
-        Alert.alert(
-          "Error",
-          "Something went wrong while processing the image.",
-        );
-      }
+      const localUri = result.assets[0].uri;
+      setTempProfileImage(localUri); // Use reliable local URI directly so it never turns purple
     }
   };
+
   const removeImage = (): void => {
     setTempProfileImage(null);
     Alert.alert(
