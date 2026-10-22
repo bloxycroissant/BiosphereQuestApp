@@ -378,34 +378,80 @@ const buildLessonContent = (
     },
   ];
 
-  const recapPool: QuizQuestion[] = [
+  // Up to 10 unique non-repeating recap questions based on MATATAG Curriculum standards
+  const fullRecapPool: QuizQuestion[] = [
     buildQuestion(
-      `Mastery Check: What is the primary definition of ${lesson.title}?`,
+      `Mastery Check 1: What is the primary definition of ${lesson.title}?`,
       lesson.meaning,
       ["An unproven guess.", "A temporary trick."],
       "Accurate recall of the core rule!",
     ),
     buildQuestion(
-      `Scenario: If asked to explain ${lesson.title}, you should state:`,
+      `Mastery Check 2: When explaining ${lesson.title}, which statement is correct?`,
       lesson.meaning,
-      ["It is too complex to understand.", "It happens by pure chance."],
+      ["It is completely random.", "It has no rules."],
       "Clear communication of knowledge!",
     ),
     buildQuestion(
-      `Recall our example: "${lesson.example}". What did it illustrate?`,
+      `Mastery Check 3: Recall our example: "${lesson.example}". What did it illustrate?`,
       lesson.title,
-      ["An unrelated topic.", "An error."],
+      ["An unrelated topic.", "An error in calculation."],
       "Great recognition of worked examples!",
     ),
     buildQuestion(
-      "True or False: Paying attention to details leads to accurate solutions.",
+      "Mastery Check 4: True or False: Paying attention to details leads to accurate solutions.",
       "True, observant learners find correct answers.",
       ["False, rushing is better.", "False, details do not matter."],
       "Observant thinking is key!",
     ),
+    buildQuestion(
+      `Mastery Check 5: Which practice best helps us master ${lesson.title}?`,
+      "Reviewing classroom examples and checking our work carefully.",
+      [
+        "Guessing answers quickly without looking.",
+        "Ignoring all instructions.",
+      ],
+      "Systematic review builds mastery!",
+    ),
+    buildQuestion(
+      `Mastery Check 6: How does ${lesson.title} connect to our daily classroom activities?`,
+      "By helping us solve practical problems logically and accurately.",
+      ["It only exists inside storybooks.", "It has no use in real life."],
+      "Practical connection verified!",
+    ),
+    buildQuestion(
+      "Mastery Check 7: What should you do if your first attempt at solving a problem is incorrect?",
+      "Review the steps, correct mistakes, and try again patiently.",
+      ["Give up and throw your notebook away.", "Change the rules of math."],
+      "Perseverance leads to learning!",
+    ),
+    buildQuestion(
+      `Mastery Check 8: In the context of ${subjectTitle}, why is careful observation important?`,
+      "It ensures our findings and calculations are factual and precise.",
+      ["It wastes valuable study time.", "Observations do not matter at all."],
+      "Observation is the foundation of learning!",
+    ),
+    buildQuestion(
+      "Mastery Check 9: Which habit helps you remember what you learn in class?",
+      "Discussing concepts with classmates and practicing regularly.",
+      [
+        "Forgetting everything after the bell rings.",
+        "Never reviewing your notes.",
+      ],
+      "Active practice reinforces memory!",
+    ),
+    buildQuestion(
+      `Mastery Check 10: Final Reflection: How confident are you in applying ${lesson.title}?`,
+      "Very confident after working through the lesson guides and examples.",
+      ["Not sure at all.", "I will never use this."],
+      "Great job completing your learning mission!",
+    ),
   ];
 
-  return { topics, recapQuestions: shuffle(recapPool) };
+  // Maximum of 10 questions, shuffled and non-repeating
+  const recapQuestions = shuffle(fullRecapPool).slice(0, 10);
+
+  return { topics, recapQuestions };
 };
 
 export default function InteractiveLessonViewer({
