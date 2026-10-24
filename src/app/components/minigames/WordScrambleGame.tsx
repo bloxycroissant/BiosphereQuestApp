@@ -169,35 +169,29 @@ export const WordScrambleGame: React.FC<Props> = ({
   onSuccess,
   onClose,
 }) => {
-  let clickPlayer: any = null;
-  let correctPlayer: any = null;
-  let wrongPlayer: any = null;
-  try {
-    clickPlayer = useAudioPlayer(
-      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Button_Click_SFX.mp3"),
-    );
-    correctPlayer = useAudioPlayer(
-      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Correct_Answer_SFX.mp3"),
-    );
-    wrongPlayer = useAudioPlayer(
-      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Wrong_Answer_SFX.mp3"),
-    );
-  } catch {}
+  const clickPlayer = useAudioPlayer(
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Button_Click_SFX.mp3"),
+  );
+  const correctPlayer = useAudioPlayer(
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Correct_Answer_SFX.mp3"),
+  );
+  const wrongPlayer = useAudioPlayer(
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Wrong_Answer_SFX.mp3"),
+  );
 
   const playSound = async (type: "click" | "correct" | "wrong") => {
     try {
-      if (type === "click" && clickPlayer) {
-        if (typeof clickPlayer.seekTo === "function")
-          await clickPlayer.seekTo(0);
-        await clickPlayer.play();
-      } else if (type === "correct" && correctPlayer) {
-        if (typeof correctPlayer.seekTo === "function")
-          await correctPlayer.seekTo(0);
-        await correctPlayer.play();
-      } else if (type === "wrong" && wrongPlayer) {
-        if (typeof wrongPlayer.seekTo === "function")
-          await wrongPlayer.seekTo(0);
-        await wrongPlayer.play();
+      const player =
+        type === "click"
+          ? clickPlayer
+          : type === "correct"
+            ? correctPlayer
+            : wrongPlayer;
+      if (player) {
+        if (typeof player.seekTo === "function") {
+          await player.seekTo(0);
+        }
+        await player.play();
       }
     } catch (e) {
       console.log("SFX Play Error:", e);
