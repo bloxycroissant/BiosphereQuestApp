@@ -77,19 +77,21 @@ export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
     );
   } catch {}
 
-  const playSound = (type: "click" | "correct" | "wrong") => {
+  const playSound = async (type: "click" | "correct" | "wrong") => {
     try {
       if (type === "click" && clickPlayer) {
-        clickPlayer.seekTo(0);
+        await clickPlayer.seekTo(0);
         clickPlayer.play();
       } else if (type === "correct" && correctPlayer) {
-        correctPlayer.seekTo(0);
+        await correctPlayer.seekTo(0);
         correctPlayer.play();
       } else if (type === "wrong" && wrongPlayer) {
-        wrongPlayer.seekTo(0);
+        await wrongPlayer.seekTo(0);
         wrongPlayer.play();
       }
-    } catch {}
+    } catch (error) {
+      console.log("Audio play error:", error);
+    }
   };
 
   const antiCheatTimestamp = useRef<number>(Date.now());
