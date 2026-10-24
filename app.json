@@ -39,7 +39,8 @@
             "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
           }
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
