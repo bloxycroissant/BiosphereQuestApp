@@ -72,13 +72,16 @@ export const NumberNinjaGame: React.FC<Props> = ({
   const playSound = async (type: "click" | "correct" | "wrong") => {
     try {
       if (type === "click" && clickPlayer) {
-        clickPlayer.seekTo(0);
+        if (typeof clickPlayer.seekTo === "function")
+          await clickPlayer.seekTo(0);
         await clickPlayer.play();
       } else if (type === "correct" && correctPlayer) {
-        correctPlayer.seekTo(0);
+        if (typeof correctPlayer.seekTo === "function")
+          await correctPlayer.seekTo(0);
         await correctPlayer.play();
       } else if (type === "wrong" && wrongPlayer) {
-        wrongPlayer.seekTo(0);
+        if (typeof wrongPlayer.seekTo === "function")
+          await wrongPlayer.seekTo(0);
         await wrongPlayer.play();
       }
     } catch (e) {
