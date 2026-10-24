@@ -1,10 +1,11 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,13 +18,37 @@ import { supabase } from "../lib/supabase";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 
-export default function VerifyScreen() {
+export default function VerifyScreen(): React.JSX.Element {
   const { email } = useLocalSearchParams<{ email?: string | string[] }>();
   const emailAddress = Array.isArray(email) ? (email[0] ?? "") : (email ?? "");
 
   const [code, setCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
+
+  const handleBack = useCallback((): void => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/signup" as any);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   useEffect(() => {
     if (resendTimer <= 0) {
@@ -37,7 +62,7 @@ export default function VerifyScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const handleVerify = async () => {
+  const handleVerify = async (): Promise<void> => {
     const normalizedCode = code.trim();
 
     if (!emailAddress) {
@@ -96,7 +121,7 @@ export default function VerifyScreen() {
     }
   };
 
-  const handleResend = async () => {
+  const handleResend = async (): Promise<void> => {
     if (resendTimer > 0) return;
 
     if (!emailAddress) {
@@ -130,12 +155,11 @@ export default function VerifyScreen() {
       >
         <View style={styles.content}>
           <Pressable
-            onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/signup")
-            }
+            onPress={handleBack}
             style={styles.backButton}
+            hitSlop={12}
           >
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={styles.back}>Back</Text>
           </Pressable>
 
           <Image source={logo} style={styles.logo} contentFit="contain" />

@@ -9,6 +9,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Modal,
   Platform,
@@ -17,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
   ViewStyle,
 } from "react-native";
@@ -208,7 +210,7 @@ export default function HomeScreen(): React.JSX.Element {
   useEffect(() => {
     if (bgmPlayer) {
       bgmPlayer.loop = true;
-      bgmPlayer.volume = 0.5;
+      bgmPlayer.volume = 0.15;
       bgmPlayer.play();
     }
   }, [bgmPlayer]);
@@ -283,6 +285,8 @@ export default function HomeScreen(): React.JSX.Element {
   const [formDurationMins, setFormDurationMins] = useState(30);
   const [formNotes, setFormNotes] = useState("");
   const [formReminder, setFormReminder] = useState("10 mins before");
+
+  const lastBackPressed = useRef<number>(0);
 
   const currentLevelStartXp = (level - 1) * 100;
   const currentLevelProgressXp = xp - currentLevelStartXp;
@@ -977,7 +981,48 @@ export default function HomeScreen(): React.JSX.Element {
       loadSharedProgress();
       loadArcadeGames();
       loadStudySessions();
-    }, []),
+
+      const onBackPress = (): boolean => {
+        // Priority 1: Dismiss active modals first
+        if (isNotificationsModalOpen) {
+          setIsNotificationsModalOpen(false);
+          return true;
+        }
+        if (isAddSessionModalOpen) {
+          closeAddSessionModal();
+          return true;
+        }
+        if (isLocked) {
+          setIsLocked(false);
+          router.replace("/" as any);
+          return true;
+        }
+
+        if (router.canGoBack()) {
+          router.back();
+          return true;
+        }
+
+        const nowMs = Date.now();
+        if (nowMs - lastBackPressed.current < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+
+        lastBackPressed.current = nowMs;
+        if (Platform.OS === "android") {
+          ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [isNotificationsModalOpen, isAddSessionModalOpen, isLocked]),
   );
 
   useEffect(() => {

@@ -1,15 +1,18 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -22,12 +25,38 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const STAR_COUNT = 10;
 const ASTRONAUT_COUNT = 10;
 
-export default function WelcomeScreen() {
+export default function WelcomeScreen(): React.JSX.Element {
   const [isChecking, setIsChecking] = useState(true);
 
   const astroY = useRef(new Animated.Value(0)).current;
   const stellaY = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const lastBackPressed = useRef<number>(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        const now = Date.now();
+        if (now - lastBackPressed.current < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+
+        lastBackPressed.current = now;
+        if (Platform.OS === "android") {
+          ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, []),
+  );
 
   useEffect(() => {
     const checkOnboardingStatus = async () => {
@@ -197,7 +226,7 @@ export default function WelcomeScreen() {
   );
 }
 
-function FloatingElement({ emoji, size }: { emoji: string; size: number }) {
+function FloatingElement({ emoji, size }: { emoji: string; size: number }): React.JSX.Element {
   const posX = useRef(
     new Animated.Value(Math.random() * (SCREEN_WIDTH - 40))
   ).current;
@@ -295,7 +324,7 @@ function FloatingElement({ emoji, size }: { emoji: string; size: number }) {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label }: { value: string; label: string }): React.JSX.Element {
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
@@ -312,7 +341,7 @@ function WelcomeRow({
   icon: string;
   title: string;
   subtitle: string;
-}) {
+}): React.JSX.Element {
   return (
     <View style={styles.row} pointerEvents="none">
       <Text style={styles.rowIcon}>{icon}</Text>

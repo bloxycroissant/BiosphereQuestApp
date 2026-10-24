@@ -53,7 +53,7 @@ export default function ScheduleScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.back}>‹ Cancel</Text>
+        <Text style={styles.back}>Cancel</Text>
         <Text style={styles.title}>Study Schedule</Text>
         <Text style={styles.subtitle}>
           Plan sessions, build your streak, and keep moving.
