@@ -55,14 +55,29 @@ export const NumberNinjaGame: React.FC<Props> = ({
   onClose,
 }) => {
   const clickPlayer = useAudioPlayer(
-    require("../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button Click SFX.mp3"),
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
   );
   const correctPlayer = useAudioPlayer(
-    require("../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct Answer SFX.mp3"),
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
   );
   const wrongPlayer = useAudioPlayer(
-    require("../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong Answer SFX.mp3"),
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
   );
+
+  const playSound = (type: "click" | "correct" | "wrong") => {
+    try {
+      if (type === "click") {
+        clickPlayer.seekTo(0);
+        clickPlayer.play();
+      } else if (type === "correct") {
+        correctPlayer.seekTo(0);
+        correctPlayer.play();
+      } else if (type === "wrong") {
+        wrongPlayer.seekTo(0);
+        wrongPlayer.play();
+      }
+    } catch {}
+  };
 
   const seenQuestions = useRef(new Set<string>());
   const antiCheatTimestamp = useRef<number>(Date.now());
@@ -106,25 +121,16 @@ export const NumberNinjaGame: React.FC<Props> = ({
 
     setSelected(value);
     if (value === question.correctAnswer) {
-      try {
-        correctPlayer.seekTo(0);
-        correctPlayer.play();
-      } catch {}
+      playSound("correct");
       setScore((current) => current + 1);
       onSuccess(currentXP);
     } else {
-      try {
-        wrongPlayer.seekTo(0);
-        wrongPlayer.play();
-      } catch {}
+      playSound("wrong");
     }
   };
 
   const next = () => {
-    try {
-      clickPlayer.seekTo(0);
-      clickPlayer.play();
-    } catch {}
+    playSound("click");
     if (roundExpired) return;
     antiCheatTimestamp.current = Date.now();
 
@@ -134,7 +140,9 @@ export const NumberNinjaGame: React.FC<Props> = ({
       !nextQuestion ||
       (nextQuestion.prompt && seenQuestions.current.has(nextQuestion.prompt))
     ) {
-      seenQuestions.current.clear();
+      if (seenQuestions.current.size > 150) {
+        seenQuestions.current.clear();
+      }
       nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
     }
 
@@ -148,10 +156,7 @@ export const NumberNinjaGame: React.FC<Props> = ({
   };
 
   const restartGame = () => {
-    try {
-      clickPlayer.seekTo(0);
-      clickPlayer.play();
-    } catch {}
+    playSound("click");
     antiCheatTimestamp.current = Date.now();
     seenQuestions.current.clear();
     const nextQuestion = generateNinjaProblem(grade, seenQuestions.current);
@@ -174,10 +179,7 @@ export const NumberNinjaGame: React.FC<Props> = ({
         <View style={styles.topBar}>
           <TouchableOpacity
             onPress={() => {
-              try {
-                clickPlayer.seekTo(0);
-                clickPlayer.play();
-              } catch {}
+              playSound("click");
               onClose();
             }}
           >
