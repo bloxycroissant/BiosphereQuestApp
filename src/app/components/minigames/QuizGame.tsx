@@ -62,25 +62,30 @@ const generateUniqueDeck = (
 };
 
 export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
-  const clickPlayer = useAudioPlayer(
-    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
-  );
-  const correctPlayer = useAudioPlayer(
-    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
-  );
-  const wrongPlayer = useAudioPlayer(
-    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
-  );
+  let clickPlayer: any = null;
+  let correctPlayer: any = null;
+  let wrongPlayer: any = null;
+  try {
+    clickPlayer = useAudioPlayer(
+      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Button_Click_SFX.mp3"),
+    );
+    correctPlayer = useAudioPlayer(
+      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Correct_Answer_SFX.mp3"),
+    );
+    wrongPlayer = useAudioPlayer(
+      require("../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Wrong_Answer_SFX.mp3"),
+    );
+  } catch {}
 
   const playSound = (type: "click" | "correct" | "wrong") => {
     try {
-      if (type === "click") {
+      if (type === "click" && clickPlayer) {
         clickPlayer.seekTo(0);
         clickPlayer.play();
-      } else if (type === "correct") {
+      } else if (type === "correct" && correctPlayer) {
         correctPlayer.seekTo(0);
         correctPlayer.play();
-      } else if (type === "wrong") {
+      } else if (type === "wrong" && wrongPlayer) {
         wrongPlayer.seekTo(0);
         wrongPlayer.play();
       }
