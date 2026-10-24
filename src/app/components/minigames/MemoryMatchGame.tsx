@@ -98,8 +98,10 @@ export const MemoryMatchGame: React.FC<Props> = ({
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [completedBoards, setCompletedBoards] = useState(0);
   const [roundExpired, setRoundExpired] = useState(false);
-  const [tileScales] = useState(() =>
-    Array.from({ length: 16 }, () => new Animated.Value(1)),
+
+  // Animated values for each card's 3D flip effect (0 = face down, 1 = flipped)
+  const [tileFlips] = useState(() =>
+    Array.from({ length: 16 }, () => new Animated.Value(0)),
   );
   const mismatchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,6 +115,9 @@ export const MemoryMatchGame: React.FC<Props> = ({
         clearTimeout(mismatchTimeout.current);
         mismatchTimeout.current = null;
       }
+
+      // Reset all flip animated values back to 0
+      tileFlips.forEach((val) => val.setValue(0));
 
       let nextCards = generateMemoryPairs(grade, seenBoards.current, subject);
       let key = boardKey(nextCards);
@@ -142,7 +147,7 @@ export const MemoryMatchGame: React.FC<Props> = ({
         setCompletedBoards(0);
       }
     },
-    [grade, subject],
+    [grade, subject, tileFlips],
   );
 
   useEffect(() => {
@@ -193,18 +198,13 @@ export const MemoryMatchGame: React.FC<Props> = ({
 
     playPageTurn();
 
-    Animated.sequence([
-      Animated.timing(tileScales[index], {
-        toValue: 0.88,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.spring(tileScales[index], {
-        toValue: 1,
-        friction: 4,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Trigger the same spring flip animation as FlashcardGame
+    Animated.spring(tileFlips[index], {
+      toValue: 1,
+      friction: 8,
+      tension: 10,
+      useNativeDriver: true,
+    }).start();
 
     const nextFlipped = [...flipped, index];
     setFlipped(nextFlipped);
@@ -221,6 +221,15 @@ export const MemoryMatchGame: React.FC<Props> = ({
     }
 
     mismatchTimeout.current = setTimeout(() => {
+      // Flip back unmatched cards with spring animation
+      nextFlipped.forEach((cardIndex) => {
+        Animated.spring(tileFlips[cardIndex], {
+          toValue: 0,
+          friction: 8,
+          tension: 10,
+          useNativeDriver: true,
+        }).start();
+      });
       setFlipped([]);
       mismatchTimeout.current = null;
     }, 850);
@@ -261,36 +270,66 @@ export const MemoryMatchGame: React.FC<Props> = ({
             {cards.map((card, index) => {
               const visible =
                 flipped.includes(index) || matched.includes(card.pairId);
+
+              const frontInterpolate = tileFlips[index].interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "180deg"],
+              });
+
+              const backInterpolate = tileFlips[index].interpolate({
+                inputRange: [0, 1],
+                outputRange: ["180deg", "360deg"],
+              });
+
               return (
-                <Animated.View
-                  key={`${card.id}-${index}`}
-                  style={[
-                    styles.cardSlot,
-                    { transform: [{ scale: tileScales[index] ?? 1 }] },
-                  ]}
-                >
+                <View key={`${card.id}-${index}`} style={styles.cardSlot}>
                   <TouchableOpacity
-                    style={[
-                      styles.tile,
-                      visible && styles.tileRevealed,
-                      matched.includes(card.pairId) && styles.tileMatched,
-                    ]}
+                    style={styles.tileTouchArea}
                     onPress={() => reveal(index)}
-                    activeOpacity={0.8}
+                    activeOpacity={1}
                     disabled={roundExpired}
                     accessibilityRole="button"
                     accessibilityLabel={
                       visible ? card.content : `Face-down card ${index + 1}`
                     }
                   >
-                    <Text
-                      style={[styles.tileText, !visible && styles.hiddenText]}
-                      numberOfLines={2}
+                    {/* Front Face (Hidden / Question Mark) */}
+                    <Animated.View
+                      style={[
+                        styles.tileFace,
+                        styles.tileFront,
+                        {
+                          transform: [
+                            { perspective: 1000 },
+                            { rotateY: frontInterpolate },
+                          ],
+                        },
+                      ]}
                     >
-                      {visible ? card.content : "?"}
-                    </Text>
+                      <Text style={styles.hiddenText}>?</Text>
+                    </Animated.View>
+
+                    {/* Back Face (Revealed Content / Term or Meaning) */}
+                    <Animated.View
+                      style={[
+                        styles.tileFace,
+                        styles.tileBack,
+                        visible && styles.tileRevealed,
+                        matched.includes(card.pairId) && styles.tileMatched,
+                        {
+                          transform: [
+                            { perspective: 1000 },
+                            { rotateY: backInterpolate },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Text style={styles.tileText} numberOfLines={3}>
+                        {card.content}
+                      </Text>
+                    </Animated.View>
                   </TouchableOpacity>
-                </Animated.View>
+                </View>
               );
             })}
           </View>
@@ -375,16 +414,29 @@ const styles = StyleSheet.create({
     gap: 8,
   } as ViewStyle,
   cardSlot: { width: "22%", height: 82 } as ViewStyle,
-  tile: {
-    flex: 1,
+  tileTouchArea: {
     width: "100%",
+    height: "100%",
+  } as ViewStyle,
+  tileFace: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     padding: 5,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    backfaceVisibility: "hidden",
+  } as ViewStyle,
+  tileFront: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderWidth: 1.5,
     borderColor: "#38bdf8",
+  } as ViewStyle,
+  tileBack: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderWidth: 1.5,
+    borderColor: "#818cf8",
   } as ViewStyle,
   tileRevealed: {
     backgroundColor: "rgba(255, 255, 255, 0.15)",
@@ -396,11 +448,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   tileText: {
     color: "#f8fafc",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
     textAlign: "center",
   } as TextStyle,
-  hiddenText: { color: "#7dd3fc", fontSize: 24, lineHeight: 30 } as TextStyle,
+  hiddenText: { color: "#7dd3fc", fontSize: 22, lineHeight: 28 } as TextStyle,
   progress: {
     color: "#cbd5e1",
     fontSize: 11,
