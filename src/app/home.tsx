@@ -235,7 +235,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [userGrade, setUserGrade] = useState("1");
 
   const [streak, setStreak] = useState(0);
-  const [level, setLevel] = useState(0);
+  const [level, setLevel] = useState(1);
   const [lessons, setLessons] = useState(0);
   const [xp, setXp] = useState(0);
   const [studyMinutes, setStudyMinutes] = useState(0);
@@ -284,9 +284,11 @@ export default function HomeScreen(): React.JSX.Element {
   const [formNotes, setFormNotes] = useState("");
   const [formReminder, setFormReminder] = useState("10 mins before");
 
-  const nextLevelXp = progress.nextLevelXp || 100;
+  const currentLevelStartXp = (level - 1) * 100;
+  const currentLevelProgressXp = xp - currentLevelStartXp;
+  const nextLevelXp = level * 100;
   const width =
-    `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%` as any;
+    `${Math.min(100, Math.max(0, Math.round((currentLevelProgressXp / 100) * 100)))}%` as any;
 
   const scheduleStudyReminder = async (session: StudySession) => {
     if (Platform.OS === "web" || !Notifications) return;
@@ -900,18 +902,16 @@ export default function HomeScreen(): React.JSX.Element {
           resolvedGrade = parseInt(val, 10);
         }
 
-        const restoredXp = normalizeXpValue(parsed.xp);
-        const newLvl = Number.isFinite(parsed.level)
-          ? parsed.level
-          : Math.floor(restoredXp / 100) + 1;
+        const restoredXp = normalizeXpValue(parsed.xp ?? progress.xp ?? 0);
+        const calculatedLevel = Math.floor(restoredXp / 100) + 1;
         const previousLevel = prevLevelRef.current;
 
         setLevel(() => {
-          if (previousLevel !== null && newLvl > previousLevel) {
-            triggerLevelUpAnimation(previousLevel, newLvl);
+          if (previousLevel !== null && calculatedLevel > previousLevel) {
+            triggerLevelUpAnimation(previousLevel, calculatedLevel);
           }
-          prevLevelRef.current = newLvl;
-          return newLvl;
+          prevLevelRef.current = calculatedLevel;
+          return calculatedLevel;
         });
 
         setStreak(parsed.streak !== undefined ? parsed.streak : 0);
@@ -937,11 +937,14 @@ export default function HomeScreen(): React.JSX.Element {
           resolvedGrade = parseInt(val, 10);
         }
 
-        setLevel(0);
-        prevLevelRef.current = 0;
+        const restoredXp = normalizeXpValue(progress.xp ?? 0);
+        const calculatedLevel = Math.floor(restoredXp / 100) + 1;
+
+        setLevel(calculatedLevel);
+        prevLevelRef.current = calculatedLevel;
         setStreak(0);
         setLessons(0);
-        setXp(0);
+        setXp(restoredXp);
         setStudyMinutes(0);
         setDailyStudyMinutes(0);
       }
@@ -2071,7 +2074,7 @@ export default function HomeScreen(): React.JSX.Element {
 
                 <View style={styles.formDivider} />
 
-                <View style={styles.durationRow}>
+                <div style={{ flexDirection: "row", gap: 16 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
                     <View style={styles.counterControl}>
@@ -2163,7 +2166,7 @@ export default function HomeScreen(): React.JSX.Element {
                       })()}
                     </View>
                   </View>
-                </View>
+                </div>
               </View>
 
               <Text style={styles.formSectionHeader}>ADDITIONAL DETAILS</Text>

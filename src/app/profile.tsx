@@ -127,7 +127,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
   const [xp, setXp] = useState(0);
-  const [level, setLevel] = useState(0);
+  const [level, setLevel] = useState(1);
   const [nextLevelXp, setNextLevelXp] = useState(100);
   const [lastResetDate, setLastResetDate] = useState(Date.now());
   const [cloudBadges, setCloudBadges] = useState<Record<string, string>>({});
@@ -284,8 +284,8 @@ export default function ProfileScreen(): React.JSX.Element {
             cloudRow?.total_xp || 0,
           );
 
-      const mergedLevel = Math.floor(mergedXp / 100) + 1;
-      const mergedNextLevelXp = mergedLevel * 100;
+      const calculatedLevel = Math.floor(mergedXp / 100) + 1;
+      const calculatedNextLevelXp = calculatedLevel * 100;
 
       const mergedStudyMinutes = isSwitchingAccount
         ? cloudRow?.study_minutes || 0
@@ -372,8 +372,8 @@ export default function ProfileScreen(): React.JSX.Element {
       setUsername(resolvedUsername);
       setGradeYear(resolvedGradeYear);
       setXp(mergedXp);
-      setLevel(mergedLevel);
-      setNextLevelXp(mergedNextLevelXp);
+      setLevel(calculatedLevel);
+      setNextLevelXp(calculatedNextLevelXp);
       setStreak(mergedStreak);
       setLessons(mergedLessonsCount);
       setBio(mergedBio);
@@ -394,8 +394,8 @@ export default function ProfileScreen(): React.JSX.Element {
         email: user.email || "",
         gradeYear: resolvedGradeYear,
         xp: mergedXp,
-        level: mergedLevel,
-        nextLevelXp: mergedNextLevelXp,
+        level: calculatedLevel,
+        nextLevelXp: calculatedNextLevelXp,
         streak: mergedStreak,
         lessons: mergedLessonsCount,
         studyMinutes: mergedStudyMinutes,
@@ -695,26 +695,21 @@ export default function ProfileScreen(): React.JSX.Element {
       if (parsed.streak !== undefined) setStreak(parsed.streak);
       if (parsed.lessons !== undefined) setLessons(parsed.lessons);
 
-      const restoredXp = normalizeXpValue(parsed.xp ?? 0);
+      const restoredXp = normalizeXpValue(parsed.xp ?? progress.xp ?? 0);
       setXp(restoredXp);
 
-      if (Number.isFinite(parsed.nextLevelXp)) {
-        setNextLevelXp(parsed.nextLevelXp);
-      } else {
-        setNextLevelXp((Math.floor(restoredXp / 100) + 1) * 100);
+      const calculatedLevel = Math.floor(restoredXp / 100) + 1;
+      const calculatedNextLevelXp = calculatedLevel * 100;
+
+      setLevel(calculatedLevel);
+      setNextLevelXp(calculatedNextLevelXp);
+
+      if (prevLevel !== null && calculatedLevel > prevLevel) {
+        triggerLevelUpAnimation(prevLevel, calculatedLevel);
       }
+      setPrevLevel(calculatedLevel);
 
       if (parsed.lastResetDate) setLastResetDate(parsed.lastResetDate);
-
-      const newLvl = Number.isFinite(parsed.level)
-        ? parsed.level
-        : Math.floor(restoredXp / 100) + 1;
-
-      if (prevLevel !== null && newLvl > prevLevel) {
-        triggerLevelUpAnimation(prevLevel, newLvl);
-      }
-      setLevel(newLvl);
-      setPrevLevel(newLvl);
     } catch (e) {
       console.error("Failed to load profile data", e);
     }
@@ -844,7 +839,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const localUri = result.assets[0].uri;
-      setTempProfileImage(localUri); // Use reliable local URI directly so it never turns purple
+      setTempProfileImage(localUri);
     }
   };
 
@@ -863,14 +858,21 @@ export default function ProfileScreen(): React.JSX.Element {
 
     const newLessons = lessons + 1;
     const newXp = xp + 25;
+    const newLevel = Math.floor(newXp / 100) + 1;
+    const newNextLevelXp = newLevel * 100;
+
     setLessons(newLessons);
     setXp(newXp);
+    setLevel(newLevel);
+    setNextLevelXp(newNextLevelXp);
     progress.addXp(25);
 
     await persistData({
       sessions: updatedSessions,
       lessons: newLessons,
       xp: newXp,
+      level: newLevel,
+      nextLevelXp: newNextLevelXp,
     });
 
     try {
@@ -895,7 +897,7 @@ export default function ProfileScreen(): React.JSX.Element {
     try {
       await supabase.rpc("sync_user_xp", {
         p_name: username || name || "Explorer",
-        p_total_xp: xp + 25,
+        p_total_xp: newXp,
         p_earned_xp: 25,
       });
       await syncFullProfileToCloud();
@@ -929,7 +931,6 @@ export default function ProfileScreen(): React.JSX.Element {
       if (!isNaN(mins) && mins > 0) durationStr += `${mins} mins`;
       if (!durationStr.trim()) durationStr = "30 mins";
 
-      const targetDateObj = new Date(targetYear, targetMonth, targetDay);
       const formattedMonth = String(targetMonth + 1).padStart(2, "0");
       const formattedDay = String(targetDay).padStart(2, "0");
       const dateKeyStr = `${targetYear}-${formattedMonth}-${formattedDay}`;
@@ -987,7 +988,10 @@ export default function ProfileScreen(): React.JSX.Element {
     });
   };
 
-  const percent = `${Math.min(100, Math.round((xp / nextLevelXp) * 100))}%`;
+  const currentLevelStartXp = (level - 1) * 100;
+  const currentLevelProgressXp = xp - currentLevelStartXp;
+  const percent = `${Math.min(100, Math.max(0, Math.round((currentLevelProgressXp / 100) * 100)))}%`;
+
   const animatedCalendarBorderColor = calendarGlowAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["#374b7c", "#625cff"],
