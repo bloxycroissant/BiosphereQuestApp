@@ -49,19 +49,19 @@ const getXPForDifficulty = (diff: Difficulty): number => {
   }
 };
 
-export const NumberNinjaGame: React.FC<Props> = ({
+export const CodebreakerGame: React.FC<Props> = ({
   grade,
   onSuccess,
   onClose,
 }) => {
   const clickPlayer = useAudioPlayer(
-    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
   );
   const correctPlayer = useAudioPlayer(
-    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
   );
   const wrongPlayer = useAudioPlayer(
-    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
   );
 
   const playSound = (type: "click" | "correct" | "wrong") => {
@@ -227,7 +227,7 @@ export const NumberNinjaGame: React.FC<Props> = ({
             <View style={styles.feedback}>
               <Text style={styles.feedbackText}>
                 {selected === question.correctAnswer
-                  ? `Bullseye! +${currentXP} XP`
+                  ? `Bullseye! +{currentXP} XP`
                   : `The answer was ${question.correctAnswer}.`}
               </Text>
               <TouchableOpacity style={styles.primaryButton} onPress={next}>

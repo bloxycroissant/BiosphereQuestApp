@@ -1,3 +1,4 @@
+import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -168,6 +169,31 @@ export const WordScrambleGame: React.FC<Props> = ({
   onSuccess,
   onClose,
 }) => {
+  const clickPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
+  );
+  const correctPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
+  );
+  const wrongPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
+  );
+
+  const playSound = (type: "click" | "correct" | "wrong") => {
+    try {
+      if (type === "click") {
+        clickPlayer.seekTo(0);
+        clickPlayer.play();
+      } else if (type === "correct") {
+        correctPlayer.seekTo(0);
+        correctPlayer.play();
+      } else if (type === "wrong") {
+        wrongPlayer.seekTo(0);
+        wrongPlayer.play();
+      }
+    } catch {}
+  };
+
   const seenChallenges = useRef(new Set<string>());
   const antiCheatTimestamp = useRef<number>(Date.now());
 
@@ -198,6 +224,9 @@ export const WordScrambleGame: React.FC<Props> = ({
 
   const loadNextWord = useCallback(() => {
     antiCheatTimestamp.current = Date.now();
+    if (seenChallenges.current.size > 100) {
+      seenChallenges.current.clear();
+    }
     const nextChallenge = getUniqueWordScramble(grade, seenChallenges.current);
     seenChallenges.current.add(nextChallenge.targetWord);
 
@@ -247,6 +276,7 @@ export const WordScrambleGame: React.FC<Props> = ({
   }, [finished, resultEntrance]);
 
   const animateTile = (index: number, selected: boolean) => {
+    playSound("click");
     if (!tileScales[index]) return;
     Animated.sequence([
       Animated.timing(tileScales[index], {
@@ -276,6 +306,7 @@ export const WordScrambleGame: React.FC<Props> = ({
   };
 
   const checkAnswer = () => {
+    playSound("click");
     if (finished) return;
 
     if (Date.now() - antiCheatTimestamp.current < 250) {
@@ -290,6 +321,7 @@ export const WordScrambleGame: React.FC<Props> = ({
     }
 
     if (answer === challenge.targetWord) {
+      playSound("correct");
       onSuccess(currentXP);
       setTotalXp((prev) => prev + currentXP);
       setSolvedCount((count) => count + 1);
@@ -299,11 +331,13 @@ export const WordScrambleGame: React.FC<Props> = ({
         loadNextWord();
       }, 600);
     } else {
+      playSound("wrong");
       setMessage("Not quite. Rearrange the tiles and try again.");
     }
   };
 
   const restartGame = () => {
+    playSound("click");
     antiCheatTimestamp.current = Date.now();
     seenChallenges.current.clear();
     const initial = getUniqueWordScramble(grade, seenChallenges.current);
@@ -361,14 +395,25 @@ export const WordScrambleGame: React.FC<Props> = ({
             >
               <Text style={styles.buttonText}>Play Again ↻</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => {
+                playSound("click");
+                onClose();
+              }}
+            >
               <Text style={styles.backText}>Return to Games</Text>
             </TouchableOpacity>
           </Animated.View>
         ) : (
           <>
             <View style={styles.topBar}>
-              <TouchableOpacity onPress={onClose}>
+              <TouchableOpacity
+                onPress={() => {
+                  playSound("click");
+                  onClose();
+                }}
+              >
                 <Text style={styles.backText}>Return to Games</Text>
               </TouchableOpacity>
               <Text style={styles.grade}>
@@ -453,6 +498,7 @@ export const WordScrambleGame: React.FC<Props> = ({
                 <TouchableOpacity
                   style={styles.secondaryButton}
                   onPress={() => {
+                    playSound("click");
                     setPickedTiles([]);
                     setMessage("");
                   }}

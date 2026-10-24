@@ -1,3 +1,4 @@
+import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
 import {
@@ -52,6 +53,31 @@ export const CodebreakerGame: React.FC<Props> = ({
   onSuccess,
   onClose,
 }) => {
+  const clickPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Button_Click_SFX.mp3"),
+  );
+  const correctPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Correct_Answer_SFX.mp3"),
+  );
+  const wrongPlayer = useAudioPlayer(
+    require("../../../assets/BiosphereQuestSoundEffectsandMusic/Biosphere Quest SFX/Wrong_Answer_SFX.mp3"),
+  );
+
+  const playSound = (type: "click" | "correct" | "wrong") => {
+    try {
+      if (type === "click") {
+        clickPlayer.seekTo(0);
+        clickPlayer.play();
+      } else if (type === "correct") {
+        correctPlayer.seekTo(0);
+        correctPlayer.play();
+      } else if (type === "wrong") {
+        wrongPlayer.seekTo(0);
+        wrongPlayer.play();
+      }
+    } catch {}
+  };
+
   const seenChallenges = useRef(new Set<string>());
   const antiCheatTimestamp = useRef<number>(Date.now());
 
@@ -65,6 +91,7 @@ export const CodebreakerGame: React.FC<Props> = ({
   const currentXP = getXPForDifficulty(currentDifficulty);
 
   const startRound = (selectedSubject: Subject) => {
+    playSound("click");
     antiCheatTimestamp.current = Date.now();
     seenChallenges.current.clear();
     const nextChallenge = generateCodebreaker(
@@ -90,12 +117,16 @@ export const CodebreakerGame: React.FC<Props> = ({
 
     setSelected(option);
     if (challenge.options[option] === challenge.missingAnswer) {
+      playSound("correct");
       setCorrectCount((count) => count + 1);
       onSuccess(currentXP);
+    } else {
+      playSound("wrong");
     }
   };
 
   const next = () => {
+    playSound("click");
     antiCheatTimestamp.current = Date.now();
     const nextQuestionNum = questionNumber + 1;
     let nextChallenge = generateCodebreaker(
@@ -106,7 +137,9 @@ export const CodebreakerGame: React.FC<Props> = ({
     let key = nextChallenge ? challengeKey(nextChallenge) : "";
 
     if (!nextChallenge || seenChallenges.current.has(key)) {
-      seenChallenges.current.clear();
+      if (seenChallenges.current.size > 150) {
+        seenChallenges.current.clear();
+      }
       nextChallenge = generateCodebreaker(
         grade,
         subject ?? "Math",
@@ -132,17 +165,22 @@ export const CodebreakerGame: React.FC<Props> = ({
           style={styles.container}
         >
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity
+              onPress={() => {
+                playSound("click");
+                onClose();
+              }}
+            >
               <Text style={styles.backText}>Return to Games</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.content}>
             <Text style={styles.eyebrow}>
-              GRADE {grade} • DYNAMIC PROGRESSION
+              GRADE {grade} • MATATAG CURRICULUM
             </Text>
             <Text style={styles.title}>🔐 Codebreaker</Text>
             <Text style={styles.subtitle}>
-              Solve puzzles that scale from Easy all the way to Impossible!
+              Infinite pattern puzzles aligned with Grades 1-6 books!
             </Text>
             <TouchableOpacity
               style={[styles.subjectButton, styles.math]}
@@ -150,7 +188,7 @@ export const CodebreakerGame: React.FC<Props> = ({
             >
               <Text style={styles.subjectTitle}>🔢 Math Track</Text>
               <Text style={styles.subjectCopy}>
-                Skip counting, addition, and complex multiplication patterns
+                Number sequences, operations, and arithmetic progressions
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -159,7 +197,7 @@ export const CodebreakerGame: React.FC<Props> = ({
             >
               <Text style={styles.subjectTitle}>🌿 Science Track</Text>
               <Text style={styles.subjectCopy}>
-                Life cycles and advanced environmental sequences
+                Ecosystem cycles, states of matter, and natural processes
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -168,7 +206,7 @@ export const CodebreakerGame: React.FC<Props> = ({
             >
               <Text style={styles.subjectTitle}>✨ Mixed Track</Text>
               <Text style={styles.subjectCopy}>
-                A balance of Math and Science challenges
+                A complete balance of Math and Science challenges
               </Text>
             </TouchableOpacity>
           </View>
@@ -186,11 +224,12 @@ export const CodebreakerGame: React.FC<Props> = ({
         <View style={styles.topBar}>
           <TouchableOpacity
             onPress={() => {
+              playSound("click");
               setSubject(null);
               setChallenge(null);
             }}
           >
-            <Text style={styles.backText}> Back toTracks</Text>
+            <Text style={styles.backText}> Back to Tracks</Text>
           </TouchableOpacity>
           <Text style={styles.progress}>
             Puzzle {questionNumber} • {subject} • ✓ {correctCount}
