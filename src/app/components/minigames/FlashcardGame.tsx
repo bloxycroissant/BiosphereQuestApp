@@ -56,7 +56,7 @@ export const FlashcardGame: React.FC<Props> = ({
   onClose,
 }) => {
   const pageTurnPlayer = useAudioPlayer(
-    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/PageTurn.mp3"),
+    require("../../../../assets/BiosphereQuestSoundEffectsandMusic/PageTurn.mp3"),
   );
 
   const playPageTurn = async () => {
