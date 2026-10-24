@@ -1,14 +1,13 @@
 import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
-import { useSafeAudioPlayer } from "@/hooks/use-safe-audio";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  BackHandler,
   Easing,
   Image,
   LayoutAnimation,
@@ -77,20 +76,9 @@ const STUDY_SESSIONS_KEY = "@biosphere_study_sessions_v1";
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ProfileScreen(): React.JSX.Element {
-  const bgmPlayer = useSafeAudioPlayer(
+  const bgmPlayer = useAudioPlayer(
     require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 30 Min Study, Focus & Relax Beats.mp3"),
   );
-
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    if (
-      Platform.OS === "android" &&
-      UIManager.setLayoutAnimationEnabledExperimental
-    ) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-  }, []);
 
   useEffect(() => {
     if (bgmPlayer) {
@@ -99,6 +87,14 @@ export default function ProfileScreen(): React.JSX.Element {
       bgmPlayer.play();
     }
   }, [bgmPlayer]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  if (
+    Platform.OS === "android" &&
+    UIManager.setLayoutAnimationEnabledExperimental
+  ) {
+    UIManager.setLayoutAnimationEnabledExperimental?.(true);
+  }
 
   const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
   const stellaMascot = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
@@ -212,71 +208,6 @@ export default function ProfileScreen(): React.JSX.Element {
       useNativeDriver: true,
     }).start();
   };
-
-  const animateViewChange = useCallback(
-    (nextView: ViewMode): void => {
-      if (nextView === "addSchedule") {
-        setTargetYear(now.getFullYear());
-        setTargetMonth(now.getMonth());
-        setTargetDay(now.getDate());
-        addFormAnim.setValue(40);
-        addFormOpacity.setValue(0);
-        Animated.parallel([
-          Animated.spring(addFormAnim, {
-            toValue: 0,
-            tension: 70,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(addFormOpacity, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-
-      Animated.sequence([
-        Animated.timing(viewTransitionAnim, {
-          toValue: 0.95,
-          duration: 90,
-          useNativeDriver: true,
-        }),
-        Animated.timing(viewTransitionAnim, {
-          toValue: 1,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      setCurrentView(nextView);
-    },
-    [addFormAnim, addFormOpacity, viewTransitionAnim, now],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        if (currentView === "editProfile" || currentView === "addSchedule") {
-          animateViewChange("profile");
-          return true;
-        }
-
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace("/home" as any);
-        }
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [currentView, animateViewChange]),
-  );
 
   const syncFullProfileToCloud = async (): Promise<void> => {
     try {
@@ -555,6 +486,43 @@ export default function ProfileScreen(): React.JSX.Element {
       void loadSavedData().then(() => checkAuthStatus());
     }, []),
   );
+
+  const animateViewChange = (nextView: ViewMode): void => {
+    if (nextView === "addSchedule") {
+      setTargetYear(now.getFullYear());
+      setTargetMonth(now.getMonth());
+      setTargetDay(now.getDate());
+      addFormAnim.setValue(40);
+      addFormOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(addFormAnim, {
+          toValue: 0,
+          tension: 70,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.timing(addFormOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    Animated.sequence([
+      Animated.timing(viewTransitionAnim, {
+        toValue: 0.95,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.timing(viewTransitionAnim, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    setCurrentView(nextView);
+  };
 
   const handleTabSwitch = (newSection: Section): void => {
     if (newSection === section) return;
@@ -1005,10 +973,7 @@ export default function ProfileScreen(): React.JSX.Element {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.editHeaderRow}>
-              <Pressable
-                onPress={() => animateViewChange("profile")}
-                hitSlop={12}
-              >
+              <Pressable onPress={() => animateViewChange("profile")}>
                 <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <Text style={styles.editHeaderTitle}>Edit Profile</Text>
@@ -1162,10 +1127,7 @@ export default function ProfileScreen(): React.JSX.Element {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.editHeaderRow}>
-              <Pressable
-                onPress={() => animateViewChange("profile")}
-                hitSlop={12}
-              >
+              <Pressable onPress={() => animateViewChange("profile")}>
                 <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <View style={styles.addHeaderTitleRow}>
@@ -1839,35 +1801,6 @@ function Badges({
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
   const badgeModalAnim = useRef(new Animated.Value(0)).current;
 
-  const closeBadgeModal = useCallback(() => {
-    Animated.timing(badgeModalAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setSelectedBadge(null);
-    });
-  }, [badgeModalAnim]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        if (selectedBadge) {
-          closeBadgeModal();
-          return true;
-        }
-        return false;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [selectedBadge, closeBadgeModal]),
-  );
-
   const getUnlockDate = (id: string, xpThreshold?: number) => {
     const savedDate = progress.badgeUnlockDates?.[id] || cloudBadges?.[id];
     if (savedDate) return savedDate;
@@ -2002,6 +1935,16 @@ function Badges({
       tension: 65,
       friction: 7,
     }).start();
+  };
+
+  const closeBadgeModal = () => {
+    Animated.timing(badgeModalAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedBadge(null);
+    });
   };
 
   const formatUnlockDate = (dateStr: string) => {

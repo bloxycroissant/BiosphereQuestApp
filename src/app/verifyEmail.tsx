@@ -1,11 +1,10 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Alert,
-  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,37 +17,13 @@ import { supabase } from "../lib/supabase";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 
-export default function VerifyScreen(): React.JSX.Element {
+export default function VerifyScreen() {
   const { email } = useLocalSearchParams<{ email?: string | string[] }>();
   const emailAddress = Array.isArray(email) ? (email[0] ?? "") : (email ?? "");
 
   const [code, setCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
-
-  const handleBack = useCallback((): void => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/signup" as any);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
 
   useEffect(() => {
     if (resendTimer <= 0) {
@@ -62,7 +37,7 @@ export default function VerifyScreen(): React.JSX.Element {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const handleVerify = async (): Promise<void> => {
+  const handleVerify = async () => {
     const normalizedCode = code.trim();
 
     if (!emailAddress) {
@@ -121,7 +96,7 @@ export default function VerifyScreen(): React.JSX.Element {
     }
   };
 
-  const handleResend = async (): Promise<void> => {
+  const handleResend = async () => {
     if (resendTimer > 0) return;
 
     if (!emailAddress) {
@@ -155,11 +130,12 @@ export default function VerifyScreen(): React.JSX.Element {
       >
         <View style={styles.content}>
           <Pressable
-            onPress={handleBack}
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/signup")
+            }
             style={styles.backButton}
-            hitSlop={12}
           >
-            <Text style={styles.back}>Back</Text>
+            <Text style={styles.back}>‹ Back</Text>
           </Pressable>
 
           <Image source={logo} style={styles.logo} contentFit="contain" />

@@ -3,13 +3,12 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { makeRedirectUri } from "expo-auth-session";
 import { Image } from "expo-image";
-import { Link, router, useFocusEffect } from "expo-router";
+import { Link, router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useCallback, useState, type ComponentProps } from "react";
+import React, { useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -67,30 +66,6 @@ export default function LoginScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const handleBack = useCallback((): void => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/" as any);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
 
   const handleGoogleLogin = async (): Promise<void> => {
     try {
@@ -298,11 +273,10 @@ export default function LoginScreen(): React.JSX.Element {
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <Pressable onPress={handleBack} hitSlop={12}>
-              <Text style={styles.back}>Back</Text>
+            <Pressable onPress={() => router.back()}>
+              <Text style={styles.back}> Back</Text>
             </Pressable>
 
             <View style={styles.mascots}>
@@ -366,7 +340,6 @@ export default function LoginScreen(): React.JSX.Element {
                   <Pressable
                     onPress={() => setShowPassword(!showPassword)}
                     style={styles.eyeIcon}
-                    hitSlop={8}
                   >
                     <Ionicons
                       name={showPassword ? "eye" : "eye-off"}
@@ -453,7 +426,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 12,
   },
-  back: { color: "#e582ff", fontWeight: "800", fontSize: 15 },
+  back: { color: "#e582ff", fontWeight: "800" },
   mascots: {
     flexDirection: "row",
     alignItems: "flex-end",

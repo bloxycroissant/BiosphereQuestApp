@@ -2,11 +2,10 @@ import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { Link, router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { Link, router } from "expo-router";
+import React, { useState } from "react";
 import {
   Alert,
-  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -30,30 +29,6 @@ export default function SignupScreen(): React.JSX.Element {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
-
-  const handleBack = useCallback((): void => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/" as any);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
 
   const handleSignup = async (): Promise<void> => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,8 +143,12 @@ export default function SignupScreen(): React.JSX.Element {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <Pressable onPress={handleBack} hitSlop={12}>
-              <Text style={styles.back}> Back</Text>
+            <Pressable
+              onPress={() =>
+                router.canGoBack() ? router.back() : router.replace("/" as any)
+              }
+            >
+              <Text style={styles.back}>Back</Text>
             </Pressable>
 
             <View style={styles.mascots}>
@@ -220,7 +199,6 @@ export default function SignupScreen(): React.JSX.Element {
                   <Pressable
                     onPress={() => setShowPassword(!showPassword)}
                     style={styles.eyeIcon}
-                    hitSlop={8}
                   >
                     <Ionicons
                       name={showPassword ? "eye" : "eye-off"}
@@ -279,7 +257,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 12,
   },
-  back: { color: "#e582ff", fontWeight: "800", fontSize: 15 },
+  back: { color: "#e582ff", fontWeight: "800" },
   mascots: {
     flexDirection: "row",
     alignItems: "flex-end",

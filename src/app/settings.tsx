@@ -5,7 +5,6 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  BackHandler,
   Image,
   Modal,
   Pressable,
@@ -50,13 +49,13 @@ export default function SettingsScreen(): React.JSX.Element {
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleBack = useCallback((): void => {
+  const handleBack = (): void => {
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/home" as any);
     }
-  }, []);
+  };
 
   const syncAuth = async (): Promise<void> => {
     try {
@@ -128,47 +127,7 @@ export default function SettingsScreen(): React.JSX.Element {
   useFocusEffect(
     useCallback(() => {
       void syncAuth();
-
-      const onBackPress = (): boolean => {
-        if (gradeModalVisible) {
-          setGradeModalVisible(false);
-          return true;
-        }
-        if (resetModalVisible) {
-          setResetModalVisible(false);
-          return true;
-        }
-        if (parentGateVisible) {
-          setParentGateVisible(false);
-          setSecurityAnswer("");
-          return true;
-        }
-        if (deleteModalVisible) {
-          if (!isDeleting) {
-            setDeleteModalVisible(false);
-            setDeletePassword("");
-          }
-          return true;
-        }
-
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress
-      );
-
-      return () => subscription.remove();
-    }, [
-      gradeModalVisible,
-      resetModalVisible,
-      parentGateVisible,
-      deleteModalVisible,
-      isDeleting,
-      handleBack,
-    ]),
+    }, []),
   );
 
   const handleUpdateGrade = async (newGrade: number): Promise<void> => {
@@ -630,7 +589,7 @@ export default function SettingsScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} hitSlop={12}>
+          <Pressable onPress={handleBack}>
             <Text style={styles.backText}> Back </Text>
           </Pressable>
           <Text style={styles.headerTitle}>Settings </Text>
