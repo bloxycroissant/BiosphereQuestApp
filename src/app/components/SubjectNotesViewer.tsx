@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { type Subject } from "./curriculum";
 
-const pageTurnSoundFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/Page Turn.mp3");
+const pageTurnSoundFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/PageTurn.mp3");
 const stellaMascotImage = require("../../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
 
 interface SubjectNotesViewerProps {
