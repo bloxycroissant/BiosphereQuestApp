@@ -16,7 +16,7 @@ import {
 import { Lesson, Subject } from "./curriculum";
 
 const stellaMascotImage = require("../../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
-const lessonBgmFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 🌌 30 Min Study, Focus & Relax Beats.mp3");
+const lessonBgmFile = require("../../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 30 Min Study, Focus & Relax Beats.mp3");
 
 interface InteractiveLessonViewerProps {
   gradeLevel?: number;

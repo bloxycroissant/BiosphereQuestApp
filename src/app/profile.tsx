@@ -77,7 +77,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function ProfileScreen(): React.JSX.Element {
   const bgmPlayer = useAudioPlayer(
-    require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 🌌 30 Min Study, Focus & Relax Beats.mp3"),
+    require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 30 Min Study, Focus & Relax Beats.mp3"),
   );
 
   useEffect(() => {
