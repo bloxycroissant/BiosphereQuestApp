@@ -11,9 +11,8 @@ import {
   ViewStyle,
 } from "react-native";
 import {
-  generateWhackChallenge,
   GradeLevel,
-  WhackChallenge,
+  WhackChallenge
 } from "../../data/questionGenerators";
 import { MinigameMotion } from "./MinigameMotion";
 
@@ -26,7 +25,7 @@ interface Props {
 type Difficulty = "Easy" | "Medium" | "Hard" | "Expert" | "Impossible";
 
 const MAX_LIVES = 5;
-const TARGET_QUOTA = 10;
+const TARGET_QUOTA = 4;
 
 const getDifficulty = (completedQuotas: number): Difficulty => {
   if (completedQuotas <= 0) return "Easy";
@@ -49,6 +48,174 @@ const getXPForDifficulty = (diff: Difficulty): number => {
     case "Impossible":
       return 220;
   }
+};
+
+// Expanded MATATAG Curriculum-aligned robust challenge bank guaranteeing 4 correct and 5 wrong answers (9 tiles total)
+const MATATAG_CURRICULUM_BANK: Record<
+  GradeLevel,
+  {
+    ruleText: string;
+    targetMultiple: number;
+    correctPool: number[];
+    wrongPool: number[];
+  }[]
+> = {
+  1: [
+    {
+      ruleText: "Whack numbers that are counting by 2s up to 20!",
+      targetMultiple: 2,
+      correctPool: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+      wrongPool: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19],
+    },
+    {
+      ruleText: "Whack numbers that are multiples of 5 (Grade 1 Number Sense)!",
+      targetMultiple: 5,
+      correctPool: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
+      wrongPool: [1, 2, 3, 4, 6, 7, 8, 9, 11, 12],
+    },
+    {
+      ruleText: "Whack numbers that end in zero (Decades up to 50)!",
+      targetMultiple: 10,
+      correctPool: [10, 20, 30, 40, 50],
+      wrongPool: [11, 12, 21, 23, 31, 34, 41, 46],
+    },
+  ],
+  2: [
+    {
+      ruleText: "Whack numbers that are multiples of 3 (Grade 2 Tables)!",
+      targetMultiple: 3,
+      correctPool: [3, 6, 9, 12, 15, 18, 21, 24, 27, 30],
+      wrongPool: [1, 2, 4, 5, 7, 8, 10, 11, 13, 14],
+    },
+    {
+      ruleText:
+        "Whack numbers that are multiples of 4 (Multiplication Mastery)!",
+      targetMultiple: 4,
+      correctPool: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40],
+      wrongPool: [1, 2, 3, 5, 6, 7, 9, 10, 11, 13],
+    },
+    {
+      ruleText: "Whack even numbers between 1 and 20 (Grade 2 Patterns)!",
+      targetMultiple: 2,
+      correctPool: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+      wrongPool: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19],
+    },
+  ],
+  3: [
+    {
+      ruleText: "Whack numbers that are multiples of 6 (Grade 3 Curriculum)!",
+      targetMultiple: 6,
+      correctPool: [6, 12, 18, 24, 30, 36, 42, 48, 54, 60],
+      wrongPool: [5, 7, 11, 13, 17, 19, 23, 25, 29, 31],
+    },
+    {
+      ruleText: "Whack numbers that are multiples of 7 (Grade 3 Times Tables)!",
+      targetMultiple: 7,
+      correctPool: [7, 14, 21, 28, 35, 42, 49, 56, 63, 70],
+      wrongPool: [6, 8, 13, 15, 20, 22, 27, 29, 34, 36],
+    },
+    {
+      ruleText:
+        "Whack numbers that are multiples of 8 (Advanced Multiplication)!",
+      targetMultiple: 8,
+      correctPool: [8, 16, 24, 32, 40, 48, 56, 64, 72, 80],
+      wrongPool: [7, 9, 15, 17, 23, 25, 31, 33, 39, 41],
+    },
+  ],
+  4: [
+    {
+      ruleText: "Whack numbers that are multiples of 9 (Grade 4 Curriculum)!",
+      targetMultiple: 9,
+      correctPool: [9, 18, 27, 36, 45, 54, 63, 72, 81, 90],
+      wrongPool: [8, 10, 17, 19, 26, 28, 35, 37, 44, 46],
+    },
+    {
+      ruleText: "Whack numbers that are multiples of 11 (Patterns & Factors)!",
+      targetMultiple: 11,
+      correctPool: [11, 22, 33, 44, 55, 66, 77, 88, 99],
+      wrongPool: [10, 12, 21, 23, 32, 34, 43, 45, 54, 56],
+    },
+    {
+      ruleText: "Whack numbers that are multiples of 12 (Grade 4 Mastery)!",
+      targetMultiple: 12,
+      correctPool: [12, 24, 36, 48, 60, 72, 84, 96],
+      wrongPool: [10, 11, 13, 23, 25, 35, 37, 47, 49, 59],
+    },
+  ],
+  5: [
+    {
+      ruleText: "Whack numbers divisible by 3 (Grade 5 Divisibility Rules)!",
+      targetMultiple: 3,
+      correctPool: [15, 21, 24, 27, 33, 39, 42, 51, 57, 63],
+      wrongPool: [14, 16, 20, 22, 25, 28, 32, 34, 40, 44],
+    },
+    {
+      ruleText: "Whack numbers divisible by 4 (Grade 5 Number Theory)!",
+      targetMultiple: 4,
+      correctPool: [16, 24, 28, 32, 36, 44, 48, 52, 60, 64],
+      wrongPool: [15, 17, 23, 25, 29, 31, 35, 37, 43, 45],
+    },
+    {
+      ruleText: "Whack numbers divisible by 5 (Advanced Number Sense)!",
+      targetMultiple: 5,
+      correctPool: [25, 35, 45, 55, 65, 75, 85, 95, 105],
+      wrongPool: [24, 26, 34, 36, 44, 46, 54, 56, 64, 66],
+    },
+  ],
+  6: [
+    {
+      ruleText: "Whack numbers divisible by 6 (Grade 6 Prime & Composite)!",
+      targetMultiple: 6,
+      correctPool: [18, 24, 36, 42, 48, 54, 66, 72, 78, 84],
+      wrongPool: [17, 19, 23, 25, 35, 37, 43, 47, 53, 55],
+    },
+    {
+      ruleText:
+        "Whack numbers divisible by 8 (Grade 6 Mathematical Reasoning)!",
+      targetMultiple: 8,
+      correctPool: [24, 32, 40, 48, 56, 72, 80, 88, 96],
+      wrongPool: [23, 25, 31, 33, 39, 41, 47, 49, 55, 57],
+    },
+    {
+      ruleText: "Whack numbers divisible by 9 (Grade 6 Algebraic Readiness)!",
+      targetMultiple: 9,
+      correctPool: [27, 36, 45, 54, 63, 72, 81, 90, 99],
+      wrongPool: [26, 28, 35, 37, 44, 46, 53, 55, 62, 64],
+    },
+  ],
+};
+
+const generateCurricularWhackChallenge = (
+  grade: GradeLevel,
+  seenSet: Set<string>,
+): WhackChallenge => {
+  const gradePools =
+    MATATAG_CURRICULUM_BANK[grade] || MATATAG_CURRICULUM_BANK[1];
+  const candidateRule =
+    gradePools[Math.floor(Math.random() * gradePools.length)];
+
+  // Shuffle and pick exactly 4 correct (right answers)
+  const shuffledCorrect = [...candidateRule.correctPool].sort(
+    () => Math.random() - 0.5,
+  );
+  const selectedCorrect = shuffledCorrect.slice(0, TARGET_QUOTA);
+
+  // Shuffle and pick exactly 5 wrong (incorrect answers)
+  const shuffledWrong = [...candidateRule.wrongPool].sort(
+    () => Math.random() - 0.5,
+  );
+  const selectedWrong = shuffledWrong.slice(0, MAX_LIVES); // 5 wrong answers
+
+  // Combine to form 9 grid numbers (4 correct + 5 wrong = 9 tiles)
+  const combinedGrid = [...selectedCorrect, ...selectedWrong].sort(
+    () => Math.random() - 0.5,
+  );
+
+  return {
+    ruleText: candidateRule.ruleText,
+    targetMultiple: candidateRule.targetMultiple,
+    gridNumbers: combinedGrid,
+  };
 };
 
 export const WhackANumberGame: React.FC<Props> = ({
@@ -92,7 +259,10 @@ export const WhackANumberGame: React.FC<Props> = ({
   });
 
   const [challenge, setChallenge] = useState<WhackChallenge>(() => {
-    const initial = generateWhackChallenge(grade, seenChallenges.current);
+    const initial = generateCurricularWhackChallenge(
+      grade,
+      seenChallenges.current,
+    );
     if (initial) seenChallenges.current.add(challengeKey(initial));
     return initial;
   });
@@ -123,12 +293,18 @@ export const WhackANumberGame: React.FC<Props> = ({
       if (seenChallenges.current.size > 80) {
         seenChallenges.current.clear();
       }
-      let nextChallenge = generateWhackChallenge(grade, seenChallenges.current);
+      let nextChallenge = generateCurricularWhackChallenge(
+        grade,
+        seenChallenges.current,
+      );
       let key = nextChallenge ? challengeKey(nextChallenge) : "";
 
       if (!nextChallenge || (key && seenChallenges.current.has(key))) {
         seenChallenges.current.clear();
-        nextChallenge = generateWhackChallenge(grade, seenChallenges.current);
+        nextChallenge = generateCurricularWhackChallenge(
+          grade,
+          seenChallenges.current,
+        );
         key = nextChallenge ? challengeKey(nextChallenge) : "";
       }
 
@@ -212,7 +388,9 @@ export const WhackANumberGame: React.FC<Props> = ({
       playSound("correct");
       const nextScore = score + 1;
       setScore(nextScore);
-      setFeedback("🔨 💥 HAMMER SMASH! +1 Target");
+      setFeedback("🔨 💥 HAMMER SMASH! +1 Target (Correct)");
+
+      setWhacked((current) => [...current, index]);
 
       if (nextScore >= TARGET_QUOTA) {
         onSuccess(currentXP);
@@ -221,29 +399,27 @@ export const WhackANumberGame: React.FC<Props> = ({
         startNextBoard(false);
         return;
       }
+
+      const targetsOnBoard = challenge.gridNumbers
+        .map((number, tileIndex) =>
+          number % challenge.targetMultiple === 0 ? tileIndex : -1,
+        )
+        .filter((tileIndex) => tileIndex !== -1);
+      const alreadyHit = [...whacked, index];
+
+      if (targetsOnBoard.every((tileIndex) => alreadyHit.includes(tileIndex))) {
+        startNextBoard(false);
+      }
     } else {
       playSound("wrong");
       const remainingLives = lives - 1;
       setLives(remainingLives);
-      setFeedback("🔨 💔 OUCH! Wrong Target! Lost 1 Life!");
+      setFeedback("🔨 💔 OUCH! Incorrect Number! Lost 1 Life!");
 
       if (remainingLives <= 0) {
         setWhacked((current) => [...current, index]);
         return;
       }
-    }
-
-    setWhacked((current) => [...current, index]);
-
-    const targetsOnBoard = challenge.gridNumbers
-      .map((number, tileIndex) =>
-        number % challenge.targetMultiple === 0 ? tileIndex : -1,
-      )
-      .filter((tileIndex) => tileIndex !== -1);
-    const alreadyHit = [...whacked, index];
-
-    if (targetsOnBoard.every((tileIndex) => alreadyHit.includes(tileIndex))) {
-      startNextBoard(false);
     }
   };
 
@@ -287,7 +463,7 @@ export const WhackANumberGame: React.FC<Props> = ({
         </View>
         <View style={styles.content}>
           <Text style={styles.eyebrow}>
-            HIT {TARGET_QUOTA} TARGETS FOR +{currentXP} XP
+            HIT {TARGET_QUOTA} TARGETS (4 Right, 5 Wrong) FOR +{currentXP} XP
           </Text>
           <Text style={styles.title}>Whack-a-Number 🔨</Text>
           <Text style={styles.rule}>{challenge.ruleText}</Text>
@@ -352,7 +528,7 @@ export const WhackANumberGame: React.FC<Props> = ({
 
           <Text style={styles.feedback}>
             {feedback ||
-              "Tap each target number! Avoid wrong numbers to protect your lives."}
+              "Tap the 4 correct targets! Avoid the 5 incorrect numbers to protect your lives."}
           </Text>
 
           {isGameOver && (

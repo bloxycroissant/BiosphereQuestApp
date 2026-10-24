@@ -52,6 +52,7 @@ const getXPForDifficulty = (diff: Difficulty): number => {
 };
 
 const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
+  // Grade 1
   {
     word: "PLANT",
     clue: "A living organism that absorbs water and sunlight",
@@ -59,6 +60,29 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
   },
   { word: "SOLAR", clue: "Relating to or determined by the sun", minGrade: 1 },
   { word: "EARTH", clue: "The third planet from the sun", minGrade: 1 },
+  { word: "DIGIT", clue: "Any of the numerals from 0 to 9", minGrade: 1 },
+  {
+    word: "SENSE",
+    clue: "Faculty by which the body perceives external stimuli",
+    minGrade: 1,
+  },
+  {
+    word: "WATER",
+    clue: "Clear liquid that forms the seas, lakes, and rivers",
+    minGrade: 1,
+  },
+  {
+    word: "SHAPE",
+    clue: "The external form or appearance of an object",
+    minGrade: 1,
+  },
+  {
+    word: "ANIMAL",
+    clue: "A living organism that feeds on organic matter",
+    minGrade: 1,
+  },
+
+  // Grade 2
   {
     word: "ANGLE",
     clue: "The space between two intersecting lines",
@@ -70,7 +94,33 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
     clue: "The curved path of a celestial object around a star",
     minGrade: 2,
   },
-  { word: "DIGIT", clue: "Any of the numerals from 0 to 9", minGrade: 1 },
+  {
+    word: "SOLID",
+    clue: "Firm and stable in shape; not liquid or gas",
+    minGrade: 2,
+  },
+  {
+    word: "LIQUID",
+    clue: "A substance that flows freely and has a constant volume",
+    minGrade: 2,
+  },
+  {
+    word: "ENERGY",
+    clue: "The strength and vitality required for sustained activity",
+    minGrade: 2,
+  },
+  {
+    word: "MONEY",
+    clue: "A current medium of exchange in coins and banknotes",
+    minGrade: 2,
+  },
+  {
+    word: "LENGTH",
+    clue: "The measurement of something from end to end",
+    minGrade: 2,
+  },
+
+  // Grade 3
   {
     word: "PRISM",
     clue: "A solid geometric figure with two parallel bases",
@@ -87,6 +137,33 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
     minGrade: 3,
   },
   {
+    word: "WEATHER",
+    clue: "The state of the atmosphere at a place and time",
+    minGrade: 3,
+  },
+  {
+    word: "MATRIX",
+    clue: "A rectangular array of quantities or expressions",
+    minGrade: 3,
+  },
+  {
+    word: "SPECIES",
+    clue: "A group of living organisms consisting of similar individuals",
+    minGrade: 3,
+  },
+  {
+    word: "MAGNET",
+    clue: "A material or object that produces a magnetic field",
+    minGrade: 3,
+  },
+  {
+    word: "CIRCUIT",
+    clue: "A complete and closed path for an electric current",
+    minGrade: 3,
+  },
+
+  // Grade 4
+  {
     word: "GRAVITY",
     clue: "The force that attracts a body toward the center of the earth",
     minGrade: 4,
@@ -102,6 +179,33 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
     minGrade: 4,
   },
   {
+    word: "DIGESTION",
+    clue: "The process of breaking down food by mechanical and enzymatic action",
+    minGrade: 4,
+  },
+  {
+    word: "QUADRANT",
+    clue: "Each of four parts into which a plane is divided",
+    minGrade: 4,
+  },
+  {
+    word: "FRICTION",
+    clue: "The resistance that one surface encounters when moving over another",
+    minGrade: 4,
+  },
+  {
+    word: "POLLEN",
+    clue: "Fine powdery substance discharged from the male part of a flower",
+    minGrade: 4,
+  },
+  {
+    word: "VOLUME",
+    clue: "The amount of space that a substance or object occupies",
+    minGrade: 4,
+  },
+
+  // Grade 5
+  {
     word: "EQUATION",
     clue: "A statement that the values of two expressions are equal",
     minGrade: 5,
@@ -113,6 +217,25 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
     minGrade: 5,
   },
   {
+    word: "VERTEBRATE",
+    clue: "An animal of a large group distinguished by a backbone",
+    minGrade: 5,
+  },
+  { word: "PERCENT", clue: "By, in, or for every hundred", minGrade: 5 },
+  {
+    word: "CONTOUR",
+    clue: "An outline representing or bounding a shape or form",
+    minGrade: 5,
+  },
+  {
+    word: "TYPHOON",
+    clue: "A tropical storm in the region of the western Pacific",
+    minGrade: 5,
+  },
+  { word: "HERBIVORE", clue: "An animal that feeds on plants", minGrade: 5 },
+
+  // Grade 6
+  {
     word: "PHOTOSYNTHESIS",
     clue: "Process used by plants to convert light into energy",
     minGrade: 6,
@@ -120,6 +243,36 @@ const WORD_BANK: { word: string; clue: string; minGrade: number }[] = [
   {
     word: "HYPOTHESIS",
     clue: "A proposed explanation made on the basis of limited evidence",
+    minGrade: 6,
+  },
+  {
+    word: "BIODIVERSITY",
+    clue: "The variety of plant and animal life in a particular habitat",
+    minGrade: 6,
+  },
+  {
+    word: "INTEGER",
+    clue: "A whole number; a number that is not a fraction",
+    minGrade: 6,
+  },
+  {
+    word: "CIRCUMFERENCE",
+    clue: "The enclosing boundary of a curved geometric figure or circle",
+    minGrade: 6,
+  },
+  {
+    word: "MANGROVE",
+    clue: "A tree or shrub that grows in chiefly tropical coastal swamps",
+    minGrade: 6,
+  },
+  {
+    word: "ATMOSPHERE",
+    clue: "The envelope of gases surrounding the earth or another planet",
+    minGrade: 6,
+  },
+  {
+    word: "ORGANISM",
+    clue: "An individual animal, plant, or single-celled life form",
     minGrade: 6,
   },
 ];

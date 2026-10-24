@@ -104,6 +104,27 @@ export default function ProfileScreen(): React.JSX.Element {
   const [section, setSection] = useState<Section>("badges");
 
   const levelUpAnim = useRef(new Animated.Value(-120)).current;
+  const mascotFloat = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotFloat, {
+          toValue: -6,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotFloat, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [mascotFloat]);
+
   const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
   const [levelUpText, setLevelUpText] = useState<string>("");
   const [prevLevel, setPrevLevel] = useState<number | null>(null);
@@ -120,9 +141,6 @@ export default function ProfileScreen(): React.JSX.Element {
   const addFormOpacity = useRef(new Animated.Value(0)).current;
   const targetSlideAnim = useRef(new Animated.Value(0)).current;
   const calendarGlowAnim = useRef(new Animated.Value(0)).current;
-
-  const mascotFloat = useRef(new Animated.Value(0)).current;
-  const badgeShimmerAnim = useRef(new Animated.Value(0)).current;
 
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
@@ -167,59 +185,6 @@ export default function ProfileScreen(): React.JSX.Element {
   const [targetYear, setTargetYear] = useState(now.getFullYear());
   const [targetMonth, setTargetMonth] = useState(now.getMonth());
   const [targetDay, setTargetDay] = useState(now.getDate());
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(mascotFloat, {
-          toValue: -8,
-          duration: 1300,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(mascotFloat, {
-          toValue: 0,
-          duration: 1300,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(badgeShimmerAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(badgeShimmerAnim, {
-          toValue: 0,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(calendarGlowAnim, {
-          toValue: 1,
-          duration: 2500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-        Animated.timing(calendarGlowAnim, {
-          toValue: 0,
-          duration: 2500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-      ]),
-    ).start();
-  }, []);
 
   const getDaysInMonth = (month: number, year: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -1047,9 +1012,6 @@ export default function ProfileScreen(): React.JSX.Element {
               </Pressable>
 
               <View style={{ flexDirection: "row", gap: 20, marginTop: 10 }}>
-                <Pressable onPress={pickImage}>
-                  <Text style={styles.changePhotoText}>Change photo</Text>
-                </Pressable>
                 {tempProfileImage && (
                   <Pressable onPress={removeImage}>
                     <Text
