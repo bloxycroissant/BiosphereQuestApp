@@ -23,8 +23,7 @@
       "package": "com.biosphere.quest"
     },
     "web": {
-      "output": "single",
-      "bundler": "metro",
+      "output": "static",
       "favicon": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
     },
     "plugins": [

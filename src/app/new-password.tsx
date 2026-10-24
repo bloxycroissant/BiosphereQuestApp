@@ -3,12 +3,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,7 +21,6 @@ import {
 import { supabase } from "../lib/supabase";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
-const MaskedViewComponent = MaskedView as any;
 
 interface GradientTextProps {
   style: any;
@@ -34,7 +32,7 @@ function GradientText({
   children,
 }: GradientTextProps): React.JSX.Element {
   return (
-    <MaskedViewComponent
+    <MaskedView
       maskElement={
         <Text style={[style, { backgroundColor: "transparent" }]}>
           {children}
@@ -48,7 +46,7 @@ function GradientText({
       >
         <Text style={[style, { opacity: 0 }]}>{children}</Text>
       </LinearGradient>
-    </MaskedViewComponent>
+    </MaskedView>
   );
 }
 
@@ -60,44 +58,6 @@ export default function NewPasswordScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successModalVisible, setSuccessModalVisible] = useState(false);
-
-  const handleSuccessDismiss = async (): Promise<void> => {
-    setSuccessModalVisible(false);
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error("Error signing out recovery session:", e);
-    }
-    router.replace("/login" as any);
-  };
-
-  const handleBack = useCallback((): void => {
-    if (successModalVisible) {
-      void handleSuccessDismiss();
-      return;
-    }
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/login" as any);
-    }
-  }, [successModalVisible]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
 
   const handleResetPassword = async (): Promise<void> => {
     setErrorMessage("");
@@ -168,6 +128,16 @@ export default function NewPasswordScreen(): React.JSX.Element {
     }
   };
 
+  const handleSuccessDismiss = async (): Promise<void> => {
+    setSuccessModalVisible(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Error signing out recovery session:", e);
+    }
+    router.replace("/login" as any);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <Modal
@@ -201,11 +171,7 @@ export default function NewPasswordScreen(): React.JSX.Element {
         style={{ flex: 1 }}
       >
         <View style={styles.headerRow}>
-          <Pressable
-            onPress={handleBack}
-            style={styles.cancelButton}
-            hitSlop={12}
-          >
+          <Pressable onPress={() => router.back()} style={styles.cancelButton}>
             <MaterialCommunityIcons
               name="arrow-left"
               size={20}
@@ -258,10 +224,7 @@ export default function NewPasswordScreen(): React.JSX.Element {
                 }}
                 autoCapitalize="none"
               />
-              <Pressable
-                onPress={() => setShowPassword(!showPassword)}
-                hitSlop={8}
-              >
+              <Pressable onPress={() => setShowPassword(!showPassword)}>
                 <MaterialCommunityIcons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
                   size={20}
@@ -294,7 +257,6 @@ export default function NewPasswordScreen(): React.JSX.Element {
               />
               <Pressable
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                hitSlop={8}
               >
                 <MaterialCommunityIcons
                   name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}

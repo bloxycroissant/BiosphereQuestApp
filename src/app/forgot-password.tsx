@@ -3,12 +3,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,7 +20,6 @@ import {
 import { supabase } from "../lib/supabase";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
-const MaskedViewComponent = MaskedView as any;
 
 interface GradientTextProps {
   style: any;
@@ -33,7 +31,7 @@ function GradientText({
   children,
 }: GradientTextProps): React.JSX.Element {
   return (
-    <MaskedViewComponent
+    <MaskedView
       maskElement={
         <Text style={[style, { backgroundColor: "transparent" }]}>
           {children}
@@ -47,7 +45,7 @@ function GradientText({
       >
         <Text style={[style, { opacity: 0 }]}>{children}</Text>
       </LinearGradient>
-    </MaskedViewComponent>
+    </MaskedView>
   );
 }
 
@@ -55,31 +53,13 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const handleBack = useCallback((): void => {
+  const handleBack = (): void => {
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/login" as any);
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
-
+  };
   const handleSendCode = async (): Promise<void> => {
     setErrorMessage("");
 
@@ -143,7 +123,7 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
         style={{ flex: 1 }}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} style={styles.cancelButton} hitSlop={12}>
+          <Pressable onPress={handleBack} style={styles.cancelButton}>
             <Text style={styles.cancelText}>Back</Text>
           </Pressable>
         </View>

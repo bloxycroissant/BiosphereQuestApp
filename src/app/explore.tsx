@@ -5,8 +5,8 @@ import {
 } from "@/app/components/curriculum";
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useProgress } from "@/hooks/use-progress";
-import { useSafeAudioPlayer } from "@/hooks/use-safe-audio";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAudioPlayer } from "expo-audio";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -20,8 +20,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  BackHandler,
   Easing,
+  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -97,11 +97,11 @@ export default function ExploreScreen(): React.JSX.Element {
     lesson: Lesson;
   } | null>(null);
 
-  const exploreBgm = useSafeAudioPlayer(
+  const exploreBgm = useAudioPlayer(
     require("../../assets/BiosphereQuestSoundEffectsandMusic/Relaxing Animal Crossing City Folk Music to study chill relax to.mp3"),
   );
 
-  const lessonLofiBgm = useSafeAudioPlayer(
+  const lessonLofiBgm = useAudioPlayer(
     require("../../assets/BiosphereQuestSoundEffectsandMusic/Cozy Space Lofi 30 Min Study, Focus & Relax Beats.mp3"),
   );
 
@@ -136,6 +136,7 @@ export default function ExploreScreen(): React.JSX.Element {
   const openLesson = (subject: Subject, lesson: Lesson): void => {
     if (transitionInProgress.current || selected) return;
 
+    // Explicitly pause explore music immediately when clicking play
     if (exploreBgm) exploreBgm.pause();
 
     transitionInProgress.current = true;
@@ -298,13 +299,9 @@ export default function ExploreScreen(): React.JSX.Element {
     }
   }, [params.autoOpenSubject, subjects]);
 
-  const handleBack = useCallback((): void => {
+  const handleBack = (): void => {
     if (selected) {
       closeLesson();
-      return;
-    }
-    if (showNotes) {
-      setShowNotes(false);
       return;
     }
     if (activeSubject) {
@@ -316,23 +313,7 @@ export default function ExploreScreen(): React.JSX.Element {
     } else {
       router.replace("/home" as Href);
     }
-  }, [selected, showNotes, activeSubject]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = (): boolean => {
-        handleBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [handleBack]),
-  );
+  };
 
   return (
     <View style={styles.screenContainer}>
@@ -346,7 +327,7 @@ export default function ExploreScreen(): React.JSX.Element {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Pressable onPress={handleBack} hitSlop={14}>
+            <Pressable onPress={handleBack}>
               <Text style={styles.back}>Back</Text>
             </Pressable>
             <View style={styles.headerTitle}>
@@ -550,7 +531,7 @@ export default function ExploreScreen(): React.JSX.Element {
                 ))}
               </LinearGradient>
 
-              {/* STUDY MATERIALS BUTTON */}
+              {/* --- STUDY MATERIALS BUTTON --- */}
               <Text style={styles.sectionHeading}>STUDY MATERIALS</Text>
               <Pressable
                 style={styles.openNotesCard}
@@ -708,7 +689,7 @@ export default function ExploreScreen(): React.JSX.Element {
         {!activeSubject && <BottomNavigation />}
       </SafeAreaView>
 
-      {/* SINGLE PAGE NOTEBOOK VIEWER */}
+      {/* --- SINGLE PAGE NOTEBOOK VIEWER --- */}
       {showNotes && activeSubject && (
         <Animated.View style={styles.screenLayer}>
           <SubjectNotesViewer
@@ -719,7 +700,7 @@ export default function ExploreScreen(): React.JSX.Element {
         </Animated.View>
       )}
 
-      {/* INTERACTIVE LESSON VIEWER */}
+      {/* --- INTERACTIVE LESSON VIEWER --- */}
       {selected && (
         <Animated.View
           style={[
@@ -774,7 +755,7 @@ function NavigationItem({
   onPress,
 }: {
   label: string;
-  icon: any;
+  icon: ImageSourcePropType;
   active: boolean;
   onPress: () => void;
 }): React.JSX.Element {
