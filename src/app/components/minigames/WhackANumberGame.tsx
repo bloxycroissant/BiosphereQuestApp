@@ -74,17 +74,17 @@ export const WhackANumberGame: React.FC<Props> = ({
   const playSound = async (type: "click" | "correct" | "wrong") => {
     try {
       if (type === "click" && clickPlayer) {
-        await clickPlayer.seekTo(0);
-        clickPlayer.play();
+        clickPlayer.seekTo(0);
+        await clickPlayer.play();
       } else if (type === "correct" && correctPlayer) {
-        await correctPlayer.seekTo(0);
-        correctPlayer.play();
+        correctPlayer.seekTo(0);
+        await correctPlayer.play();
       } else if (type === "wrong" && wrongPlayer) {
-        await wrongPlayer.seekTo(0);
-        wrongPlayer.play();
+        wrongPlayer.seekTo(0);
+        await wrongPlayer.play();
       }
-    } catch (error) {
-      console.log("Audio play error:", error);
+    } catch (e) {
+      console.log("SFX Play Error:", e);
     }
   };
 
