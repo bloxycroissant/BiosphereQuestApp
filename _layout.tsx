@@ -21,6 +21,17 @@ export default function RootLayout(): React.JSX.Element {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
 
+  useEffect(() => {
+    const hideSplash = async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.log("Error hiding splash screen:", e);
+      }
+    };
+    hideSplash();
+  }, []);
+
   const isWelcomeOrAuth =
     pathname === "/" ||
     pathname === "/welcome" ||
@@ -47,7 +58,6 @@ export default function RootLayout(): React.JSX.Element {
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <ProgressProvider>
-        {/* Ensures clock, battery, and wifi icons are crisp white against the dark theme */}
         <StatusBar style="light" />
         <LinearGradient
           colors={["#090b20", "#28285e", "#0b4070"]}
