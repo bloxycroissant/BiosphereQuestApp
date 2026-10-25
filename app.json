@@ -34,6 +34,7 @@
           "backgroundColor": "#091426",
           "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png",
           "imageWidth": 150,
+          "resizeMode": "contain",
           "dark": {
             "backgroundColor": "#091426",
             "image": "./assets/BiosphereQuestAssets/Biosphere Quest Logo.png"
