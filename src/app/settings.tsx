@@ -72,24 +72,27 @@ export default function SettingsScreen(): React.JSX.Element {
       }
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const activeUser = session?.user ?? null;
+
+      if (activeUser) {
         setHasAccount(true);
-        setUserEmail(user.email || "Active User");
+        setUserEmail(activeUser.email || "Active User");
 
         const isGoogle =
-          user.app_metadata?.provider === "google" ||
-          user.identities?.some((id: any) => id.provider === "google");
+          activeUser.app_metadata?.provider === "google" ||
+          activeUser.identities?.some((id: any) => id.provider === "google");
         setIsGoogleAuth(Boolean(isGoogle));
         return;
       }
 
-      if (parsed?.email?.trim()) {
-        setHasAccount(true);
-        setUserEmail(parsed.email);
-        setIsGoogleAuth(parsed.authProvider === "google");
-        return;
+      // No active Supabase session: clear stale email/authProvider from local storage if present
+      if (parsed && (parsed.email || parsed.authProvider)) {
+        delete parsed.email;
+        delete parsed.authProvider;
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       }
 
       setHasAccount(false);
@@ -160,7 +163,7 @@ export default function SettingsScreen(): React.JSX.Element {
 
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
-        onBackPress
+        onBackPress,
       );
 
       return () => subscription.remove();
@@ -185,8 +188,10 @@ export default function SettingsScreen(): React.JSX.Element {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
+
       if (user) {
         await supabase.auth.updateUser({
           data: { grade_level: newGrade.toString() },
@@ -638,7 +643,7 @@ export default function SettingsScreen(): React.JSX.Element {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={handleBack} hitSlop={12}>
-            <Text style={styles.backText}> Back </Text>
+            <Text style={styles.backText}>← Back</Text>
           </Pressable>
           <Text style={styles.headerTitle}>Settings </Text>
           <View style={{ width: 45 }} />
