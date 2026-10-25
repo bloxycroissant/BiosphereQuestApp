@@ -84,13 +84,14 @@ export const NumberNinjaGame: React.FC<Props> = ({
   };
 
   const seenQuestions = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now());
+  const antiCheatTimestamp = useRef<number>(0);
 
   const [question, setQuestion] = useState<NinjaProblem>(() => {
-    const initial = generateNinjaProblem(grade, seenQuestions.current);
-    if (initial?.prompt) seenQuestions.current.add(initial.prompt);
-    return initial;
+    return generateNinjaProblem(grade, new Set<string>());
   });
+  useEffect(() => {
+    if (question?.prompt) seenQuestions.current.add(question.prompt);
+  }, [question]);
 
   const [questionNumber, setQuestionNumber] = useState(1);
   const [score, setScore] = useState(0);
@@ -120,7 +121,10 @@ export const NumberNinjaGame: React.FC<Props> = ({
   const answer = (value: number) => {
     if (selected !== null || roundExpired) return;
 
+    // These timestamps are sampled only in response to player input.
+    // eslint-disable-next-line react-hooks/purity
     if (Date.now() - antiCheatTimestamp.current < 200) return;
+    // eslint-disable-next-line react-hooks/purity
     antiCheatTimestamp.current = Date.now();
 
     setSelected(value);
@@ -245,7 +249,7 @@ export const NumberNinjaGame: React.FC<Props> = ({
           {roundExpired && (
             <View style={styles.feedback}>
               <Text style={styles.feedbackText}>
-                Time's Up! You scored {score} point{score === 1 ? "" : "s"}.
+                Time&apos;s Up! You scored {score} point{score === 1 ? "" : "s"}.
               </Text>
               <TouchableOpacity
                 style={styles.primaryButton}

@@ -1,6 +1,6 @@
 import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
@@ -73,18 +73,19 @@ export const FlashcardGame: React.FC<Props> = ({
   };
 
   const seenCards = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now());
+  const antiCheatTimestamp = useRef<number>(0);
 
   const [completedCycles, setCompletedCycles] = useState(0);
   const [deck, setDeck] = useState<Flashcard[]>(() => {
-    const initialDeck = generateFlashcardDeck(grade);
-    initialDeck.forEach((item) => seenCards.current.add(item.front));
-    return initialDeck;
+    return generateFlashcardDeck(grade);
   });
+  useEffect(() => {
+    deck.forEach((item) => seenCards.current.add(item.front));
+  }, [deck]);
   const [index, setIndex] = useState(0);
   const [masteredCards, setMasteredCards] = useState<string[]>([]);
   const [isFlipped, setIsFlipped] = useState(false);
-  const flipValue = useRef(new Animated.Value(0)).current;
+  const [flipValue] = useState(() => new Animated.Value(0));
 
   const currentDifficulty = getDifficulty(completedCycles);
   const currentXP = getXPForDifficulty(currentDifficulty);
@@ -108,7 +109,10 @@ export const FlashcardGame: React.FC<Props> = ({
   };
 
   const advance = (reviewAgain: boolean) => {
+    // These timestamps are sampled only in response to player input.
+    // eslint-disable-next-line react-hooks/purity
     if (Date.now() - antiCheatTimestamp.current < 150) return;
+    // eslint-disable-next-line react-hooks/purity
     antiCheatTimestamp.current = Date.now();
 
     if (reviewAgain && card) {
@@ -127,12 +131,17 @@ export const FlashcardGame: React.FC<Props> = ({
           onSuccess(currentXP);
           setCompletedCycles((c) => c + 1);
 
+          // The seen-card set is a mutable game-session cache.
+          // eslint-disable-next-line react-hooks/refs
           let nextDeck = generateFlashcardDeck(grade, seenCards.current);
           if (!nextDeck || nextDeck.length === 0) {
+            // eslint-disable-next-line react-hooks/refs
             seenCards.current.clear();
+            // eslint-disable-next-line react-hooks/refs
             nextDeck = generateFlashcardDeck(grade, seenCards.current);
           }
 
+          // eslint-disable-next-line react-hooks/refs
           nextDeck.forEach((item) => seenCards.current.add(item.front));
           setDeck(nextDeck);
           setMasteredCards([]);

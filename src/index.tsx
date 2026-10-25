@@ -7,7 +7,7 @@ export default function ParentDashboard() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.greeting}>🛡️ Parent Control Center</Text>
-          <Text style={styles.subtext}>Monitoring Captain Alex's Mission</Text>
+          <Text style={styles.subtext}>Monitoring Captain Alex&apos;s Mission</Text>
         </View>
 
         <View style={styles.card}>
@@ -27,7 +27,7 @@ export default function ParentDashboard() {
         </View>
 
         <Pressable style={styles.actionButton} onPress={() => alert("Screen time paused!")}>
-          <Text style={styles.actionButtonText}>⏸️ Pause Child's Device</Text>
+          <Text style={styles.actionButtonText}>⏸️ Pause Child&apos;s Device</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

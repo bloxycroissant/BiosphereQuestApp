@@ -99,20 +99,21 @@ export default function WelcomeWizardScreen(): React.JSX.Element {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const scaleButtonAnim = useRef(new Animated.Value(1)).current;
+  const [fadeAnim] = useState(() => new Animated.Value(1));
+  const [slideAnim] = useState(() => new Animated.Value(0));
+  const [floatAnim] = useState(() => new Animated.Value(0));
+  const [scaleButtonAnim] = useState(() => new Animated.Value(1));
+  const [boxScales] = useState<Record<string, Animated.Value>>(() => {
+    const scales: Record<string, Animated.Value> = {};
+    [...gradeLevels.map((grade) => String(grade.level)), ...SUBJECT_META.map((item) => item.name)].forEach(
+      (key) => {
+        scales[key] = new Animated.Value(1);
+      },
+    );
+    return scales;
+  });
 
-  const boxScales = useRef<{ [key: string]: Animated.Value }>({}).current;
-
-  const getBoxScale = (key: string | number) => {
-    const stringKey = String(key);
-    if (!boxScales[stringKey]) {
-      boxScales[stringKey] = new Animated.Value(1);
-    }
-    return boxScales[stringKey];
-  };
+  const getBoxScale = (key: string | number) => boxScales[String(key)];
 
   const animateItemPress = (key: string | number, callback: () => void) => {
     const animValue = getBoxScale(key);

@@ -1,13 +1,14 @@
-﻿import { GradientSafeAreaView } from "@/components/gradient-safe-area";
+import { GradientSafeAreaView } from "@/components/gradient-safe-area";
 import { normalizeXpValue, useProgress } from "@/hooks/use-progress";
 import { supabase } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAudioPlayer } from "expo-audio";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  BackHandler,
   Image,
   Modal,
   Pressable,
@@ -16,6 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CodebreakerGame } from "./components/minigames/CodebreakerGame";
 import { FlashcardGame } from "./components/minigames/FlashcardGame";
 import { MemoryMatchGame } from "./components/minigames/MemoryMatchGame";
@@ -42,7 +44,7 @@ interface GameItem {
   tutorial?: {
     objective: string;
     steps: string[];
-  };
+  }
   isPlaceholder?: boolean;
 }
 
@@ -62,12 +64,48 @@ interface LeaderboardEntry {
 }
 
 const ALL_ARCADE_GAMES = [
-  { key: "flashcards", title: "Flashcards", subtitle: "Formulas & definitions", icon: "🧠", defaultBadge: "Smart" },
-  { key: "scramble", title: "Word Scramble", subtitle: "Science terminology", icon: "🔤", defaultBadge: "Spelling" },
-  { key: "memory", title: "Memory Match", subtitle: "Flip & pair icons", icon: "⭐", defaultBadge: "Memory" },
-  { key: "ninja", title: "Number Ninja", subtitle: "Rapid arithmetic", icon: "⚡", defaultBadge: "Speed" },
-  { key: "whack", title: "Whack-a-Number", subtitle: "Pop correct target", icon: "🎯", defaultBadge: "Action" },
-  { key: "codebreaker", title: "Codebreaker", subtitle: "Defuse the vault", icon: "🔥", defaultBadge: "Vault" },
+  {
+    key: "flashcards",
+    title: "Flashcards",
+    subtitle: "Formulas & definitions",
+    icon: "🧠",
+    defaultBadge: "Smart",
+  },
+  {
+    key: "scramble",
+    title: "Word Scramble",
+    subtitle: "Science terminology",
+    icon: "🔤",
+    defaultBadge: "Spelling",
+  },
+  {
+    key: "memory",
+    title: "Memory Match",
+    subtitle: "Flip & pair icons",
+    icon: "⭐",
+    defaultBadge: "Memory",
+  },
+  {
+    key: "ninja",
+    title: "Number Ninja",
+    subtitle: "Rapid arithmetic",
+    icon: "⚡",
+    defaultBadge: "Speed",
+  },
+  {
+    key: "whack",
+    title: "Whack-a-Number",
+    subtitle: "Pop correct target",
+    icon: "🎯",
+    defaultBadge: "Action",
+  },
+  {
+    key: "codebreaker",
+    title: "Codebreaker",
+    subtitle: "Defuse the vault",
+    icon: "🔥",
+    defaultBadge: "Vault",
+  },
 ];
 
 const gameCatalog: GameItem[] = [
@@ -80,7 +118,8 @@ const gameCatalog: GameItem[] = [
     xpText: "+80 XP",
     badge: "🧠 Smart",
     tutorial: {
-      objective: "Review essential formulas and terms to strengthen your core knowledge.",
+      objective:
+        "Review essential formulas and terms to strengthen your core knowledge.",
       steps: [
         "Read the prompt or question carefully.",
         "Tap the card to flip and reveal the answer.",
@@ -97,7 +136,8 @@ const gameCatalog: GameItem[] = [
     xpText: "+90 XP",
     badge: "🔤 Fun",
     tutorial: {
-      objective: "Unscramble the letters to correctly spell key science and math terms.",
+      objective:
+        "Unscramble the letters to correctly spell key science and math terms.",
       steps: [
         "Look at the scrambled letters on screen.",
         "Tap letters in the correct order to spell the word.",
@@ -114,7 +154,8 @@ const gameCatalog: GameItem[] = [
     xpText: "Up to +240 XP",
     badge: "⭐ Match",
     tutorial: {
-      objective: "Flip and match pairs of science icons to test your memory skills.",
+      objective:
+        "Flip and match pairs of science icons to test your memory skills.",
       steps: [
         "Tap a card to flip it over.",
         "Find its matching pair among the hidden cards.",
@@ -131,7 +172,8 @@ const gameCatalog: GameItem[] = [
     xpText: "+50 XP/ ans",
     badge: "⚡ Swift",
     tutorial: {
-      objective: "Solve rapid-fire arithmetic problems quickly before time runs out.",
+      objective:
+        "Solve rapid-fire arithmetic problems quickly before time runs out.",
       steps: [
         "Read the math equation quickly.",
         "Type or select the correct numerical result.",
@@ -148,7 +190,8 @@ const gameCatalog: GameItem[] = [
     xpText: "Up to +120 XP",
     badge: "🎯 Action",
     tutorial: {
-      objective: "Tap the correct popping numbers matching the prompt as fast as you can.",
+      objective:
+        "Tap the correct popping numbers matching the prompt as fast as you can.",
       steps: [
         "Read the target instruction at the top.",
         "Tap the matching numbers as they pop up.",
@@ -165,7 +208,8 @@ const gameCatalog: GameItem[] = [
     xpText: "Up to +500 XP",
     badge: "🔥 Expert",
     tutorial: {
-      objective: "Solve the secure combinations to defuse the vault before time expires.",
+      objective:
+        "Solve the secure combinations to defuse the vault before time expires.",
       steps: [
         "Analyze clues and patterns provided on screen.",
         "Input the correct digit combination.",
@@ -184,22 +228,28 @@ const quizGameItem: GameItem = {
   xpText: "+150 XP",
   badge: "🚀 Epic",
   tutorial: {
-    objective: "Answer multiple-choice questions correctly to score big XP points.",
+    objective:
+      "Answer multiple-choice questions correctly to score big XP points.",
     steps: [
       "Read each multiple-choice question carefully.",
       "Select the best answer from the given options.",
       "Complete all questions to claim your XP reward.",
     ],
   },
-};
+}
 
 const getDifficultyColor = (diff: string) => {
   switch (diff) {
-    case "Easy": return "#39d4ff";
-    case "Medium": return "#4ade80";
-    case "Hard": return "#facc15";
-    case "Impossible": return "#ef4444";
-    default: return "#4ade80";
+    case "Easy":
+      return "#39d4ff";
+    case "Medium":
+      return "#4ade80";
+    case "Hard":
+      return "#facc15";
+    case "Impossible":
+      return "#ef4444";
+    default:
+      return "#4ade80";
   }
 };
 
@@ -214,23 +264,34 @@ const getInitials = (name?: string) => {
 
 export default function GamesScreen() {
   const params = useLocalSearchParams<{ autoOpenGame?: string }>();
-  const { leaderboardXp, addXp, completeGame, recordRecentGame } = useProgress();
+  const { leaderboardXp, addXp, completeGame, recordRecentGame } =
+    useProgress();
   const [difficulty, setDifficulty] = useState("All");
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [activeGameRunning, setActiveGameRunning] = useState(false);
+  const [quitConfirmationVisible, setQuitConfirmationVisible] =
+    useState(false);
   const [selectedGrade, setSelectedGrade] = useState(1);
-  const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(null);
-  const [memorySubjectPickerVisible, setMemorySubjectPickerVisible] = useState(false);
+  const [selectedTutorialGame, setSelectedTutorialGame] = useState<any | null>(
+    null,
+  );
+  const [memorySubjectPickerVisible, setMemorySubjectPickerVisible] =
+    useState(false);
   const [memorySubject, setMemorySubject] = useState<Subject>("Both");
 
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
+    [],
+  );
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [displayGames, setDisplayGames] = useState<MiniGameMeta[]>([]);
 
   const musicPlayer = useAudioPlayer(gameThemeMusic);
   const [isMuted, setIsMuted] = useState(false);
 
-  const [lockedModalInfo, setLockedModalInfo] = useState<{ visible: boolean; gradeNum: number }>({
+  const [lockedModalInfo, setLockedModalInfo] = useState<{
+    visible: boolean;
+    gradeNum: number;
+  }>({
     visible: false,
     gradeNum: 1,
   });
@@ -238,33 +299,141 @@ export default function GamesScreen() {
   const [studyFirstEnabled, setStudyFirstEnabled] = useState(false);
   const [gradeLocks, setGradeLocks] = useState<{ [key: string]: boolean }>({});
 
-  const filterAnims = useRef({
-    All: new Animated.Value(1), Easy: new Animated.Value(1),
-    Medium: new Animated.Value(1), Hard: new Animated.Value(1), Impossible: new Animated.Value(1),
-  }).current;
+  const [filterAnims] = useState(() => ({
+    All: new Animated.Value(1),
+    Easy: new Animated.Value(1),
+    Medium: new Animated.Value(1),
+    Hard: new Animated.Value(1),
+    Impossible: new Animated.Value(1),
+  }));
 
-  const cardAnims = useRef({
-    quiz: new Animated.Value(1), flashcards: new Animated.Value(1),
-    scramble: new Animated.Value(1), memory: new Animated.Value(1),
-    ninja: new Animated.Value(1), whack: new Animated.Value(1), codebreaker: new Animated.Value(1),
-  }).current;
+  const [cardAnims] = useState(() => ({
+    quiz: new Animated.Value(1),
+    flashcards: new Animated.Value(1),
+    scramble: new Animated.Value(1),
+    memory: new Animated.Value(1),
+    ninja: new Animated.Value(1),
+    whack: new Animated.Value(1),
+    codebreaker: new Animated.Value(1),
+  }));
 
-  const tutorialAnim = useRef(new Animated.Value(0)).current;
-  const lockedModalAnim = useRef(new Animated.Value(0)).current;
-  const gridAnim = useRef(new Animated.Value(1)).current;
-  const entrance = useRef(new Animated.Value(0)).current;
-  const leaderboardPulse = useRef(new Animated.Value(1)).current;
-  const memorySubjectModalAnim = useRef(new Animated.Value(0)).current;
+  const [tutorialAnim] = useState(() => new Animated.Value(0));
+  const [lockedModalAnim] = useState(() => new Animated.Value(0));
+  const [gridAnim] = useState(() => new Animated.Value(1));
+  const [entrance] = useState(() => new Animated.Value(0));
+  const [leaderboardPulse] = useState(() => new Animated.Value(1));
+  const [memorySubjectModalAnim] = useState(() => new Animated.Value(0));
 
-  const startTimeRef = useRef(Date.now());
+  const [startTime] = useState(() => Date.now());
   const timeSavedRef = useRef(false);
+
+  const handleCancel = useCallback((): void => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/home" as any);
+    }
+  }, []);
+
+  const closeActiveGame = useCallback((): void => {
+    setQuitConfirmationVisible(false);
+    setActiveGameRunning(false);
+    setSelectedGame(null);
+  }, []);
+
+  const requestQuitActiveGame = useCallback((): void => {
+    setQuitConfirmationVisible(true);
+  }, []);
+
+  const getSelectedGameTitle = (): string => {
+    switch (selectedGame) {
+      case "quiz":
+        return "Math & Science Epic Quiz";
+      case "flashcards":
+        return "Flashcards";
+      case "scramble":
+        return "Word Scramble";
+      case "ninja":
+        return "Number Ninja";
+      case "memory":
+        return "Memory Match";
+      case "whack":
+        return "Whack-a-Number";
+      case "codebreaker":
+        return "Codebreaker";
+      default:
+        return "Minigame";
+    }
+  };
+
+  const closeTutorialWithAnimation = useCallback(
+    (onComplete?: () => void) => {
+      Animated.timing(tutorialAnim, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }).start(() => {
+        setSelectedTutorialGame(null);
+        if (onComplete) onComplete();
+      });
+    },
+    [tutorialAnim],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        if (activeGameRunning) {
+          if (quitConfirmationVisible) {
+            setQuitConfirmationVisible(false);
+          } else {
+            requestQuitActiveGame();
+          }
+          return true;
+        }
+        if (memorySubjectPickerVisible) {
+          setMemorySubjectPickerVisible(false);
+          setSelectedGame(null);
+          return true;
+        }
+        if (selectedTutorialGame) {
+          closeTutorialWithAnimation();
+          return true;
+        }
+        if (lockedModalInfo.visible) {
+          setLockedModalInfo({ visible: false, gradeNum: 1 });
+          return true;
+        }
+
+        handleCancel();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [
+      activeGameRunning,
+      quitConfirmationVisible,
+      requestQuitActiveGame,
+      memorySubjectPickerVisible,
+      selectedTutorialGame,
+      lockedModalInfo.visible,
+      closeTutorialWithAnimation,
+      closeActiveGame,
+      handleCancel,
+    ]),
+  );
 
   useEffect(() => {
     return () => {
       const saveStudyTime = async () => {
         if (timeSavedRef.current) return;
         timeSavedRef.current = true;
-        const elapsedMs = Date.now() - startTimeRef.current;
+        const elapsedMs = Date.now() - startTime;
         const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
 
         try {
@@ -272,7 +441,10 @@ export default function GamesScreen() {
           if (profileRaw) {
             const profile = JSON.parse(profileRaw);
             profile.studyMinutes = (profile.studyMinutes || 0) + elapsedMinutes;
-            await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+            await AsyncStorage.setItem(
+              PROFILE_STORAGE_KEY,
+              JSON.stringify(profile),
+            );
           }
         } catch (e) {
           console.error("Failed to save study time", e);
@@ -283,12 +455,10 @@ export default function GamesScreen() {
   }, []);
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
     if (musicPlayer) {
       try {
+        // Expo AudioPlayer exposes loop and volume as mutable playback controls.
+        // eslint-disable-next-line react-hooks/immutability
         musicPlayer.loop = true;
         musicPlayer.volume = isMuted ? 0 : 0.15;
         musicPlayer.play();
@@ -313,9 +483,11 @@ export default function GamesScreen() {
     if (!musicPlayer) return;
     try {
       if (isMuted) {
+        // eslint-disable-next-line react-hooks/immutability
         musicPlayer.volume = 0.15;
         setIsMuted(false);
       } else {
+        // eslint-disable-next-line react-hooks/immutability
         musicPlayer.volume = 0;
         setIsMuted(true);
       }
@@ -324,11 +496,12 @@ export default function GamesScreen() {
     }
   };
 
-  const fetchInitialData = async () => {
+  async function fetchInitialData() {
     try {
       const gradeData = await AsyncStorage.getItem("explorerGrade");
       if (gradeData) {
-        const numericGrade = parseInt(gradeData.replace(/[^0-9]/g, ""), 10) || 1;
+        const numericGrade =
+          parseInt(gradeData.replace(/[^0-9]/g, ""), 10) || 1;
         setSelectedGrade(numericGrade as GradeLevel);
       }
 
@@ -345,9 +518,14 @@ export default function GamesScreen() {
     } catch (e) {
       console.error("Error reading initial data in games", e);
     }
-  };
+  }
 
-  // Helper to read current player's local XP & username
+  useEffect(() => {
+    // Initial game settings are hydrated from local storage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchInitialData();
+  }, []);
+
   const getLocalPlayerStats = async () => {
     const profileRaw = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
     const guestUsername = await AsyncStorage.getItem("explorerUsername");
@@ -396,14 +574,16 @@ export default function GamesScreen() {
 
       if (error) throw error;
 
-      const cloudList: LeaderboardEntry[] = (data || []).map((row: any, idx: number) => ({
-        id: String(row.id ?? idx),
-        full_name: row.full_name?.trim() || "Explorer",
-        weekly_xp: Number(row.weekly_xp) || 0,
-      }));
+      const cloudList: LeaderboardEntry[] = (data || []).map(
+        (row: any, idx: number) => ({
+          id: String(row.id ?? idx),
+          full_name: row.full_name?.trim() || "Explorer",
+          weekly_xp: Number(row.weekly_xp) || 0,
+        }),
+      );
 
       const alreadyInList = cloudList.some(
-        (p) => p.full_name.toLowerCase() === localName.toLowerCase()
+        (p) => p.full_name.toLowerCase() === localName.toLowerCase(),
       );
 
       let combinedList = [...cloudList];
@@ -417,7 +597,7 @@ export default function GamesScreen() {
         combinedList = combinedList.map((p) =>
           p.full_name.toLowerCase() === localName.toLowerCase()
             ? { ...p, weekly_xp: Math.max(p.weekly_xp, localXp) }
-            : p
+            : p,
         );
       }
 
@@ -430,13 +610,6 @@ export default function GamesScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadArcadeGames();
-      void fetchLeaderboard();
-    }, [leaderboardXp]),
-  );
-
   useEffect(() => {
     if (params.autoOpenGame) {
       const targetKey = String(params.autoOpenGame);
@@ -447,8 +620,10 @@ export default function GamesScreen() {
 
       if (targetGame) {
         void recordRecentGame(targetGame.key);
-        setSelectedGame(targetGame.key);
-        setSelectedTutorialGame(targetGame);
+        startTransition(() => {
+          setSelectedGame(targetGame.key);
+          setSelectedTutorialGame(targetGame);
+        });
       }
     }
   }, [params.autoOpenGame]);
@@ -472,10 +647,7 @@ export default function GamesScreen() {
     });
   }
 
-  const chunkedGames = [
-    paddedGames.slice(0, 3),
-    paddedGames.slice(3, 6),
-  ];
+  const chunkedGames = [paddedGames.slice(0, 3), paddedGames.slice(3, 6)];
 
   const podiumEntries: LeaderboardEntry[] = [
     leaderboardData[0] || { id: "empty-1", full_name: "---", weekly_xp: 0 },
@@ -494,7 +666,10 @@ export default function GamesScreen() {
 
   useEffect(() => {
     Animated.sequence([
-      Animated.spring(leaderboardPulse, { toValue: 1.03, useNativeDriver: true }),
+      Animated.spring(leaderboardPulse, {
+        toValue: 1.03,
+        useNativeDriver: true,
+      }),
       Animated.spring(leaderboardPulse, { toValue: 1, useNativeDriver: true }),
     ]).start();
   }, [leaderboardXp, leaderboardPulse]);
@@ -536,16 +711,32 @@ export default function GamesScreen() {
 
   const handleFilterPress = (item: string) => {
     Animated.sequence([
-      Animated.timing(gridAnim, { toValue: 0.95, duration: 60, useNativeDriver: true }),
-      Animated.spring(gridAnim, { toValue: 1, friction: 4, useNativeDriver: true }),
+      Animated.timing(gridAnim, {
+        toValue: 0.95,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.spring(gridAnim, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     setDifficulty(item);
     const anim = filterAnims[item as keyof typeof filterAnims];
     if (anim) {
       Animated.sequence([
-        Animated.spring(anim, { toValue: 1.1, useNativeDriver: true, friction: 3 }),
-        Animated.spring(anim, { toValue: 1, useNativeDriver: true, friction: 4 }),
+        Animated.spring(anim, {
+          toValue: 1.1,
+          useNativeDriver: true,
+          friction: 3,
+        }),
+        Animated.spring(anim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 4,
+        }),
       ]).start();
     }
   };
@@ -568,8 +759,16 @@ export default function GamesScreen() {
 
     if (anim) {
       Animated.sequence([
-        Animated.timing(anim, { toValue: 0.88, duration: 70, useNativeDriver: true }),
-        Animated.spring(anim, { toValue: 1, friction: 3, useNativeDriver: true }),
+        Animated.timing(anim, {
+          toValue: 0.88,
+          duration: 70,
+          useNativeDriver: true,
+        }),
+        Animated.spring(anim, {
+          toValue: 1,
+          friction: 3,
+          useNativeDriver: true,
+        }),
       ]).start(() => {
         setSelectedGame(gameItem.key);
         setSelectedTutorialGame(gameItem);
@@ -578,17 +777,6 @@ export default function GamesScreen() {
       setSelectedGame(gameItem.key);
       setSelectedTutorialGame(gameItem);
     }
-  };
-
-  const closeTutorialWithAnimation = (onComplete?: () => void) => {
-    Animated.timing(tutorialAnim, {
-      toValue: 0,
-      duration: 120,
-      useNativeDriver: true,
-    }).start(() => {
-      setSelectedTutorialGame(null);
-      if (onComplete) onComplete();
-    });
   };
 
   const handleTutorialContinue = () => {
@@ -627,15 +815,7 @@ export default function GamesScreen() {
     setSelectedGame(null);
   };
 
-  const handleCancel = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/home" as any);
-    }
-  };
-
-  const loadArcadeGames = async () => {
+  async function loadArcadeGames() {
     try {
       const recentRaw = await AsyncStorage.getItem(RECENT_GAMES_KEY);
       const recentKeys: string[] = recentRaw ? JSON.parse(recentRaw) : [];
@@ -648,16 +828,20 @@ export default function GamesScreen() {
       if (availableRecents.length >= 2) {
         firstTwoKeys = [availableRecents[0], availableRecents[1]];
       } else if (availableRecents.length === 1) {
-        const fallback = ALL_ARCADE_GAMES.find((g) => g.key !== availableRecents[0]);
+        const fallback = ALL_ARCADE_GAMES.find(
+          (g) => g.key !== availableRecents[0],
+        );
         firstTwoKeys = [availableRecents[0], fallback ? fallback.key : "ninja"];
       } else {
         firstTwoKeys = ["flashcards", "ninja"];
       }
 
       const remainingGames = ALL_ARCADE_GAMES.filter(
-        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz"
+        (g) => !firstTwoKeys.includes(g.key) && g.key !== "quiz",
       );
 
+      // Randomize the suggestion after loading recents, not during render.
+      // eslint-disable-next-line react-hooks/purity
       const randomPicked =
         remainingGames[Math.floor(Math.random() * remainingGames.length)] ||
         remainingGames[0];
@@ -688,15 +872,19 @@ export default function GamesScreen() {
     } catch (e) {
       console.error("Failed to load arcade games", e);
     }
-  };
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadArcadeGames();
+      void fetchLeaderboard();
+    }, [leaderboardXp]),
+  );
 
   const renderActiveGame = () => {
     const commonProps = {
       grade: selectedGrade,
-      onClose: () => {
-        setActiveGameRunning(false);
-        setSelectedGame(null);
-      },
+      onClose: requestQuitActiveGame,
       onFinish: handleFinishGame,
       onComplete: handleFinishGame,
       onSuccess: (earnedXp: number) => {
@@ -708,34 +896,51 @@ export default function GamesScreen() {
     } as any;
 
     switch (selectedGame) {
-      case "quiz": return <QuizGame {...commonProps} />;
-      case "flashcards": return <FlashcardGame {...commonProps} />;
-      case "scramble": return <WordScrambleGame {...commonProps} />;
-      case "ninja": return <NumberNinjaGame {...commonProps} />;
-      case "memory": return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
-      case "whack": return <WhackANumberGame {...commonProps} />;
-      case "codebreaker": return <CodebreakerGame {...commonProps} />;
-      default: return <QuizGame {...commonProps} />;
+      case "quiz":
+        return <QuizGame {...commonProps} />;
+      case "flashcards":
+        return <FlashcardGame {...commonProps} />;
+      case "scramble":
+        return <WordScrambleGame {...commonProps} />;
+      case "ninja":
+        return <NumberNinjaGame {...commonProps} />;
+      case "memory":
+        return <MemoryMatchGame {...commonProps} subject={memorySubject} />;
+      case "whack":
+        return <WhackANumberGame {...commonProps} />;
+      case "codebreaker":
+        return <CodebreakerGame {...commonProps} />;
+      default:
+        return <QuizGame {...commonProps} />;
     }
   };
 
   return (
     <GradientSafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.topBar}>
-        <Pressable onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>Back</Text>
+        <Pressable
+          onPress={handleCancel}
+          style={styles.cancelButton}
+          hitSlop={12}
+        >
+          <Text style={styles.cancelText}> Back</Text>
         </Pressable>
         <View style={styles.topBarRightContainer}>
           <Pressable onPress={toggleMute} style={styles.muteButton}>
             <Text style={styles.muteIconText}>{isMuted ? "🔇" : "🔊"}</Text>
           </Pressable>
           <View style={styles.levelIndicatorBadge}>
-            <Text style={styles.levelIndicatorText}>🌟 Grade {selectedGrade}</Text>
+            <Text style={styles.levelIndicatorText}>
+              🌟 Grade {selectedGrade}
+            </Text>
           </View>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View
           style={{
             opacity: entrance,
@@ -752,7 +957,9 @@ export default function GamesScreen() {
           <View style={styles.headingRow}>
             <View>
               <Text style={styles.title}>🎮 Mini-Game Arcade</Text>
-              <Text style={styles.subtitle}>Play, learn & level up your XP!</Text>
+              <Text style={styles.subtitle}>
+                Play, learn & level up your XP!
+              </Text>
             </View>
             <Image
               source={require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png")}
@@ -774,7 +981,8 @@ export default function GamesScreen() {
                   xpText: "+150 XP",
                   badge: "🚀 Epic",
                   tutorial: {
-                    objective: "Answer multiple-choice questions correctly to score big XP points.",
+                    objective:
+                      "Answer multiple-choice questions correctly to score big XP points.",
                     steps: [
                       "Read each multiple-choice question carefully.",
                       "Select the best answer from the given options.",
@@ -786,10 +994,14 @@ export default function GamesScreen() {
             >
               <View style={styles.featureCopy}>
                 <View style={styles.featuredTagContainer}>
-                  <Text style={styles.featureTagText}>🚀 FEATURED ADVENTURE</Text>
+                  <Text style={styles.featureTagText}>
+                    🚀 FEATURED ADVENTURE
+                  </Text>
                 </View>
                 <Text style={styles.featureTitle}>Math & Science Quiz</Text>
-                <Text style={styles.featureDetails}>Interactive Trivia • Gr. 1-6</Text>
+                <Text style={styles.featureDetails}>
+                  Interactive Trivia • Gr. 1-6
+                </Text>
                 <View style={styles.featureXpRow}>
                   <Text style={styles.featureXp}>⚡ +150 XP</Text>
                   <Text style={styles.featureMetaSeparator}>•</Text>
@@ -803,33 +1015,56 @@ export default function GamesScreen() {
           </Animated.View>
 
           <View style={styles.filterRow}>
-            {["All", "Easy", "Medium", "Hard", "Impossible"].map((item: string) => {
-              const anim = filterAnims[item as keyof typeof filterAnims];
-              return (
-                <Animated.View key={item} style={{ transform: [{ scale: anim }] }}>
-                  <Pressable
-                    onPress={() => handleFilterPress(item)}
-                    style={[styles.filter, difficulty === item && styles.filterActive]}
+            {["All", "Easy", "Medium", "Hard", "Impossible"].map(
+              (item: string) => {
+                const anim = filterAnims[item as keyof typeof filterAnims];
+                return (
+                  <Animated.View
+                    key={item}
+                    style={{ transform: [{ scale: anim }] }}
                   >
-                    <Text style={[styles.filterText, difficulty === item && styles.filterTextActive]}>
-                      {item}
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
+                    <Pressable
+                      onPress={() => handleFilterPress(item)}
+                      style={[
+                        styles.filter,
+                        difficulty === item && styles.filterActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.filterText,
+                          difficulty === item && styles.filterTextActive,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </Pressable>
+                  </Animated.View>
+                );
+              },
+            )}
           </View>
 
-          <Animated.View style={[styles.grid, { transform: [{ scale: gridAnim }] }]}>
+          <Animated.View
+            style={[styles.grid, { transform: [{ scale: gridAnim }] }]}
+          >
             {chunkedGames.map((row, rowIndex) => (
               <View key={`row-${rowIndex}`} style={styles.gridRow}>
                 {row.map((item) => {
                   if (item.isPlaceholder) {
-                    return <View key={item.key} style={[styles.cardWrapper, { flex: 1, opacity: 0 }]} pointerEvents="none" />;
+                    return (
+                      <View
+                        key={item.key}
+                        style={[styles.cardWrapper, { flex: 1, opacity: 0 }]}
+                        pointerEvents="none"
+                      />
+                    );
                   }
 
                   const themeColor = getDifficultyColor(item.difficulty);
-                  const anim = cardAnims[item.key as keyof typeof cardAnims] || new Animated.Value(1);
+                  const anim =
+                    cardAnims[item.key as keyof typeof cardAnims] ||
+                    new Animated.Value(1);
 
                   return (
                     <Animated.View
@@ -850,7 +1085,11 @@ export default function GamesScreen() {
                           <Text style={styles.cardBadgeText}>{item.badge}</Text>
                         </View>
                         <View style={styles.cardTopArea}>
-                          <Image source={item.icon} style={styles.gameIcon} resizeMode="contain" />
+                          <Image
+                            source={item.icon}
+                            style={styles.gameIcon}
+                            resizeMode="contain"
+                          />
                         </View>
                         <View style={styles.cardTextContainer}>
                           <Text
@@ -861,11 +1100,21 @@ export default function GamesScreen() {
                           >
                             {item.title}
                           </Text>
-                          <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                          <Text style={styles.cardSubtitle} numberOfLines={1}>
+                            {item.subtitle}
+                          </Text>
                         </View>
-                        <View style={[styles.cardFooter, { borderTopColor: `${themeColor}40` }]}>
+                        <View
+                          style={[
+                            styles.cardFooter,
+                            { borderTopColor: `${themeColor}40` },
+                          ]}
+                        >
                           <Text style={styles.lightningIcon}>⚡</Text>
-                          <Text style={[styles.cardXp, { color: themeColor }]} numberOfLines={1}>
+                          <Text
+                            style={[styles.cardXp, { color: themeColor }]}
+                            numberOfLines={1}
+                          >
                             {item.xpText}
                           </Text>
                         </View>
@@ -879,7 +1128,10 @@ export default function GamesScreen() {
 
           <Text style={styles.leaderboardMainTitle}>🏆 Weekly Champions</Text>
           <Animated.View
-            style={[styles.leaderboardCard, { transform: [{ scale: leaderboardPulse }] }]}
+            style={[
+              styles.leaderboardCard,
+              { transform: [{ scale: leaderboardPulse }] },
+            ]}
           >
             {!loadingLeaderboard ? (
               <>
@@ -925,7 +1177,9 @@ export default function GamesScreen() {
                 ))}
               </>
             ) : (
-              <Text style={{ color: "#94a3b8", textAlign: "center", padding: 20 }}>
+              <Text
+                style={{ color: "#94a3b8", textAlign: "center", padding: 20 }}
+              >
                 Loading Champions...
               </Text>
             )}
@@ -982,9 +1236,13 @@ export default function GamesScreen() {
               <View style={styles.lockedIconContainer}>
                 <Text style={styles.lockedEmoji}>🔒</Text>
               </View>
-              <Text style={styles.lockedTitle}>Grade {lockedModalInfo.gradeNum} Locked</Text>
+              <Text style={styles.lockedTitle}>
+                Grade {lockedModalInfo.gradeNum} Locked
+              </Text>
               <Text style={styles.lockedDescription}>
-                Your parent or guardian has locked content access for Grade {lockedModalInfo.gradeNum}. Please check in with them to unlock this level!
+                Your parent or guardian has locked content access for Grade{" "}
+                {lockedModalInfo.gradeNum}. Please check in with them to unlock
+                this level!
               </Text>
               <Pressable
                 style={styles.lockedButton}
@@ -1005,10 +1263,55 @@ export default function GamesScreen() {
         </Animated.View>
       )}
 
-      <Modal visible={activeGameRunning} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: "#091426" }}>
+      <Modal
+        visible={activeGameRunning}
+        animationType="slide"
+        onRequestClose={() => {
+          if (quitConfirmationVisible) {
+            setQuitConfirmationVisible(false);
+          } else {
+            requestQuitActiveGame();
+          }
+        }}
+      >
+        <SafeAreaView
+          edges={["top"]}
+          style={{ flex: 1, backgroundColor: "#091426" }}
+        >
           {renderActiveGame()}
-        </View>
+          {quitConfirmationVisible && (
+            <View style={styles.quitBackdrop}>
+              <View style={styles.quitCard}>
+                <View style={styles.quitIcon}>
+                  <Text style={styles.quitIconText}>🚪</Text>
+                </View>
+                <Text style={styles.quitTitle}>
+                  Quit {getSelectedGameTitle()}?
+                </Text>
+                <Text style={styles.quitDescription}>
+                  Are you sure you want to leave this minigame? Your current
+                  progress may be lost.
+                </Text>
+                <View style={styles.quitButtonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.quitButton, styles.quitCancelButton]}
+                    onPress={() => setQuitConfirmationVisible(false)}
+                  >
+                    <Text style={styles.quitCancelText}>Keep Playing</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.quitButton, styles.quitConfirmButton]}
+                    onPress={closeActiveGame}
+                  >
+                    <Text style={styles.quitConfirmText}>Quit Minigame</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
 
       <Modal
@@ -1027,20 +1330,44 @@ export default function GamesScreen() {
               {
                 opacity: memorySubjectModalAnim,
                 transform: [
-                  { scale: memorySubjectModalAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) },
-                  { translateY: memorySubjectModalAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
+                  {
+                    scale: memorySubjectModalAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.82, 1],
+                    }),
+                  },
+                  {
+                    translateY: memorySubjectModalAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [24, 0],
+                    }),
+                  },
                 ],
               },
             ]}
           >
             <Text style={styles.subjectEyebrow}>✨ YOUR NEXT ADVENTURE</Text>
             <Text style={styles.subjectTitle}>Pick a subject</Text>
-            <Text style={styles.subjectDescription}>Choose what you want to practice in Memory Match.</Text>
+            <Text style={styles.subjectDescription}>
+              Choose what you want to practice in Memory Match.
+            </Text>
             <View style={styles.subjectChoices}>
-              {([
-                { value: "Science", icon: "🔬", color: "#32d583", copy: "Explore nature" },
-                { value: "Math", icon: "📐", color: "#38bdf8", copy: "Solve & discover" },
-              ] as const).map((choice) => (
+              {(
+                [
+                  {
+                    value: "Science",
+                    icon: "🔬",
+                    color: "#32d583",
+                    copy: "Explore nature",
+                  },
+                  {
+                    value: "Math",
+                    icon: "📐",
+                    color: "#38bdf8",
+                    copy: "Solve & discover",
+                  },
+                ] as const
+              ).map((choice) => (
                 <Pressable
                   key={choice.value}
                   accessibilityRole="button"
@@ -1052,7 +1379,11 @@ export default function GamesScreen() {
                   ]}
                 >
                   <Text style={styles.subjectChoiceIcon}>{choice.icon}</Text>
-                  <Text style={[styles.subjectChoiceTitle, { color: choice.color }]}>{choice.value}</Text>
+                  <Text
+                    style={[styles.subjectChoiceTitle, { color: choice.color }]}
+                  >
+                    {choice.value}
+                  </Text>
                   <Text style={styles.subjectChoiceCopy}>{choice.copy}</Text>
                 </Pressable>
               ))}
@@ -1060,12 +1391,17 @@ export default function GamesScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => handleMemorySubjectSelect("Both")}
-              style={({ pressed }) => [styles.bothChoice, pressed && styles.choicePressed]}
+              style={({ pressed }) => [
+                styles.bothChoice,
+                pressed && styles.choicePressed,
+              ]}
             >
               <Text style={styles.bothChoiceIcon}>🌟</Text>
               <View style={styles.bothChoiceCopy}>
                 <Text style={styles.bothChoiceTitle}>Both subjects</Text>
-                <Text style={styles.bothChoiceSubtitle}>Mix science and math</Text>
+                <Text style={styles.bothChoiceSubtitle}>
+                  Mix science and math
+                </Text>
               </View>
               <Text style={styles.choiceArrow}>→</Text>
             </Pressable>
@@ -1110,14 +1446,28 @@ function PodiumPlace({
       </View>
       <View style={[styles.podiumBar, { backgroundColor: color, height }]}>
         <Text style={styles.rankNumber}>{rank}</Text>
-        <Text style={styles.podiumName} numberOfLines={1}>{name}</Text>
+        <Text style={styles.podiumName} numberOfLines={1}>
+          {name}
+        </Text>
         <Text style={styles.podiumXp}>{xp}</Text>
       </View>
     </View>
   );
 }
 
-function RankRow({ rank, initials, name, xp, avatarBg }: { rank: string; initials: string; name: string; xp: string; avatarBg: string }) {
+function RankRow({
+  rank,
+  initials,
+  name,
+  xp,
+  avatarBg,
+}: {
+  rank: string;
+  initials: string;
+  name: string;
+  xp: string;
+  avatarBg: string;
+}) {
   return (
     <View style={styles.ranking}>
       <View style={styles.rankLeft}>
@@ -1179,7 +1529,12 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
+  headingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 2,
+  },
   title: { color: "#fff", fontSize: 21, fontWeight: "900" },
   subtitle: { color: "#94a3b8", fontSize: 11, fontWeight: "700", marginTop: 1 },
   featured: {
@@ -1203,17 +1558,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  featureTagText: { color: "#f1c65b", fontWeight: "900", fontSize: 9, letterSpacing: 0.5 },
-  featureTitle: { color: "#fff", fontSize: 17, fontWeight: "900", marginTop: 6, textAlign: "left" },
-  featureDetails: { color: "#cbd5e1", fontSize: 11, marginTop: 2, fontWeight: "600", textAlign: "left" },
+  featureTagText: {
+    color: "#f1c65b",
+    fontWeight: "900",
+    fontSize: 9,
+    letterSpacing: 0.5,
+  },
+  featureTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 6,
+    textAlign: "left",
+  },
+  featureDetails: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: "600",
+    textAlign: "left",
+  },
   featureXpRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   featureXp: { color: "#f1c65b", fontSize: 11, fontWeight: "800" },
   featureMetaSeparator: { color: "#64748b", marginHorizontal: 6, fontSize: 11 },
   featureMeta: { color: "#94a3b8", fontSize: 11, fontWeight: "600" },
-  featureTrophyContainer: { paddingLeft: 8, justifyContent: "center", alignItems: "center" },
+  featureTrophyContainer: {
+    paddingLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   trophyEmoji: { fontSize: 36 },
   filterRow: { flexDirection: "row", gap: 5, marginTop: 10 },
-  filter: { backgroundColor: "#162247", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: "#293a73" },
+  filter: {
+    backgroundColor: "#162247",
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#293a73",
+  },
   filterActive: { backgroundColor: "#4f46e5", borderColor: "#818cf8" },
   filterText: { color: "#94a3b8", fontSize: 10.5, fontWeight: "800" },
   filterTextActive: { color: "#ffffff" },
@@ -1285,7 +1668,14 @@ const styles = StyleSheet.create({
   },
   lightningIcon: { fontSize: 8 },
   cardXp: { fontSize: 9, fontWeight: "900" },
-  leaderboardMainTitle: { color: "#fff", fontSize: 14, fontWeight: "900", textAlign: "center", marginTop: 16, marginBottom: 8 },
+  leaderboardMainTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 8,
+  },
   leaderboardCard: {
     backgroundColor: "#14203f",
     borderColor: "#2e4585",
@@ -1310,9 +1700,21 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   avatarText: { color: "#fff", fontSize: 9, fontWeight: "900" },
-  podiumBar: { width: "100%", alignItems: "center", justifyContent: "flex-end", borderRadius: 6, paddingBottom: 6 },
+  podiumBar: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    borderRadius: 6,
+    paddingBottom: 6,
+  },
   rankNumber: { color: "#11152c", fontSize: 18, fontWeight: "900" },
-  podiumName: { color: "#11152c", fontSize: 8, fontWeight: "900", textAlign: "center", paddingHorizontal: 2 },
+  podiumName: {
+    color: "#11152c",
+    fontSize: 8,
+    fontWeight: "900",
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
   podiumXp: { color: "#11152c", fontSize: 8, fontWeight: "700" },
   ranking: {
     backgroundColor: "#1b2a54",
@@ -1366,9 +1768,28 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 9,
   },
-  subjectEyebrow: { color: "#4ade80", textAlign: "center", fontSize: 10, fontWeight: "900", letterSpacing: 1.2 },
-  subjectTitle: { color: "#fff", textAlign: "center", fontSize: 22, fontWeight: "900", marginTop: 6 },
-  subjectDescription: { color: "#b1c8d6", textAlign: "center", fontSize: 11, fontWeight: "600", marginTop: 5, marginBottom: 12 },
+  subjectEyebrow: {
+    color: "#4ade80",
+    textAlign: "center",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  subjectTitle: {
+    color: "#fff",
+    textAlign: "center",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  subjectDescription: {
+    color: "#b1c8d6",
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 5,
+    marginBottom: 12,
+  },
   subjectChoices: { flexDirection: "row", gap: 10 },
   subjectChoice: {
     flex: 1,
@@ -1385,7 +1806,13 @@ const styles = StyleSheet.create({
   },
   subjectChoiceIcon: { fontSize: 24, marginBottom: 4 },
   subjectChoiceTitle: { fontSize: 13, fontWeight: "900" },
-  subjectChoiceCopy: { color: "#b1c8d6", fontSize: 9, fontWeight: "700", marginTop: 3, textAlign: "center" },
+  subjectChoiceCopy: {
+    color: "#b1c8d6",
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 3,
+    textAlign: "center",
+  },
   bothChoice: {
     minHeight: 46,
     flexDirection: "row",
@@ -1471,4 +1898,79 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
+  quitBackdrop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(5, 11, 24, 0.82)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    zIndex: 10,
+  },
+  quitCard: {
+    backgroundColor: "#131d3b",
+    borderColor: "#625cff",
+    borderWidth: 1.5,
+    borderRadius: 22,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  quitIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(98, 92, 255, 0.15)",
+    borderColor: "#625cff",
+    borderWidth: 1.2,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  quitIconText: { fontSize: 28 },
+  quitTitle: {
+    color: "#fff",
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  quitDescription: {
+    color: "#c7d0e8",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  quitButtonRow: { flexDirection: "row", width: "100%", gap: 10 },
+  quitButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quitCancelButton: {
+    backgroundColor: "#202c52",
+    borderWidth: 1,
+    borderColor: "#4d6199",
+  },
+  quitConfirmButton: {
+    backgroundColor: "#625cff",
+    borderWidth: 1,
+    borderColor: "#8d89ff",
+  },
+  quitCancelText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+  quitConfirmText: { color: "#fff", fontSize: 12, fontWeight: "900" },
 });

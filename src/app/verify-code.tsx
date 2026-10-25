@@ -3,11 +3,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,6 +22,9 @@ import { supabase } from "../lib/supabase";
 
 const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
 
+// Cast to bypass React 19 JSX class component attribute type mismatch
+const MaskedViewComponent = MaskedView as any;
+
 interface GradientTextProps {
   style: any;
   children: string;
@@ -31,7 +35,7 @@ function GradientText({
   children,
 }: GradientTextProps): React.JSX.Element {
   return (
-    <MaskedView
+    <MaskedViewComponent
       maskElement={
         <Text style={[style, { backgroundColor: "transparent" }]}>
           {children}
@@ -45,7 +49,7 @@ function GradientText({
       >
         <Text style={[style, { opacity: 0 }]}>{children}</Text>
       </LinearGradient>
-    </MaskedView>
+    </MaskedViewComponent>
   );
 }
 
@@ -60,7 +64,32 @@ export default function VerifyCodeScreen(): React.JSX.Element {
   const [isCodeInvalid, setIsCodeInvalid] = useState(false);
   const [countdown, setCountdown] = useState(30);
 
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  // Use any[] to prevent React 19 _TextInputInstance mismatch with .focus()
+  const inputRefs = useRef<any[]>([]);
+
+  const handleBack = useCallback((): void => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/login" as any);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -215,7 +244,11 @@ export default function VerifyCodeScreen(): React.JSX.Element {
         style={{ flex: 1 }}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.cancelButton}>
+          <Pressable
+            onPress={handleBack}
+            style={styles.cancelButton}
+            hitSlop={12}
+          >
             <MaterialCommunityIcons
               name="arrow-left"
               size={20}
@@ -271,7 +304,7 @@ export default function VerifyCodeScreen(): React.JSX.Element {
           </View>
 
           <View style={styles.resendContainer}>
-            <Text style={styles.resendText}>Didn't receive code? </Text>
+            <Text style={styles.resendText}>Didn&apos;t receive code? </Text>
             <Pressable
               onPress={handleResendCode}
               disabled={countdown > 0 || resending}

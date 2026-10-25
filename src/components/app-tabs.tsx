@@ -1,7 +1,7 @@
 import { Href, Slot, router, usePathname } from 'expo-router';
-import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
-import { Animated, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, type ImageProps } from 'expo-image';
+import { useEffect, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 const homeIcon = require('../../assets/BiosphereQuestAssets/Home Icon.png');
 const coursesIcon = require('../../assets/BiosphereQuestAssets/Courses Icon.png');
@@ -17,7 +17,7 @@ const tabs = [
 
 export default function AppTabs() {
   const pathname = usePathname();
-  const entrance = useRef(new Animated.Value(0)).current;
+  const [entrance] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     entrance.setValue(0);
@@ -70,11 +70,11 @@ function NavigationItem({
   onPress,
 }: {
   label: string;
-  icon: ImageSourcePropType;
+  icon: NonNullable<ImageProps['source']>;
   active: boolean;
   onPress: () => void;
 }) {
-  const motion = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const [motion] = useState(() => new Animated.Value(active ? 1 : 0));
 
   useEffect(() => {
     Animated.spring(motion, { toValue: active ? 1 : 0, useNativeDriver: true, tension: 70, friction: 8 }).start();

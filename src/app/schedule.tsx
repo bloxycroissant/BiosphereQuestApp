@@ -1,7 +1,9 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useProgress, type StudySession } from "@/hooks/use-progress";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +22,7 @@ const days = [
   "Sunday",
 ];
 
-export default function ScheduleScreen() {
+export default function ScheduleScreen(): React.JSX.Element {
   const { sessions, addSession, updateSession, addXp } = useProgress();
   const [day, setDay] = useState("Monday");
   const [title, setTitle] = useState("");
@@ -28,6 +30,36 @@ export default function ScheduleScreen() {
   const [period, setPeriod] = useState<"AM" | "PM">("AM");
   const [duration, setDuration] = useState("30");
   const [editingId, setEditingId] = useState<StudySession["id"] | null>(null);
+
+  const handleBack = useCallback((): void => {
+    if (editingId !== null) {
+      setEditingId(null);
+      setTitle("");
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/home" as any);
+    }
+  }, [editingId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
+
   const addNewSession = () => {
     if (!title.trim()) return;
     addSession({
@@ -37,23 +69,30 @@ export default function ScheduleScreen() {
     });
     setTitle("");
   };
+
   const toggleDone = (session: StudySession) => {
     if (!session.done) addXp(20);
     updateSession(session.id, { done: !session.done });
   };
+
   const editSession = (session: StudySession) => {
     setEditingId(session.id);
     setTitle(session.title);
   };
+
   const saveEdit = (session: StudySession) => {
     updateSession(session.id, { title: title.trim() || session.title });
     setEditingId(null);
     setTitle("");
   };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.back}>‹ Cancel</Text>
+        <Pressable onPress={handleBack} hitSlop={12} style={styles.backButton}>
+          <Text style={styles.back}>‹ Cancel</Text>
+        </Pressable>
+
         <Text style={styles.title}>Study Schedule</Text>
         <Text style={styles.subtitle}>
           Plan sessions, build your streak, and keep moving.
@@ -158,7 +197,8 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#091426" },
   content: { padding: 18, paddingBottom: 40 },
-  back: { color: "#e582ff", fontWeight: "800" },
+  backButton: { alignSelf: "flex-start", paddingVertical: 4 },
+  back: { color: "#e582ff", fontWeight: "800", fontSize: 16 },
   title: { color: "#fff", fontSize: 27, fontWeight: "900", marginTop: 14 },
   subtitle: { color: "#c7d0e8", marginTop: 4 },
   section: {

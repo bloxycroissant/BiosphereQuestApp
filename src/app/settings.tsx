@@ -5,6 +5,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Image,
   Modal,
   Pressable,
@@ -42,6 +43,7 @@ export default function SettingsScreen(): React.JSX.Element {
   const [userEmail, setUserEmail] = useState("");
   const [isGoogleAuth, setIsGoogleAuth] = useState(false);
   const [currentGrade, setCurrentGrade] = useState(1);
+  const [pendingGrade, setPendingGrade] = useState(1);
   const { openParentControls } = useLocalSearchParams<{
     openParentControls?: string;
   }>();
@@ -49,13 +51,13 @@ export default function SettingsScreen(): React.JSX.Element {
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleBack = (): void => {
+  const handleBack = useCallback((): void => {
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/home" as any);
     }
-  };
+  }, []);
 
   const syncAuth = async (): Promise<void> => {
     try {
@@ -102,6 +104,8 @@ export default function SettingsScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
+    // Auth and saved settings are synchronized from external providers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void syncAuth();
 
     const {
@@ -127,7 +131,47 @@ export default function SettingsScreen(): React.JSX.Element {
   useFocusEffect(
     useCallback(() => {
       void syncAuth();
-    }, []),
+
+      const onBackPress = (): boolean => {
+        if (gradeModalVisible) {
+          setGradeModalVisible(false);
+          return true;
+        }
+        if (resetModalVisible) {
+          setResetModalVisible(false);
+          return true;
+        }
+        if (parentGateVisible) {
+          setParentGateVisible(false);
+          setSecurityAnswer("");
+          return true;
+        }
+        if (deleteModalVisible) {
+          if (!isDeleting) {
+            setDeleteModalVisible(false);
+            setDeletePassword("");
+          }
+          return true;
+        }
+
+        handleBack();
+        return true; // Prevents Android from exiting the app on single swipe/press
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [
+      gradeModalVisible,
+      resetModalVisible,
+      parentGateVisible,
+      deleteModalVisible,
+      isDeleting,
+      handleBack,
+    ]),
   );
 
   const handleUpdateGrade = async (newGrade: number): Promise<void> => {
@@ -393,7 +437,7 @@ export default function SettingsScreen(): React.JSX.Element {
 
             <View style={styles.gradeGrid}>
               {gradeLevels.map((g) => {
-                const isSelected = currentGrade === g.level;
+                const isSelected = pendingGrade === g.level;
                 return (
                   <Pressable
                     key={g.level}
@@ -401,7 +445,7 @@ export default function SettingsScreen(): React.JSX.Element {
                       styles.gradeBox,
                       isSelected && styles.gradeBoxActive,
                     ]}
-                    onPress={() => handleUpdateGrade(g.level)}
+                    onPress={() => setPendingGrade(g.level)}
                   >
                     <Text
                       style={[
@@ -424,16 +468,20 @@ export default function SettingsScreen(): React.JSX.Element {
               })}
             </View>
 
-            <Pressable
-              style={[
-                styles.modalBtn,
-                styles.modalCancelBtn,
-                { width: "100%", marginTop: 10 },
-              ]}
-              onPress={() => setGradeModalVisible(false)}
-            >
-              <Text style={styles.modalCancelText}>Close </Text>
-            </Pressable>
+            <View style={[styles.modalButtonRow, { marginTop: 8 }]}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setGradeModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                onPress={() => void handleUpdateGrade(pendingGrade)}
+              >
+                <Text style={styles.modalSubmitText}>Confirm Grade</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -589,7 +637,7 @@ export default function SettingsScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={handleBack}>
+          <Pressable onPress={handleBack} hitSlop={12}>
             <Text style={styles.backText}> Back </Text>
           </Pressable>
           <Text style={styles.headerTitle}>Settings </Text>
@@ -658,7 +706,10 @@ export default function SettingsScreen(): React.JSX.Element {
         <View style={styles.cardGroup}>
           <Pressable
             style={styles.rowItem}
-            onPress={() => setGradeModalVisible(true)}
+            onPress={() => {
+              setPendingGrade(currentGrade);
+              setGradeModalVisible(true);
+            }}
           >
             <View>
               <Text style={styles.rowItemText}>Change Grade Level </Text>

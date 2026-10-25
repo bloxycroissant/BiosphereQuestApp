@@ -1,8 +1,16 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { useAudioPlayer } from "expo-audio";
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   PanResponder,
@@ -401,8 +409,8 @@ const buildLessonExpansion = (
     explanation: isScience
       ? `In-Depth Scientific Analysis of ${keyword}:\n\n1. Structural Properties & Observations: When examining ${keyword}, scientists begin by documenting physical attributes, thermal changes, and environmental interactions. Every physical system operates according to fixed scientific laws that govern energy conservation, molecular behavior, and system equilibrium.\n\n2. Key Mechanisms & Relationships: Observing ${keyword} requires analyzing cause-and-effect patterns. For instance, changes in temperature, pressure, forces, or biological resources directly alter how the system behaves. Identifying these variables allows us to predict future outcomes accurately.\n\n3. Empirical Rules to Remember: Always distinguish between directly observable traits (such as color, mass, or velocity) and inferred properties (such as chemical composition or potential energy). Verifiable scientific conclusions are built on reproducible, empirical evidence.\n\nAcademic Guidance Note:\n${gradeHint}`
       : gradeLevel <= 3
-        ? `Primary Classroom Approach for ${keyword}:\n\n1. Visual & Hands-On Learning: In Grade ${gradeLevel}, math is taught using tangible objects, finger counting, visual counters, and block groups rather than abstract formulas. Touching and seeing quantities helps young explorers build strong number sense.\n\n2. Step-by-Step Problem Solving:\n- Step A: Read the problem and look at the visual counters, shapes, or items.\n- Step B: Use physical items or drawings to group, add, or take away items.\n- Step C: Count aloud to find your final answer and verify with your classmates or teacher!\n\n3. Real-World Connection: Math is all around us—whether sharing snacks, counting toys, or measuring lengths with a ruler.\n\nExplorer Tip:\n${gradeHint}`
-        : `Comprehensive Mathematical Explanation of ${keyword}:\n\n1. Foundational Rules & Principles: The mathematical framework of ${keyword} relies on fundamental axioms, formulas, and operational definitions.\n\n2. Systematic Problem Approach: When solving problems involving ${keyword}, always follow a clear three-step process:\n- Step A: Carefully identify all given information and denote unknown target variables.\n- Step B: Select the appropriate formula or operational rule.\n- Step C: Perform arithmetic calculations systematically.\n\n3. Proof and Validation Protocols: Substitute your calculated value back into the original expression to verify equality.\n\nAcademic Guidance Note:\n${gradeHint}`,
+        ? `Primary Classroom Approach for ${keyword}:\n\n1. Visual & Hands-On Learning: In Grade ${gradeLevel}, math is taught using tangible objects, finger counting, visual counters, and block groups rather than abstract formulas. Touching and seeing quantities helps young explorers build strong number sense.\n\n2. Step-by-Step Problem Solving:\nStep A: Read the problem and look at the visual counters, shapes, or items.\nStep B: Use physical items or drawings to group, add, or take away items.\nStep C: Count aloud to find your final answer and verify with your classmates or teacher!\n\n3. Real-World Connection: Math is all around us—whether sharing snacks, counting toys, or measuring lengths with a ruler.\n\nExplorer Tip:\n${gradeHint}`
+        : `Comprehensive Mathematical Explanation of ${keyword}:\n\n1. Foundational Rules & Principles: The mathematical framework of ${keyword} relies on fundamental axioms, formulas, and operational definitions.\n\n2. Systematic Problem Approach: When solving problems involving ${keyword}, always follow a clear three-step process:\nStep A: Carefully identify all given information and denote unknown target variables.\nStep B: Select the appropriate formula or operational rule.\nStep C: Perform arithmetic calculations systematically.\n\n3. Proof and Validation Protocols: Substitute your calculated value back into the original expression to verify equality.\n\nAcademic Guidance Note:\n${gradeHint}`,
     example: exampleText,
     exampleExplanation: isScience
       ? `Detailed Breakdown of the Example:\n\nAnalyze the scenario provided above regarding ${keyword}. Observe how each physical component operates in harmony with scientific principles.`
@@ -436,31 +444,31 @@ export default function SubjectNotesViewer({
   const [currentBookmarkDesign, setCurrentBookmarkDesign] =
     useState<BookmarkOption>(BOOKMARK_DESIGNS[0]);
 
-  const flipAnim = useRef(new Animated.Value(0)).current;
-  const bookmarkDropAnim = useRef(new Animated.Value(-80)).current;
-  const bookmarkScaleAnim = useRef(new Animated.Value(0.2)).current;
-  const bookmarkBtnScale = useRef(new Animated.Value(1)).current;
-  const bookmarkTextOpacity = useRef(new Animated.Value(1)).current;
+  const [flipAnim] = useState(() => new Animated.Value(0));
+  const [bookmarkDropAnim] = useState(() => new Animated.Value(-80));
+  const [bookmarkScaleAnim] = useState(() => new Animated.Value(0.2));
+  const [bookmarkBtnScale] = useState(() => new Animated.Value(1));
+  const [bookmarkTextOpacity] = useState(() => new Animated.Value(1));
 
-  const closeNotebookScale = useRef(new Animated.Value(1)).current;
-  const closeNotebookRotate = useRef(new Animated.Value(0)).current;
-  const closeNotebookOffsetY = useRef(new Animated.Value(0)).current;
-  const backBtnScale = useRef(new Animated.Value(1)).current;
-  const headerFadeAnim = useRef(new Animated.Value(0)).current;
-  const mascotFloatAnim = useRef(new Animated.Value(0)).current;
-
-  const swatchAnimValues = useRef<Record<string, Animated.Value>>({}).current;
-  const stickyTabAnimValues = useRef<Record<number, Animated.Value>>(
-    {},
-  ).current;
+  const [closeNotebookScale] = useState(() => new Animated.Value(1));
+  const [closeNotebookRotate] = useState(() => new Animated.Value(0));
+  const [closeNotebookOffsetY] = useState(() => new Animated.Value(0));
+  const [backBtnScale] = useState(() => new Animated.Value(1));
+  const [headerFadeAnim] = useState(() => new Animated.Value(0));
+  const [mascotFloatAnim] = useState(() => new Animated.Value(0));
 
   const pageTurnAudio = useAudioPlayer(pageTurnSoundFile);
 
   const selectedHighlighterRef = useRef<string | null>(null);
-  selectedHighlighterRef.current = selectedHighlighter;
-
   const currentPageRef = useRef<number>(currentPage);
-  currentPageRef.current = currentPage;
+
+  useEffect(() => {
+    selectedHighlighterRef.current = selectedHighlighter;
+  }, [selectedHighlighter]);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
   const isChildTheme = gradeLevel <= 3;
 
@@ -524,34 +532,13 @@ export default function SubjectNotesViewer({
     CARTOON_CHARACTERS[currentPage % CARTOON_CHARACTERS.length];
   const activeLabStamp = LAB_STAMPS[currentPage % LAB_STAMPS.length];
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(mascotFloatAnim, {
-          toValue: -6,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(mascotFloatAnim, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-
-    Animated.timing(headerFadeAnim, {
-      toValue: 1,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const handleCloseViewer = () => {
+  const handleCloseViewer = useCallback(() => {
     if (pageTurnAudio) {
       try {
+        // Expo AudioPlayer exposes volume as a mutable playback control.
+        // eslint-disable-next-line react-hooks/immutability
+        // Expo AudioPlayer exposes volume as a mutable playback control.
+        // eslint-disable-next-line react-hooks/immutability
         pageTurnAudio.volume = 0.2;
         pageTurnAudio.seekTo(0);
         pageTurnAudio.play();
@@ -602,7 +589,7 @@ export default function SubjectNotesViewer({
           Animated.timing(closeNotebookOffsetY, {
             toValue: 120,
             duration: 320,
-            easing: Easing.in(Easing.quad),
+            easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
         ]),
@@ -610,7 +597,54 @@ export default function SubjectNotesViewer({
     ]).start(() => {
       onClose();
     });
-  };
+  }, [
+    pageTurnAudio,
+    backBtnScale,
+    headerFadeAnim,
+    closeNotebookScale,
+    closeNotebookRotate,
+    closeNotebookOffsetY,
+    onClose,
+  ]);
+
+  useEffect(() => {
+    const onBackPress = (): boolean => {
+      handleCloseViewer();
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
+
+    return () => subscription.remove();
+  }, [handleCloseViewer]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotFloatAnim, {
+          toValue: -6,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotFloatAnim, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.timing(headerFadeAnim, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, [mascotFloatAnim, headerFadeAnim]);
 
   const chapterList = useMemo(() => {
     const list = [];
@@ -640,19 +674,17 @@ export default function SubjectNotesViewer({
     return list;
   }, [subject]);
 
-  const getSwatchAnim = (id: string) => {
-    if (!swatchAnimValues[id]) {
-      swatchAnimValues[id] = new Animated.Value(1);
-    }
-    return swatchAnimValues[id];
-  };
+  const [swatchAnimValues] = useState<Record<string, Animated.Value>>(() => {
+    const values: Record<string, Animated.Value> = {
+      off: new Animated.Value(1),
+    };
+    HIGHLIGHTER_PALETTE.forEach((item) => {
+      values[item.id] = new Animated.Value(1);
+    });
+    return values;
+  });
 
-  const getStickyTabAnim = (pageIdx: number) => {
-    if (!stickyTabAnimValues[pageIdx]) {
-      stickyTabAnimValues[pageIdx] = new Animated.Value(0);
-    }
-    return stickyTabAnimValues[pageIdx];
-  };
+  const getSwatchAnim = (id: string) => swatchAnimValues[id];
 
   const handleSelectHighlighter = (color: string | null, swatchId: string) => {
     setSelectedHighlighter(color);
@@ -729,31 +761,37 @@ export default function SubjectNotesViewer({
     });
   };
 
-  const panResponder = useRef(
+  const [panResponder] = useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gestureState) => {
         return (
+          // This ref is read only when the responder callback runs.
+          // eslint-disable-next-line react-hooks/refs
           !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 10
         );
       },
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return (
+          // eslint-disable-next-line react-hooks/refs
           !!selectedHighlighterRef.current || Math.abs(gestureState.dx) > 15
         );
       },
       onPanResponderGrant: (evt) => {
+        // eslint-disable-next-line react-hooks/refs
         if (selectedHighlighterRef.current) {
           const key = (evt.target as any)?._attributePayload?.["data-word-key"];
           if (key) applyHighlightKey(key);
         }
       },
       onPanResponderMove: (evt, gestureState) => {
+        // eslint-disable-next-line react-hooks/refs
         if (selectedHighlighterRef.current) {
           const key = (evt.target as any)?._attributePayload?.["data-word-key"];
           if (key) applyHighlightKey(key);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
+        // eslint-disable-next-line react-hooks/refs
         if (!selectedHighlighterRef.current) {
           const SWIPE_THRESHOLD = 30;
           if (gestureState.dx < -SWIPE_THRESHOLD) {
@@ -764,7 +802,7 @@ export default function SubjectNotesViewer({
         }
       },
     }),
-  ).current;
+  );
 
   const renderParagraphs = (text: string, prefix: string) => {
     return text.split("\n\n").map((paragraph, pIdx) => {
@@ -820,7 +858,7 @@ export default function SubjectNotesViewer({
                 : `📑 ${subject.title} Comprehensive Journal`}
             </Text>
             <Text style={styles.pageSubtitle}>
-              Grade {gradeLevel} Explorer's Master Notebook
+              Grade {gradeLevel} Explorer&apos;s Master Notebook
             </Text>
           </View>
         </View>
@@ -840,7 +878,7 @@ export default function SubjectNotesViewer({
           📖 Notebook Structural Organization
         </Text>
         {renderParagraphs(
-          "• Chapters 1–4 (Theoretical Foundations): Focus purely on extensive explanations, formal definitions, and deep descriptions of core principles.\n\n• Chapters 5–7 (Practical Applications): Focus on comprehensive real-world worked examples, step-by-step computation models, and guided activity exercises.\n\nHighlighter Tool Usage: Choose a color from the toolbar above to mark important text. Select 'Off' to clear highlights. Use the sticky arrow tabs on the right margin to jump directly across chapters.",
+          "• Chapters 1–4 (Theoretical Foundations): Focus purely on extensive explanations, formal definitions, and deep descriptions of core principles.\n\n• Chapters 5–7 (Practical Applications): Focus on comprehensive real-world worked examples, step-by-step computation models, and guided activity exercises.\n\n• Highlighter Tool Usage: Choose a color from the toolbar above to mark important text. Select 'Off' to clear highlights. Use the sticky arrow tabs on the right margin to jump directly across chapters.",
           "intro-2",
         )}
       </ScrollView>,
@@ -991,7 +1029,7 @@ export default function SubjectNotesViewer({
             </Text>
             {renderParagraphs(expansion.exampleExplanation, `c${index}-why`)}
             <Text style={styles.sectionHeading}>
-              🚀 Explorer's Mission Strategy
+              🚀 Explorer&apos;s Mission Strategy
             </Text>
             {renderParagraphs(
               "Apply the foundational rules and theoretical descriptions from Chapters 1–4 to complete this activity exercise. Always check your steps against the definition to verify complete correctness!",
@@ -1015,6 +1053,14 @@ export default function SubjectNotesViewer({
   ]);
 
   const totalPages = pages.length;
+  const [stickyTabAnimValues] = useState<Record<number, Animated.Value>>(() => {
+    const values: Record<number, Animated.Value> = {};
+    pages.forEach((_, index) => {
+      values[index] = new Animated.Value(0);
+    });
+    return values;
+  });
+  const getStickyTabAnim = (pageIdx: number) => stickyTabAnimValues[pageIdx];
 
   const jumpToPage = (newPage: number) => {
     if (
@@ -1026,6 +1072,8 @@ export default function SubjectNotesViewer({
 
     if (pageTurnAudio) {
       try {
+        // Expo AudioPlayer exposes volume as a mutable playback control.
+        // eslint-disable-next-line react-hooks/immutability
         pageTurnAudio.volume = 0.15;
         pageTurnAudio.seekTo(0);
         pageTurnAudio.play();
@@ -1068,11 +1116,11 @@ export default function SubjectNotesViewer({
     }
   };
 
-  const turnPage = (direction: "next" | "prev") => {
+  function turnPage(direction: "next" | "prev") {
     const cur = currentPageRef.current;
     const newPage = direction === "next" ? cur + 1 : cur - 1;
     jumpToPage(newPage);
-  };
+  }
 
   const toggleBookmark = () => {
     Animated.sequence([
@@ -1171,6 +1219,7 @@ export default function SubjectNotesViewer({
           <AnimatedPressable
             onPress={handleCloseViewer}
             style={[styles.backBtn, { transform: [{ scale: backBtnScale }] }]}
+            hitSlop={12}
           >
             <Text style={styles.backText}>👈 Back to Courses</Text>
           </AnimatedPressable>

@@ -1,9 +1,16 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAudioPlayer } from "expo-audio";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   Modal,
@@ -482,11 +489,14 @@ export default function InteractiveLessonViewer({
 
   useEffect(() => {
     if (bgmPlayer) {
+      // Expo AudioPlayer uses mutable playback controls for these settings.
+      // eslint-disable-next-line react-hooks/immutability
       bgmPlayer.loop = true;
       bgmPlayer.volume = 0.2;
       bgmPlayer.play();
     }
   }, [bgmPlayer]);
+
   const { topics, recapQuestions } = useMemo(
     () => buildLessonContent(lesson, subject.title, gradeLevel),
     [lesson, subject.title, gradeLevel],
@@ -518,13 +528,64 @@ export default function InteractiveLessonViewer({
         ? recapQuestions[recapQuestionIndex]
         : null;
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-  const pulseScaleAnim = useRef(new Animated.Value(1)).current;
+  const [progressAnim] = useState(() => new Animated.Value(0));
+  const [shimmerAnim] = useState(() => new Animated.Value(0));
+  const [pulseScaleAnim] = useState(() => new Animated.Value(1));
 
-  const startTimeRef = useRef(Date.now());
+  const [startTime] = useState(() => Date.now());
   const timeSavedRef = useRef(false);
   const quizStartTimeRef = useRef<number | null>(null);
+
+  const clearCurrentProgress = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(storageKey);
+    } catch (e) {
+      console.error("Failed to clear progress", e);
+    }
+  }, [storageKey]);
+
+  const handleRestart = useCallback(async () => {
+    await clearCurrentProgress();
+    setStage("topic_learn");
+    setTopicIndex(0);
+    setTopicQuestionIndex(0);
+    setRecapQuestionIndex(0);
+    setTotalXpEarned(0);
+    setMistakesCount(0);
+    setSelectedOption(null);
+    setIsAnswered(false);
+    setIsCorrect(false);
+    setShowResumeModal(false);
+  }, [clearCurrentProgress]);
+
+  // Hardware Back / Swipe navigation listener
+  useEffect(() => {
+    const onBackPress = (): boolean => {
+      if (showExitModal) {
+        setShowExitModal(false);
+        return true;
+      }
+      if (showResumeModal) {
+        void handleRestart();
+        return true;
+      }
+      if (stage === "summary") {
+        if (onBack) onBack();
+        return true;
+      }
+
+      // Prompt to pause and save rather than losing spot
+      setShowExitModal(true);
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
+
+    return () => subscription.remove();
+  }, [showExitModal, showResumeModal, stage, onBack, handleRestart]);
 
   useEffect(() => {
     if (
@@ -540,7 +601,7 @@ export default function InteractiveLessonViewer({
       const saveStudyTime = async () => {
         if (timeSavedRef.current) return;
         timeSavedRef.current = true;
-        const elapsedMs = Date.now() - startTimeRef.current;
+        const elapsedMs = Date.now() - startTime;
         const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
 
         try {
@@ -621,14 +682,6 @@ export default function InteractiveLessonViewer({
     }
   };
 
-  const clearCurrentProgress = async () => {
-    try {
-      await AsyncStorage.removeItem(storageKey);
-    } catch (e) {
-      console.error("Failed to clear progress", e);
-    }
-  };
-
   const handleResume = () => {
     if (savedProgressData) {
       setStage(savedProgressData.stage || "topic_learn");
@@ -638,20 +691,6 @@ export default function InteractiveLessonViewer({
       setTotalXpEarned(savedProgressData.totalXpEarned || 0);
       setMistakesCount(savedProgressData.mistakesCount || 0);
     }
-    setShowResumeModal(false);
-  };
-
-  const handleRestart = async () => {
-    await clearCurrentProgress();
-    setStage("topic_learn");
-    setTopicIndex(0);
-    setTopicQuestionIndex(0);
-    setRecapQuestionIndex(0);
-    setTotalXpEarned(0);
-    setMistakesCount(0);
-    setSelectedOption(null);
-    setIsAnswered(false);
-    setIsCorrect(false);
     setShowResumeModal(false);
   };
 
@@ -703,6 +742,9 @@ export default function InteractiveLessonViewer({
     isCorrect,
     topics.length,
     recapQuestions.length,
+    progressAnim,
+    pulseScaleAnim,
+    currentTopic.questions.length,
   ]);
 
   const handleSelectOption = (idx: number) => {
@@ -814,8 +856,9 @@ export default function InteractiveLessonViewer({
           <Pressable
             onPress={() => setShowExitModal(true)}
             style={styles.backTouch}
+            hitSlop={12}
           >
-            <Text style={styles.backLabel}>Exit</Text>
+            <Text style={styles.backLabel}> Exit</Text>
           </Pressable>
           <View style={styles.xpBadge}>
             <Text style={styles.xpBadgeText}>⚡ +{totalXpEarned} XP</Text>
@@ -1075,6 +1118,7 @@ export default function InteractiveLessonViewer({
         )}
       </ScrollView>
 
+      {/* Exit / Pause Confirmation Modal */}
       <Modal
         visible={showExitModal}
         transparent
@@ -1112,6 +1156,7 @@ export default function InteractiveLessonViewer({
         </View>
       </Modal>
 
+      {/* Resume Mission Modal */}
       <Modal
         visible={showResumeModal}
         transparent

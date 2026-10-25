@@ -1,8 +1,9 @@
 import { GradientSafeAreaView as SafeAreaView } from "@/components/gradient-safe-area";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -13,7 +14,7 @@ import {
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
-export default function ChangePasswordScreen() {
+export default function ChangePasswordScreen(): React.JSX.Element {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,41 @@ export default function ChangePasswordScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successModalVisible, setSuccessModalVisible] = useState(false);
 
-  const handleUpdatePassword = async () => {
+  const handleBack = useCallback((): void => {
+    if (successModalVisible) {
+      setSuccessModalVisible(false);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/settings" as any);
+      }
+      return;
+    }
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/settings" as any);
+    }
+  }, [successModalVisible]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
+
+  const handleUpdatePassword = async (): Promise<void> => {
     setErrorMessage("");
 
     if (!newPassword.trim() || !confirmPassword.trim()) {
@@ -89,10 +124,7 @@ export default function ChangePasswordScreen() {
         visible={successModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => {
-          setSuccessModalVisible(false);
-          router.back();
-        }}
+        onRequestClose={handleBack}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -104,13 +136,7 @@ export default function ChangePasswordScreen() {
               Your account password has been changed successfully. You can now
               use this password the next time you log in.
             </Text>
-            <Pressable
-              style={styles.modalButton}
-              onPress={() => {
-                setSuccessModalVisible(false);
-                router.back();
-              }}
-            >
+            <Pressable style={styles.modalButton} onPress={handleBack}>
               <Text style={styles.modalButtonText}>Back to Settings</Text>
             </Pressable>
           </View>
@@ -118,8 +144,8 @@ export default function ChangePasswordScreen() {
       </Modal>
 
       <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>Back</Text>
+        <Pressable onPress={handleBack} style={styles.backButton} hitSlop={12}>
+          <Text style={styles.backText}> Back</Text>
         </Pressable>
       </View>
 
@@ -157,7 +183,10 @@ export default function ChangePasswordScreen() {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={8}
+              >
                 <MaterialCommunityIcons
                   name={showPassword ? "eye-off" : "eye"}
                   size={20}

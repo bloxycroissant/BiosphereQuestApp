@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { ScrollViewInstance } from "react-native";
 
 const STORAGE_KEY = "@biosphere_profile_data_v1";
 const PARENT_CONTROLS_KEY = "@biosphere_parent_controls_v1";
@@ -29,7 +30,12 @@ export default function ParentDashboardScreen() {
   const [lessonsCompleted, setLessonsCompleted] = useState(0);
   const [streak, setStreak] = useState(0);
   const [quizAccuracy, setQuizAccuracy] = useState("0%");
-  const [greeting, setGreeting] = useState("Good Morning");
+  const [greeting] = useState(() => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) return "Good Morning";
+    if (currentHour < 18) return "Good Afternoon";
+    return "Good Evening";
+  });
 
   const [timeCapEnabled, setTimeCapEnabled] = useState(true);
   const [timeCapMinutes, setTimeCapMinutes] = useState(90);
@@ -43,15 +49,25 @@ export default function ParentDashboardScreen() {
   const [studyFirstEnabled, setStudyFirstEnabled] = useState(true);
   const [parentKeyword, setParentKeyword] = useState("");
 
-  const entrance = useRef(new Animated.Value(0)).current;
-  const scaleAnims = useRef<{ [key: string]: Animated.Value }>({}).current;
-  const scrollViewRef = useRef<ScrollView | null>(null);
+  const [entrance] = useState(() => new Animated.Value(0));
+  const [scaleAnims] = useState<Record<string, Animated.Value>>(() => {
+    const values: Record<string, Animated.Value> = {};
+    const keys = [
+      ...Array.from({ length: 4 }, (_, index) => `timeBtn_${index}`),
+      ...Array.from({ length: 12 }, (_, index) => `hr_${index + 1}`),
+      ...["00", "15", "30", "45"].map((minute) => `min_${minute}`),
+      "period_AM",
+      "period_PM",
+    ];
+    keys.forEach((key) => {
+      values[key] = new Animated.Value(1);
+    });
+    return values;
+  });
+  const scrollViewRef = useRef<ScrollViewInstance | null>(null);
   const [keyboardSpace, setKeyboardSpace] = useState(0);
 
   const getScaleAnim = (key: string) => {
-    if (!scaleAnims[key]) {
-      scaleAnims[key] = new Animated.Value(1);
-    }
     return scaleAnims[key];
   };
 
@@ -73,48 +89,7 @@ export default function ParentDashboardScreen() {
     }).start();
   };
 
-  useEffect(() => {
-    Animated.spring(entrance, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 55,
-      friction: 9,
-    }).start();
-
-    const currentHour = new Date().getHours();
-    if (currentHour < 12) {
-      setGreeting("Good Morning");
-    } else if (currentHour < 18) {
-      setGreeting("Good Afternoon");
-    } else {
-      setGreeting("Good Evening");
-    }
-
-    loadStudentDataAndControls();
-
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardSpace(e.endCoordinates.height);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 80);
-    });
-
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardSpace(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const loadStudentDataAndControls = async () => {
+  async function loadStudentDataAndControls() {
     try {
       const studentData = await AsyncStorage.getItem(STORAGE_KEY);
       const guestName = await AsyncStorage.getItem("explorerName");
@@ -154,7 +129,7 @@ export default function ParentDashboardScreen() {
     } catch (e) {
       console.error("Failed to load controls", e);
     }
-  };
+  }
 
   const parseAndSetBedtime = (timeStr: string) => {
     try {
@@ -171,6 +146,40 @@ export default function ParentDashboardScreen() {
       console.error("Error parsing bedtime string", err);
     }
   };
+
+  useEffect(() => {
+    Animated.spring(entrance, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 55,
+      friction: 9,
+    }).start();
+
+    // The student and controls are hydrated from local storage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadStudentDataAndControls();
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardSpace(e.endCoordinates.height);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardSpace(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const saveParentControls = async (
     updatedSettings: Record<string, unknown>,

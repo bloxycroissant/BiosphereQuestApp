@@ -2,8 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from "react";
@@ -155,69 +157,33 @@ const getLocalDateString = (date = new Date()) => {
 
 export function ProgressProvider({ children }: PropsWithChildren) {
   const [progress, setProgress] = useState<Progress>(initialProgress);
+  const [isProgressLoaded, setIsProgressLoaded] = useState(false);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
-    loadProgress();
-  }, []);
+  const saveAndSync = useCallback((updatedFields: Partial<Progress>) => {
+    const saveOperation = saveQueueRef.current.then(async () => {
+      try {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        const parsed = saved ? JSON.parse(saved) : {};
+        const merged = { ...parsed, ...updatedFields };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
 
-  useEffect(() => {
-    const newDates = { ...(progress.badgeUnlockDates || {}) };
-    let changed = false;
-    const today = getLocalDateString();
-
-    const check = (id: string, condition: boolean) => {
-      if (condition && !newDates[id]) {
-        newDates[id] = today;
-        changed = true;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.auth.updateUser({
+            data: { biosphere_progress: merged },
+          });
+        }
+      } catch (e) {
+        console.error("Failed to save global progress", e);
       }
-    };
+    });
 
-    check("first_steps", progress.xp >= 150);
-    check("cadet", progress.xp >= 500);
-    check("streak", progress.streak >= 3);
-    check("time", progress.studyMinutes >= 60);
-    check("daily", progress.dailyChallengesPassed >= 3);
-    check("perfect", progress.perfectLessons > 0);
-    check("minigame", progress.codebreakerPassed > 0);
-    check("speed_math", progress.speedMathPassed > 0);
-    check("speed_sci", progress.speedSciencePassed > 0);
-    check("elite", progress.xp >= 1000);
-    check("gold", progress.xp >= 2500);
-    check("master", progress.xp >= 5000);
-
-    if (changed) {
-      setProgress((prev) => {
-        const updated = { ...prev, badgeUnlockDates: newDates };
-        saveAndSync(updated);
-        return updated;
-      });
-    }
-  }, [
-    progress.xp,
-    progress.streak,
-    progress.studyMinutes,
-    progress.dailyChallengesPassed,
-    progress.perfectLessons,
-    progress.codebreakerPassed,
-    progress.speedMathPassed,
-    progress.speedSciencePassed,
-  ]);
-
-  const saveAndSync = async (updatedFields: Partial<Progress>) => {
-    try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : {};
-      const merged = { ...parsed, ...updatedFields };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user)
-          supabase.auth.updateUser({ data: { biosphere_progress: merged } });
-      });
-    } catch (e) {
-      console.error("Failed to save global progress", e);
-    }
-  };
+    saveQueueRef.current = saveOperation;
+    return saveOperation;
+  }, []);
 
   const evaluateStreak = (
     currentStreak: number,
@@ -316,8 +282,63 @@ export function ProgressProvider({ children }: PropsWithChildren) {
       await saveAndSync(mergedState);
     } catch (e) {
       console.error("Failed to load global progress", e);
+    } finally {
+      setIsProgressLoaded(true);
     }
   };
+
+  useEffect(() => {
+    // Hydrate the provider from persisted and cloud progress.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProgress();
+  }, []);
+
+  useEffect(() => {
+    const today = getLocalDateString();
+    // Derive unlocks from the latest state to avoid replacing concurrent progress.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProgress((current) => {
+      const newDates = { ...(current.badgeUnlockDates || {}) };
+      let changed = false;
+
+      const check = (id: string, condition: boolean) => {
+        if (condition && !newDates[id]) {
+          newDates[id] = today;
+          changed = true;
+        }
+      };
+
+      check("first_steps", current.xp >= 150);
+      check("cadet", current.xp >= 500);
+      check("streak", current.streak >= 3);
+      check("time", current.studyMinutes >= 60);
+      check("daily", current.dailyChallengesPassed >= 3);
+      check("perfect", current.perfectLessons > 0);
+      check("minigame", current.codebreakerPassed > 0);
+      check("speed_math", current.speedMathPassed > 0);
+      check("speed_sci", current.speedSciencePassed > 0);
+      check("elite", current.xp >= 1000);
+      check("gold", current.xp >= 2500);
+      check("master", current.xp >= 5000);
+
+      return changed ? { ...current, badgeUnlockDates: newDates } : current;
+    });
+  }, [
+    progress.xp,
+    progress.streak,
+    progress.studyMinutes,
+    progress.dailyChallengesPassed,
+    progress.perfectLessons,
+    progress.codebreakerPassed,
+    progress.speedMathPassed,
+    progress.speedSciencePassed,
+  ]);
+
+  useEffect(() => {
+    if (isProgressLoaded) {
+      void saveAndSync({ badgeUnlockDates: progress.badgeUnlockDates });
+    }
+  }, [isProgressLoaded, progress.badgeUnlockDates, saveAndSync]);
 
   const addXp = async (amount: number) => {
     if (!Number.isFinite(amount) || amount < 0) return;

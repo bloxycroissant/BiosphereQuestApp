@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Pressable, Animated } from 'react-native';
 import { useProgress } from '@/hooks/use-progress';
 import { router } from 'expo-router';
@@ -53,8 +53,8 @@ export function ParentalLockGuard({ children, feature }: ParentalLockGuardProps)
 }
 
 function LockScreenView({ title, subtitle, actionLabel, onAction }: { title: string; subtitle: string; actionLabel?: string; onAction?: () => void }) {
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(0.85));
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.parallel([

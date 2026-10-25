@@ -78,19 +78,21 @@ export const MemoryMatchGame: React.FC<Props> = ({
   const seenBoards = useRef(new Set<string>());
   const antiCheatClickLimit = useRef<{ count: number; time: number }>({
     count: 0,
-    time: Date.now(),
+    time: 0,
   });
 
   const [cards, setCards] = useState<MemoryMatchCard[]>(() => {
     const initialCards = generateMemoryPairs(
       grade,
-      seenBoards.current,
+      new Set<string>(),
       subject,
     );
-    const key = boardKey(initialCards);
-    if (key) seenBoards.current.add(key);
     return initialCards;
   });
+  useEffect(() => {
+    const key = boardKey(cards);
+    if (key) seenBoards.current.add(key);
+  }, [cards]);
 
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<string[]>([]);
@@ -188,6 +190,8 @@ export const MemoryMatchGame: React.FC<Props> = ({
     )
       return;
 
+    // This timestamp is sampled only in response to a card tap.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     if (now - antiCheatClickLimit.current.time < 1000) {
       antiCheatClickLimit.current.count += 1;

@@ -1,6 +1,6 @@
 import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
@@ -255,17 +255,15 @@ export const WhackANumberGame: React.FC<Props> = ({
   const seenChallenges = useRef(new Set<string>());
   const antiCheatClickLimit = useRef<{ count: number; time: number }>({
     count: 0,
-    time: Date.now(),
+    time: 0,
   });
 
   const [challenge, setChallenge] = useState<WhackChallenge>(() => {
-    const initial = generateCurricularWhackChallenge(
-      grade,
-      seenChallenges.current,
-    );
-    if (initial) seenChallenges.current.add(challengeKey(initial));
-    return initial;
+    return generateCurricularWhackChallenge(grade, new Set<string>());
   });
+  useEffect(() => {
+    if (challenge) seenChallenges.current.add(challengeKey(challenge));
+  }, [challenge]);
 
   const [whacked, setWhacked] = useState<number[]>([]);
   const [activeHammerIndex, setActiveHammerIndex] = useState<number | null>(
@@ -276,11 +274,11 @@ export const WhackANumberGame: React.FC<Props> = ({
   const [feedback, setFeedback] = useState("");
   const [completedQuotas, setCompletedQuotas] = useState(0);
 
-  const tileScales = useRef<Animated.Value[]>(
+  const [tileScales] = useState(() =>
     Array.from({ length: 9 }, () => new Animated.Value(1)),
-  ).current;
+  );
 
-  const hammerAnim = useRef(new Animated.Value(0)).current;
+  const [hammerAnim] = useState(() => new Animated.Value(0));
 
   const currentDifficulty = getDifficulty(completedQuotas);
   const currentXP = getXPForDifficulty(currentDifficulty);
@@ -368,6 +366,8 @@ export const WhackANumberGame: React.FC<Props> = ({
   const whack = (index: number) => {
     if (whacked.includes(index) || isGameOver) return;
 
+    // This timestamp is sampled only in response to a tile tap.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     if (now - antiCheatClickLimit.current.time < 1000) {
       antiCheatClickLimit.current.count += 1;

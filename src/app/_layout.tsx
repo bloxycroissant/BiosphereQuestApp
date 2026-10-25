@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -41,7 +41,7 @@ export default function RootLayout() {
 
 function AnimatedRoute() {
   const pathname = usePathname();
-  const entrance = useRef(new Animated.Value(0)).current;
+  const [entrance] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     entrance.setValue(0);

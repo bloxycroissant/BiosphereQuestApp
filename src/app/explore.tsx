@@ -16,12 +16,18 @@ import {
   useLocalSearchParams,
   usePathname,
 } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Animated,
+  BackHandler,
   Easing,
-  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -108,9 +114,12 @@ export default function ExploreScreen(): React.JSX.Element {
   useEffect(() => {
     if (!exploreBgm || !lessonLofiBgm) return;
 
+    // Expo AudioPlayer exposes loop and volume as mutable playback controls.
+    // eslint-disable-next-line react-hooks/immutability
     exploreBgm.loop = true;
     exploreBgm.volume = 0.5;
 
+    // eslint-disable-next-line react-hooks/immutability
     lessonLofiBgm.loop = true;
     lessonLofiBgm.volume = 0.5;
 
@@ -136,7 +145,6 @@ export default function ExploreScreen(): React.JSX.Element {
   const openLesson = (subject: Subject, lesson: Lesson): void => {
     if (transitionInProgress.current || selected) return;
 
-    // Explicitly pause explore music immediately when clicking play
     if (exploreBgm) exploreBgm.pause();
 
     transitionInProgress.current = true;
@@ -264,7 +272,7 @@ export default function ExploreScreen(): React.JSX.Element {
               " curriculum has been locked by parental controls.",
           );
         } else {
-          setGrade(targetGrade);
+          startTransition(() => setGrade(targetGrade));
         }
       }
     } catch (e) {
@@ -294,14 +302,18 @@ export default function ExploreScreen(): React.JSX.Element {
         (s) => s.title.toLowerCase() === String(subjParam).toLowerCase(),
       );
       if (targetSubj) {
-        setActiveSubject(targetSubj);
+        startTransition(() => setActiveSubject(targetSubj));
       }
     }
   }, [params.autoOpenSubject, subjects]);
 
-  const handleBack = (): void => {
+  const handleBack = useCallback((): void => {
     if (selected) {
       closeLesson();
+      return;
+    }
+    if (showNotes) {
+      setShowNotes(false);
       return;
     }
     if (activeSubject) {
@@ -313,7 +325,23 @@ export default function ExploreScreen(): React.JSX.Element {
     } else {
       router.replace("/home" as Href);
     }
-  };
+  }, [selected, showNotes, activeSubject]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   return (
     <View style={styles.screenContainer}>
@@ -327,8 +355,8 @@ export default function ExploreScreen(): React.JSX.Element {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Pressable onPress={handleBack}>
-              <Text style={styles.back}>Back</Text>
+            <Pressable onPress={handleBack} hitSlop={14}>
+              <Text style={styles.back}> Back</Text>
             </Pressable>
             <View style={styles.headerTitle}>
               <Image
@@ -531,7 +559,7 @@ export default function ExploreScreen(): React.JSX.Element {
                 ))}
               </LinearGradient>
 
-              {/* --- STUDY MATERIALS BUTTON --- */}
+              {/* STUDY MATERIALS BUTTON */}
               <Text style={styles.sectionHeading}>STUDY MATERIALS</Text>
               <Pressable
                 style={styles.openNotesCard}
@@ -689,7 +717,7 @@ export default function ExploreScreen(): React.JSX.Element {
         {!activeSubject && <BottomNavigation />}
       </SafeAreaView>
 
-      {/* --- SINGLE PAGE NOTEBOOK VIEWER --- */}
+      {/* SINGLE PAGE NOTEBOOK VIEWER */}
       {showNotes && activeSubject && (
         <Animated.View style={styles.screenLayer}>
           <SubjectNotesViewer
@@ -700,7 +728,7 @@ export default function ExploreScreen(): React.JSX.Element {
         </Animated.View>
       )}
 
-      {/* --- INTERACTIVE LESSON VIEWER --- */}
+      {/* INTERACTIVE LESSON VIEWER */}
       {selected && (
         <Animated.View
           style={[
@@ -755,11 +783,11 @@ function NavigationItem({
   onPress,
 }: {
   label: string;
-  icon: ImageSourcePropType;
+  icon: any;
   active: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const motion = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const [motion] = useState(() => new Animated.Value(active ? 1 : 0));
 
   useEffect(() => {
     Animated.spring(motion, {

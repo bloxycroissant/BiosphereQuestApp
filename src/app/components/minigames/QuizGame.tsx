@@ -311,7 +311,7 @@ const generateCurricularWhackChallenge = (
   };
 };
 
-export const WhackANumberGame: React.FC<Props> = ({
+export const QuizGame: React.FC<Props> = ({
   grade,
 
   onSuccess,
@@ -356,18 +356,11 @@ export const WhackANumberGame: React.FC<Props> = ({
   const antiCheatClickLimit = useRef<{ count: number; time: number }>({
     count: 0,
 
-    time: Date.now(),
+    time: 0,
   });
 
   const [challenge, setChallenge] = useState<WhackChallenge>(() => {
-    const initial = generateCurricularWhackChallenge(
-      grade,
-      seenChallenges.current,
-    );
-
-    if (initial) seenChallenges.current.add(challengeKey(initial));
-
-    return initial;
+    return generateCurricularWhackChallenge(grade, new Set<string>());
   });
 
   const [whacked, setWhacked] = useState<number[]>([]);
@@ -384,11 +377,11 @@ export const WhackANumberGame: React.FC<Props> = ({
 
   const [completedQuotas, setCompletedQuotas] = useState(0);
 
-  const tileScales = useRef<Animated.Value[]>(
+  const [tileScales] = useState(() =>
     Array.from({ length: 9 }, () => new Animated.Value(1)),
-  ).current;
+  );
 
-  const hammerAnim = useRef(new Animated.Value(0)).current;
+  const [hammerAnim] = useState(() => new Animated.Value(0));
 
   const currentDifficulty = getDifficulty(completedQuotas);
 
@@ -503,6 +496,8 @@ export const WhackANumberGame: React.FC<Props> = ({
   const whack = (index: number) => {
     if (whacked.includes(index) || isGameOver) return;
 
+    // This handler runs only in response to a player tap.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
 
     if (now - antiCheatClickLimit.current.time < 1000) {

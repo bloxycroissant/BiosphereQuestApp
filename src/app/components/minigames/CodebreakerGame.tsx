@@ -83,7 +83,7 @@ export const CodebreakerGame: React.FC<Props> = ({
   };
 
   const seenChallenges = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now());
+  const antiCheatTimestamp = useRef<number>(0);
 
   const [subject, setSubject] = useState<Subject | null>(null);
   const [challenge, setChallenge] = useState<CodebreakerChallenge | null>(null);
@@ -116,7 +116,10 @@ export const CodebreakerGame: React.FC<Props> = ({
   const choose = (option: number) => {
     if (selected !== null || !challenge) return;
 
+    // These timestamps are sampled only in response to player input.
+    // eslint-disable-next-line react-hooks/purity
     if (Date.now() - antiCheatTimestamp.current < 250) return;
+    // eslint-disable-next-line react-hooks/purity
     antiCheatTimestamp.current = Date.now();
 
     setSelected(option);

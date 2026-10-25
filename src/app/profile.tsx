@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  BackHandler,
   Easing,
   Image,
   LayoutAnimation,
@@ -82,6 +83,8 @@ export default function ProfileScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (bgmPlayer) {
+      // Expo AudioPlayer uses mutable playback controls for these settings.
+      // eslint-disable-next-line react-hooks/immutability
       bgmPlayer.loop = true;
       bgmPlayer.volume = 0.5;
       bgmPlayer.play();
@@ -89,12 +92,14 @@ export default function ProfileScreen(): React.JSX.Element {
   }, [bgmPlayer]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  if (
-    Platform.OS === "android" &&
-    UIManager.setLayoutAnimationEnabledExperimental
-  ) {
-    UIManager.setLayoutAnimationEnabledExperimental?.(true);
-  }
+  useEffect(() => {
+    if (
+      Platform.OS === "android" &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   const logo = require("../../assets/BiosphereQuestAssets/Biosphere Quest Logo.png");
   const stellaMascot = require("../../assets/BiosphereQuestAssets/Stella (Biosphere Quest Mascot).png");
@@ -103,8 +108,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const [currentView, setCurrentView] = useState<ViewMode>("profile");
   const [section, setSection] = useState<Section>("badges");
 
-  const levelUpAnim = useRef(new Animated.Value(-120)).current;
-  const mascotFloat = useRef(new Animated.Value(0)).current;
+  const [levelUpAnim] = useState(() => new Animated.Value(-120));
+  const [mascotFloat] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.loop(
@@ -129,25 +134,25 @@ export default function ProfileScreen(): React.JSX.Element {
   const [levelUpText, setLevelUpText] = useState<string>("");
   const [prevLevel, setPrevLevel] = useState<number | null>(null);
 
-  const editProfileScale = useRef(new Animated.Value(1)).current;
-  const saveProfileScale = useRef(new Animated.Value(1)).current;
-  const addScheduleScale = useRef(new Animated.Value(1)).current;
-  const viewTransitionAnim = useRef(new Animated.Value(1)).current;
+  const [editProfileScale] = useState(() => new Animated.Value(1));
+  const [saveProfileScale] = useState(() => new Animated.Value(1));
+  const [addScheduleScale] = useState(() => new Animated.Value(1));
+  const [viewTransitionAnim] = useState(() => new Animated.Value(1));
 
-  const tabSlideAnim = useRef(new Animated.Value(0)).current;
-  const tabOpacityAnim = useRef(new Animated.Value(1)).current;
+  const [tabSlideAnim] = useState(() => new Animated.Value(0));
+  const [tabOpacityAnim] = useState(() => new Animated.Value(1));
 
-  const addFormAnim = useRef(new Animated.Value(40)).current;
-  const addFormOpacity = useRef(new Animated.Value(0)).current;
-  const targetSlideAnim = useRef(new Animated.Value(0)).current;
-  const calendarGlowAnim = useRef(new Animated.Value(0)).current;
+  const [addFormAnim] = useState(() => new Animated.Value(40));
+  const [addFormOpacity] = useState(() => new Animated.Value(0));
+  const [targetSlideAnim] = useState(() => new Animated.Value(0));
+  const [calendarGlowAnim] = useState(() => new Animated.Value(0));
 
   const [streak, setStreak] = useState(0);
   const [lessons, setLessons] = useState(0);
   const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
   const [nextLevelXp, setNextLevelXp] = useState(100);
-  const [lastResetDate, setLastResetDate] = useState(Date.now());
+  const [lastResetDate, setLastResetDate] = useState(() => Date.now());
   const [cloudBadges, setCloudBadges] = useState<Record<string, string>>({});
 
   const [name, setName] = useState("");
@@ -173,7 +178,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const [sessions, setSessions] = useState<LocalSession[]>([]);
 
-  const now = new Date();
+  const [now] = useState(() => new Date());
   const [newTitle, setNewTitle] = useState("");
   const [newDay, setNewDay] = useState("Mon");
   const [newTime, setNewTime] = useState("9:00 AM");
@@ -208,6 +213,71 @@ export default function ProfileScreen(): React.JSX.Element {
       useNativeDriver: true,
     }).start();
   };
+
+  const animateViewChange = useCallback(
+    (nextView: ViewMode): void => {
+      if (nextView === "addSchedule") {
+        setTargetYear(now.getFullYear());
+        setTargetMonth(now.getMonth());
+        setTargetDay(now.getDate());
+        addFormAnim.setValue(40);
+        addFormOpacity.setValue(0);
+        Animated.parallel([
+          Animated.spring(addFormAnim, {
+            toValue: 0,
+            tension: 70,
+            friction: 8,
+            useNativeDriver: true,
+          }),
+          Animated.timing(addFormOpacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+
+      Animated.sequence([
+        Animated.timing(viewTransitionAnim, {
+          toValue: 0.95,
+          duration: 90,
+          useNativeDriver: true,
+        }),
+        Animated.timing(viewTransitionAnim, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      setCurrentView(nextView);
+    },
+    [addFormAnim, addFormOpacity, viewTransitionAnim, now],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        if (currentView === "editProfile" || currentView === "addSchedule") {
+          animateViewChange("profile");
+          return true;
+        }
+
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace("/home" as any);
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [currentView, animateViewChange]),
+  );
 
   const syncFullProfileToCloud = async (): Promise<void> => {
     try {
@@ -459,6 +529,8 @@ export default function ProfileScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
+    // Auth state is synchronized from Supabase and local storage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void checkAuthStatus();
 
     const {
@@ -486,43 +558,6 @@ export default function ProfileScreen(): React.JSX.Element {
       void loadSavedData().then(() => checkAuthStatus());
     }, []),
   );
-
-  const animateViewChange = (nextView: ViewMode): void => {
-    if (nextView === "addSchedule") {
-      setTargetYear(now.getFullYear());
-      setTargetMonth(now.getMonth());
-      setTargetDay(now.getDate());
-      addFormAnim.setValue(40);
-      addFormOpacity.setValue(0);
-      Animated.parallel([
-        Animated.spring(addFormAnim, {
-          toValue: 0,
-          tension: 70,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.timing(addFormOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-
-    Animated.sequence([
-      Animated.timing(viewTransitionAnim, {
-        toValue: 0.95,
-        duration: 90,
-        useNativeDriver: true,
-      }),
-      Animated.timing(viewTransitionAnim, {
-        toValue: 1,
-        duration: 160,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setCurrentView(nextView);
-  };
 
   const handleTabSwitch = (newSection: Section): void => {
     if (newSection === section) return;
@@ -609,7 +644,7 @@ export default function ProfileScreen(): React.JSX.Element {
     }
   };
 
-  const loadSavedData = async (): Promise<void> => {
+  async function loadSavedData(): Promise<void> {
     try {
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
       let parsed = savedData ? JSON.parse(savedData) : {};
@@ -678,7 +713,7 @@ export default function ProfileScreen(): React.JSX.Element {
     } catch (e) {
       console.error("Failed to load profile data", e);
     }
-  };
+  }
 
   useEffect(() => {
     void loadSavedData();
@@ -973,7 +1008,10 @@ export default function ProfileScreen(): React.JSX.Element {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.editHeaderRow}>
-              <Pressable onPress={() => animateViewChange("profile")}>
+              <Pressable
+                onPress={() => animateViewChange("profile")}
+                hitSlop={12}
+              >
                 <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <Text style={styles.editHeaderTitle}>Edit Profile</Text>
@@ -1127,7 +1165,10 @@ export default function ProfileScreen(): React.JSX.Element {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.editHeaderRow}>
-              <Pressable onPress={() => animateViewChange("profile")}>
+              <Pressable
+                onPress={() => animateViewChange("profile")}
+                hitSlop={12}
+              >
                 <Text style={styles.cancelText}> Cancel</Text>
               </Pressable>
               <View style={styles.addHeaderTitleRow}>
@@ -1673,7 +1714,7 @@ function CategoryChipItem({
   onSelect: (c: string) => void;
 }): React.JSX.Element {
   const isSel = selectedCategory === cat;
-  const chipScale = useRef(new Animated.Value(1)).current;
+  const [chipScale] = useState(() => new Animated.Value(1));
   return (
     <AnimatedPressable
       onPressIn={() => {
@@ -1718,7 +1759,7 @@ function ReminderChipItem({
   onSelect: (r: string) => void;
 }): React.JSX.Element {
   const isSel = selectedReminder === rem;
-  const remScale = useRef(new Animated.Value(1)).current;
+  const [remScale] = useState(() => new Animated.Value(1));
   return (
     <AnimatedPressable
       onPressIn={() => {
@@ -1799,7 +1840,36 @@ function Badges({
   const progress = useProgress();
 
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
-  const badgeModalAnim = useRef(new Animated.Value(0)).current;
+  const [badgeModalAnim] = useState(() => new Animated.Value(0));
+
+  const closeBadgeModal = useCallback(() => {
+    Animated.timing(badgeModalAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedBadge(null);
+    });
+  }, [badgeModalAnim]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = (): boolean => {
+        if (selectedBadge) {
+          closeBadgeModal();
+          return true;
+        }
+        return false;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [selectedBadge, closeBadgeModal]),
+  );
 
   const getUnlockDate = (id: string, xpThreshold?: number) => {
     const savedDate = progress.badgeUnlockDates?.[id] || cloudBadges?.[id];
@@ -1926,6 +1996,10 @@ function Badges({
     },
   ];
 
+  const [badgePressScales] = useState(() =>
+    dynamicAchievements.map(() => new Animated.Value(1)),
+  );
+
   const openBadgeModal = (badge: any) => {
     setSelectedBadge(badge);
     badgeModalAnim.setValue(0);
@@ -1935,16 +2009,6 @@ function Badges({
       tension: 65,
       friction: 7,
     }).start();
-  };
-
-  const closeBadgeModal = () => {
-    Animated.timing(badgeModalAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setSelectedBadge(null);
-    });
   };
 
   const formatUnlockDate = (dateStr: string) => {
@@ -1960,8 +2024,8 @@ function Badges({
     <View>
       <Text style={styles.section}>🏅 Badges & Achievements</Text>
       <View style={styles.badges}>
-        {dynamicAchievements.map((achievement) => {
-          const badgePressScale = useRef(new Animated.Value(1)).current;
+        {dynamicAchievements.map((achievement, index) => {
+          const badgePressScale = badgePressScales[index];
 
           const handlePressIn = () => {
             Animated.spring(badgePressScale, {

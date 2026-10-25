@@ -352,13 +352,14 @@ export const WordScrambleGame: React.FC<Props> = ({
   };
 
   const seenChallenges = useRef(new Set<string>());
-  const antiCheatTimestamp = useRef<number>(Date.now());
+  const antiCheatTimestamp = useRef<number>(0);
 
   const [challenge, setChallenge] = useState<ScrambleChallenge>(() => {
-    const initial = getUniqueWordScramble(grade, seenChallenges.current);
-    seenChallenges.current.add(initial.targetWord);
-    return initial;
+    return getUniqueWordScramble(grade, new Set<string>());
   });
+  useEffect(() => {
+    seenChallenges.current.add(challenge.targetWord);
+  }, [challenge]);
 
   const [pickedTiles, setPickedTiles] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
@@ -466,10 +467,13 @@ export const WordScrambleGame: React.FC<Props> = ({
     playSound("click");
     if (finished) return;
 
+    // These timestamps are sampled only in response to player input.
+    // eslint-disable-next-line react-hooks/purity
     if (Date.now() - antiCheatTimestamp.current < 250) {
       setMessage("Anti-cheat: Action too fast.");
       return;
     }
+    // eslint-disable-next-line react-hooks/purity
     antiCheatTimestamp.current = Date.now();
 
     if (answer.length !== challenge.targetWord.length) {

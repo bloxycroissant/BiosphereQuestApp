@@ -9,6 +9,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Modal,
   Platform,
@@ -17,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
   ViewStyle,
 } from "react-native";
@@ -37,7 +39,7 @@ type NotificationsModule = {
     trigger: { type: string; date: Date };
   }) => Promise<unknown>;
   SchedulableTriggerInputTypes: { DATE: string };
-};
+}
 
 let Notifications: NotificationsModule | null = null;
 try {
@@ -207,6 +209,8 @@ export default function HomeScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (bgmPlayer) {
+      // Expo AudioPlayer exposes loop and volume as mutable playback controls.
+      // eslint-disable-next-line react-hooks/immutability
       bgmPlayer.loop = true;
       bgmPlayer.volume = 0.5;
       bgmPlayer.play();
@@ -214,22 +218,22 @@ export default function HomeScreen(): React.JSX.Element {
   }, [bgmPlayer]);
 
   const progress = useProgress();
-  const appear = useRef(new Animated.Value(0)).current;
-  const levelUpAnim = useRef(new Animated.Value(-120)).current;
+  const [appear] = useState(() => new Animated.Value(0));
+  const [levelUpAnim] = useState(() => new Animated.Value(-120));
 
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const bellPulseAnim = useRef(new Animated.Value(1)).current;
-  const xpPulseAnim = useRef(new Animated.Value(1)).current;
+  const [floatAnim] = useState(() => new Animated.Value(0));
+  const [bellPulseAnim] = useState(() => new Animated.Value(1));
+  const [xpPulseAnim] = useState(() => new Animated.Value(1));
 
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const sessionsListAnim = useRef(new Animated.Value(0)).current;
-  const modalBadgePulse = useRef(new Animated.Value(1)).current;
+  const [slideAnim] = useState(() => new Animated.Value(0));
+  const [sessionsListAnim] = useState(() => new Animated.Value(0));
+  const [modalBadgePulse] = useState(() => new Animated.Value(1));
 
-  const modalSlideAnim = useRef(new Animated.Value(300)).current;
-  const modalFadeAnim = useRef(new Animated.Value(0)).current;
+  const [modalSlideAnim] = useState(() => new Animated.Value(300));
+  const [modalFadeAnim] = useState(() => new Animated.Value(0));
 
-  const challengePulse = useRef(new Animated.Value(1)).current;
-  const calendarGlowAnim = useRef(new Animated.Value(0)).current;
+  const [challengePulse] = useState(() => new Animated.Value(1));
+  const [calendarGlowAnim] = useState(() => new Animated.Value(0));
 
   const [userName, setUserName] = useState("Explorer");
   const [userGrade, setUserGrade] = useState("1");
@@ -244,7 +248,12 @@ export default function HomeScreen(): React.JSX.Element {
   const prevLevelRef = useRef<number | null>(null);
   const [levelUpText, setLevelUpText] = useState("");
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [greeting, setGreeting] = useState("Good morning");
+  const [greeting] = useState(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return "Good morning";
+    if (hour >= 12 && hour < 17) return "Good afternoon";
+    return "Good evening";
+  });
 
   const [isLocked, setIsLocked] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
@@ -283,6 +292,8 @@ export default function HomeScreen(): React.JSX.Element {
   const [formDurationMins, setFormDurationMins] = useState(30);
   const [formNotes, setFormNotes] = useState("");
   const [formReminder, setFormReminder] = useState("10 mins before");
+
+  const lastBackPressed = useRef<number>(0);
 
   const currentLevelStartXp = (level - 1) * 100;
   const currentLevelProgressXp = xp - currentLevelStartXp;
@@ -337,9 +348,6 @@ export default function HomeScreen(): React.JSX.Element {
     if (isAddSessionModalOpen) {
       modalSlideAnim.setValue(300);
       modalFadeAnim.setValue(0);
-      setFormTargetYear(currentYear);
-      setFormTargetMonth(currentMonth);
-      setFormTargetDay(selectedDay);
       Animated.parallel([
         Animated.timing(modalFadeAnim, {
           toValue: 1,
@@ -476,12 +484,6 @@ export default function HomeScreen(): React.JSX.Element {
         }),
       ]),
     ).start();
-  }, []);
-
-  useEffect(() => {
-    checkParentRules();
-    const interval = setInterval(checkParentRules, 20000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -668,6 +670,8 @@ export default function HomeScreen(): React.JSX.Element {
     const formattedStartTime = `${formStartHour}:${String(formStartMin).padStart(2, "0")} ${formStartPeriod}`;
 
     const newSession: StudySession = {
+      // This value is created only when the user saves a session.
+      // eslint-disable-next-line react-hooks/purity
       id: Date.now().toString(),
       title: formTitle.trim() || "Study Session",
       category: formCategory,
@@ -712,7 +716,7 @@ export default function HomeScreen(): React.JSX.Element {
     });
   };
 
-  const checkParentRules = async () => {
+  async function checkParentRules() {
     try {
       const data = await AsyncStorage.getItem(PARENT_CONTROLS_KEY);
       if (!data) return;
@@ -760,14 +764,11 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      setGreeting("Good morning");
-    } else if (hour >= 12 && hour < 17) {
-      setGreeting("Good afternoon");
-    } else {
-      setGreeting("Good evening");
-    }
+    // Parent controls are hydrated from external storage and polled while focused.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void checkParentRules();
+    const interval = setInterval(checkParentRules, 20000);
+    return () => clearInterval(interval);
   }, []);
 
   const triggerLevelUpAnimation = (oldLvl: number, newLvl: number) => {
@@ -977,7 +978,50 @@ export default function HomeScreen(): React.JSX.Element {
       loadSharedProgress();
       loadArcadeGames();
       loadStudySessions();
-    }, []),
+
+      const onBackPress = (): boolean => {
+        // Priority 1: Dismiss active modals first
+        if (isNotificationsModalOpen) {
+          setIsNotificationsModalOpen(false);
+          return true;
+        }
+        if (isAddSessionModalOpen) {
+          closeAddSessionModal();
+          return true;
+        }
+        if (isLocked) {
+          setIsLocked(false);
+          router.replace("/" as any);
+          return true;
+        }
+
+        // Priority 2: Pop stack if history exists
+        if (router.canGoBack()) {
+          router.back();
+          return true;
+        }
+
+        // Priority 3: Two-step confirmation to exit from Home root
+        const nowMs = Date.now();
+        if (nowMs - lastBackPressed.current < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+
+        lastBackPressed.current = nowMs;
+        if (Platform.OS === "android") {
+          ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [isNotificationsModalOpen, isAddSessionModalOpen, isLocked]),
   );
 
   useEffect(() => {
@@ -1501,7 +1545,12 @@ export default function HomeScreen(): React.JSX.Element {
               <Text style={styles.selectedDateHeadline}>Study Sessions</Text>
               <Pressable
                 style={styles.addScheduleBtn}
-                onPress={() => setIsAddSessionModalOpen(true)}
+                onPress={() => {
+                  setFormTargetYear(currentYear);
+                  setFormTargetMonth(currentMonth);
+                  setFormTargetDay(selectedDay);
+                  setIsAddSessionModalOpen(true);
+                }}
               >
                 <Text style={styles.addScheduleBtnText}>+ Schedule</Text>
               </Pressable>
@@ -1518,7 +1567,7 @@ export default function HomeScreen(): React.JSX.Element {
             >
               {activeDaySessions.length === 0 ? (
                 <Text style={styles.noSessionsText}>
-                  No study sessions planned for this date. Tap "+ Schedule" to
+                  No study sessions planned for this date. Tap &quot;+ Schedule&quot; to
                   add one!
                 </Text>
               ) : (
@@ -2074,7 +2123,7 @@ export default function HomeScreen(): React.JSX.Element {
 
                 <View style={styles.formDivider} />
 
-                <div style={{ flexDirection: "row", gap: 16 }}>
+                <View style={styles.durationRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formFieldLabel}>DURATION (HOURS)</Text>
                     <View style={styles.counterControl}>
@@ -2166,7 +2215,7 @@ export default function HomeScreen(): React.JSX.Element {
                       })()}
                     </View>
                   </View>
-                </div>
+                </View>
               </View>
 
               <Text style={styles.formSectionHeader}>ADDITIONAL DETAILS</Text>
