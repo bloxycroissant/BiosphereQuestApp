@@ -1,9 +1,6 @@
 import { useAudioPlayer } from "expo-audio";
-
 import { LinearGradient } from "expo-linear-gradient";
-
-import React, { useCallback, useRef, useState } from "react";
-
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
@@ -13,311 +10,231 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-
 import { GradeLevel, WhackChallenge } from "../../data/questionGenerators";
-
 import { MinigameMotion } from "./MinigameMotion";
 
 interface Props {
   grade: GradeLevel;
-
   onSuccess: (xp: number) => void;
-
   onClose: () => void;
 }
 
 type Difficulty = "Easy" | "Medium" | "Hard" | "Expert" | "Impossible";
 
-const MAX_LIVES = 5;
-
-const TARGET_QUOTA = 5; // Updated to 5 total questions per round as per XP scaling guidelines
+const ROUND_TIME_SECONDS = 30; // 30-second countdown timer per round
+const TARGET_QUOTA = 5; // 5 total questions per round target
 
 const getDifficulty = (completedQuotas: number): Difficulty => {
   if (completedQuotas <= 0) return "Easy";
-
   if (completedQuotas === 1) return "Medium";
-
   if (completedQuotas === 2) return "Hard";
-
   if (completedQuotas === 3) return "Expert";
-
   return "Impossible";
 };
 
-// Exact XP calculation: 30 XP per correct answer (+30 XP per score increment)
-
+// Exact XP calculation: 30 XP per correct answer only
 const getXPForScore = (score: number): number => {
   return score * 30;
 };
 
-// MATATAG Curriculum-aligned robust challenge bank guaranteeing non-repetitive, rich questions for Grades 1 to 6
-
-const MATATAG_CURRICULUM_BANK: Record<
-  GradeLevel,
-  {
-    ruleText: string;
-    targetMultiple: number;
-    correctPool: number[];
-    wrongPool: number[];
-  }[]
-> = {
-  1: [
-    {
-      ruleText: "MATATAG Grade 1: Whack numbers that count by 2s up to 20!",
-
-      targetMultiple: 2,
-
-      correctPool: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
-
-      wrongPool: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 1: Whack numbers that are multiples of 5 (Counting by 5s)!",
-
-      targetMultiple: 5,
-
-      correctPool: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-
-      wrongPool: [1, 2, 3, 4, 6, 7, 8, 9, 11, 12],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 1: Whack numbers ending in zero (Decades up to 50)!",
-
-      targetMultiple: 10,
-
-      correctPool: [10, 20, 30, 40, 50],
-
-      wrongPool: [11, 12, 21, 23, 31, 34, 41, 46],
-    },
-  ],
-
-  2: [
-    {
-      ruleText:
-        "MATATAG Grade 2: Whack numbers that are multiples of 3 (Multiplication Tables)!",
-
-      targetMultiple: 3,
-
-      correctPool: [3, 6, 9, 12, 15, 18, 21, 24, 27, 30],
-
-      wrongPool: [1, 2, 4, 5, 7, 8, 10, 11, 13, 14],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 2: Whack numbers that are multiples of 4 (Basic Multiplication)!",
-
-      targetMultiple: 4,
-
-      correctPool: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40],
-
-      wrongPool: [1, 2, 3, 5, 6, 7, 9, 10, 11, 13],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 2: Whack even numbers between 1 and 20 (Patterns)!",
-
-      targetMultiple: 2,
-
-      correctPool: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
-
-      wrongPool: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19],
-    },
-  ],
-
-  3: [
-    {
-      ruleText:
-        "MATATAG Grade 3: Whack numbers that are multiples of 6 (Intermediate Tables)!",
-
-      targetMultiple: 6,
-
-      correctPool: [6, 12, 18, 24, 30, 36, 42, 48, 54, 60],
-
-      wrongPool: [5, 7, 11, 13, 17, 19, 23, 25, 29, 31],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 3: Whack numbers that are multiples of 7 (Multiplication Mastery)!",
-
-      targetMultiple: 7,
-
-      correctPool: [7, 14, 21, 28, 35, 42, 49, 56, 63, 70],
-
-      wrongPool: [6, 8, 13, 15, 20, 22, 27, 29, 34, 36],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 3: Whack numbers that are multiples of 8 (Advanced Tables)!",
-
-      targetMultiple: 8,
-
-      correctPool: [8, 16, 24, 32, 40, 48, 56, 64, 72, 80],
-
-      wrongPool: [7, 9, 15, 17, 23, 25, 31, 33, 39, 41],
-    },
-  ],
-
-  4: [
-    {
-      ruleText:
-        "MATATAG Grade 4: Whack numbers that are multiples of 9 (Fractions & Multiples)!",
-
-      targetMultiple: 9,
-
-      correctPool: [9, 18, 27, 36, 45, 54, 63, 72, 81, 90],
-
-      wrongPool: [8, 10, 17, 19, 26, 28, 35, 37, 44, 46],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 4: Whack numbers that are multiples of 11 (Patterns & Factors)!",
-
-      targetMultiple: 11,
-
-      correctPool: [11, 22, 33, 44, 55, 66, 77, 88, 99],
-
-      wrongPool: [10, 12, 21, 23, 32, 34, 43, 45, 54, 56],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 4: Whack numbers that are multiples of 12 (Grade 4 Mastery)!",
-
-      targetMultiple: 12,
-
-      correctPool: [12, 24, 36, 48, 60, 72, 84, 96],
-
-      wrongPool: [10, 11, 13, 23, 25, 35, 37, 47, 49, 59],
-    },
-  ],
-
-  5: [
-    {
-      ruleText:
-        "MATATAG Grade 5: Whack numbers divisible by 3 (Divisibility Rules & Decimals)!",
-
-      targetMultiple: 3,
-
-      correctPool: [15, 21, 24, 27, 33, 39, 42, 51, 57, 63],
-
-      wrongPool: [14, 16, 20, 22, 25, 28, 32, 34, 40, 44],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 5: Whack numbers divisible by 4 (Number Theory & Fractions)!",
-
-      targetMultiple: 4,
-
-      correctPool: [16, 24, 28, 32, 36, 44, 48, 52, 60, 64],
-
-      wrongPool: [15, 17, 23, 25, 29, 31, 35, 37, 43, 45],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 5: Whack numbers divisible by 5 (Advanced Number Sense)!",
-
-      targetMultiple: 5,
-
-      correctPool: [25, 35, 45, 55, 65, 75, 85, 95, 105],
-
-      wrongPool: [24, 26, 34, 36, 44, 46, 54, 56, 64, 66],
-    },
-  ],
-
-  6: [
-    {
-      ruleText:
-        "MATATAG Grade 6: Whack numbers divisible by 6 (Prime & Composite Numbers)!",
-
-      targetMultiple: 6,
-
-      correctPool: [18, 24, 36, 42, 48, 54, 66, 72, 78, 84],
-
-      wrongPool: [17, 19, 23, 25, 35, 37, 43, 47, 53, 55],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 6: Whack numbers divisible by 8 (Mathematical Reasoning)!",
-
-      targetMultiple: 8,
-
-      correctPool: [24, 32, 40, 48, 56, 72, 80, 88, 96],
-
-      wrongPool: [23, 25, 31, 33, 39, 41, 47, 49, 55, 57],
-    },
-
-    {
-      ruleText:
-        "MATATAG Grade 6: Whack numbers divisible by 9 (Algebraic Readiness)!",
-
-      targetMultiple: 9,
-
-      correctPool: [27, 36, 45, 54, 63, 72, 81, 90, 99],
-
-      wrongPool: [26, 28, 35, 37, 44, 46, 53, 55, 62, 64],
-    },
-  ],
-};
-
-const generateCurricularWhackChallenge = (
+interface QuizQuestion {
+  questionText: string;
+  optionsList: string[];
+  correctAnswer: string;
+}
+
+// Procedural generator to guarantee virtually infinite, non-repeating MATATAG-aligned questions
+const generateInfiniteCurricularQuestion = (
   grade: GradeLevel,
+  seenSet: React.MutableRefObject<string[]>,
+): QuizQuestion => {
+  let questionText = "";
+  let correctAnswer = "";
+  let optionsList: string[] = [];
 
-  seenSet: Set<string>,
-): WhackChallenge => {
-  const gradePools =
-    MATATAG_CURRICULUM_BANK[grade] || MATATAG_CURRICULUM_BANK[1];
+  let attempts = 0;
+  while (attempts < 20) {
+    if (grade === 1) {
+      const a = Math.floor(Math.random() * 20) + 1;
+      const b = Math.floor(Math.random() * 10) + 1;
+      const type = Math.floor(Math.random() * 3);
+      if (type === 0) {
+        const sum = a + b;
+        questionText = `MATATAG Grade 1: What is the sum of ${a} and ${b}?`;
+        correctAnswer = sum.toString();
+      } else if (type === 1) {
+        const max = Math.max(a, b);
+        const min = Math.min(a, b);
+        const diff = max - min;
+        questionText = `MATATAG Grade 1: What is ${max} minus ${min}?`;
+        correctAnswer = diff.toString();
+      } else {
+        const nextNum = a + 1;
+        questionText = `MATATAG Grade 1: What number comes right after ${a}?`;
+        correctAnswer = nextNum.toString();
+      }
+    } else if (grade === 2) {
+      const a = Math.floor(Math.random() * 50) + 10;
+      const b = Math.floor(Math.random() * 30) + 5;
+      const type = Math.floor(Math.random() * 3);
+      if (type === 0) {
+        const sum = a + b;
+        questionText = `MATATAG Grade 2: What is the sum of ${a} and ${b}?`;
+        correctAnswer = sum.toString();
+      } else if (type === 1) {
+        const factor1 = Math.floor(Math.random() * 9) + 2;
+        const factor2 = Math.floor(Math.random() * 9) + 2;
+        const prod = factor1 * factor2;
+        questionText = `MATATAG Grade 2: Find the product of ${factor1} multiplied by ${factor2} (${factor1} x ${factor2}):`;
+        correctAnswer = prod.toString();
+      } else {
+        const max = Math.max(a, b);
+        const min = Math.min(a, b);
+        const diff = max - min;
+        questionText = `MATATAG Grade 2: Subtract ${min} from ${max} (${max} - ${min}):`;
+        correctAnswer = diff.toString();
+      }
+    } else if (grade === 3) {
+      const a = Math.floor(Math.random() * 100) + 50;
+      const b = Math.floor(Math.random() * 50) + 10;
+      const type = Math.floor(Math.random() * 3);
+      if (type === 0) {
+        const factor1 = Math.floor(Math.random() * 10) + 3;
+        const factor2 = Math.floor(Math.random() * 10) + 3;
+        const prod = factor1 * factor2;
+        questionText = `MATATAG Grade 3: What is the product of ${factor1} and ${factor2}?`;
+        correctAnswer = prod.toString();
+      } else if (type === 1) {
+        const sum = a + b;
+        questionText = `MATATAG Grade 3: What is the total sum of ${a} and ${b}?`;
+        correctAnswer = sum.toString();
+      } else {
+        const denom = Math.floor(Math.random() * 6) + 3;
+        const numer = Math.floor(Math.random() * (denom - 1)) + 1;
+        questionText = `MATATAG Grade 3: Which of the following fractions is equivalent to ${numer}/${denom} parts?`;
+        correctAnswer = `${numer}/${denom}`;
+      }
+    } else if (grade === 4) {
+      const base = Math.floor(Math.random() * 20) + 5;
+      const multiplier = Math.floor(Math.random() * 10) + 2;
+      const type = Math.floor(Math.random() * 3);
+      if (type === 0) {
+        const product = base * multiplier;
+        questionText = `MATATAG Grade 4: What is the Least Common Multiple/Product correlation for factors ${base} and ${multiplier}?`;
+        correctAnswer = product.toString();
+      } else if (type === 1) {
+        const length = Math.floor(Math.random() * 15) + 5;
+        const width = Math.floor(Math.random() * 10) + 3;
+        const area = length * width;
+        questionText = `MATATAG Grade 4: What is the area of a rectangle with a length of ${length} cm and width of ${width} cm?`;
+        correctAnswer = `${area} sq cm`;
+      } else {
+        const dec1 = (Math.random() * 5).toFixed(2);
+        const dec2 = (Math.random() * 5).toFixed(2);
+        const sumDec = (parseFloat(dec1) + parseFloat(dec2)).toFixed(2);
+        questionText = `MATATAG Grade 4: Add the decimals: ${dec1} + ${dec2} =`;
+        correctAnswer = sumDec;
+      }
+    } else if (grade === 5) {
+      const side = Math.floor(Math.random() * 8) + 3;
+      const type = Math.floor(Math.random() * 3);
+      if (type === 0) {
+        const volume = side * side * side;
+        questionText = `MATATAG Grade 5: Find the volume of a cube with a side length of ${side} cm (V = s x s x s):`;
+        correctAnswer = `${volume} cubic cm`;
+      } else if (type === 1) {
+        const principal = (Math.floor(Math.random() * 50) + 10) * 100;
+        const interest = principal * 0.05;
+        questionText = `MATATAG Grade 5: How much is the simple interest for 1 year on P${principal} at a 5% interest rate?`;
+        correctAnswer = `P${interest}`;
+      } else {
+        const num = Math.floor(Math.random() * 4) + 1;
+        const den = 4;
+        const pct =
+          num === 1 ? "25%" : num === 2 ? "50%" : num === 3 ? "75%" : "100%";
+        questionText = `MATATAG Grade 5: What is the percentage equivalent of ${num}/${den}?`;
+        correctAnswer = pct;
+      }
+    } else {
+      const xVal = Math.floor(Math.random() * 10) + 2;
+      const coeff = Math.floor(Math.random() * 5) + 2;
+      const constant = Math.floor(Math.random() * 20) + 5;
+      const targetVal = coeff * xVal + constant;
+      const type = Math.floor(Math.random() * 2);
+      if (type === 0) {
+        questionText = `MATATAG Grade 6: Solve for x in the algebraic equation: ${coeff}x + ${constant} = ${targetVal}`;
+        correctAnswer = `x = ${xVal}`;
+      } else {
+        const radius = Math.floor(Math.random() * 7) + 3;
+        const area = Math.round((22 / 7) * radius * radius);
+        questionText = `MATATAG Grade 6: Find the area of a circle with a radius of ${radius} cm (Use π = 22/7):`;
+        correctAnswer = `${area} sq cm`;
+      }
+    }
 
-  const candidateRule =
-    gradePools[Math.floor(Math.random() * gradePools.length)];
+    if (!seenSet.current.includes(questionText)) {
+      seenSet.current.push(questionText);
+      break;
+    }
+    attempts++;
+  }
 
-  // Shuffle and pick exactly TARGET_QUOTA (5) correct answers
+  const wrongOptionsSet = new Set<string>();
+  const correctNum = parseFloat(correctAnswer.replace(/[^0-9.-]+/g, "")) || 10;
+  while (wrongOptionsSet.size < 3) {
+    const offset =
+      (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
+    let fakeVal: string | number = correctNum + offset;
+    if (correctAnswer.includes("x =")) {
+      fakeVal = `x = ${Math.max(1, Math.round(correctNum + offset))}`;
+    } else if (correctAnswer.includes("sq cm")) {
+      fakeVal = `${Math.max(1, Math.round(correctNum + offset * 3))} sq cm`;
+    } else if (correctAnswer.includes("cubic cm")) {
+      fakeVal = `${Math.max(1, Math.round(correctNum + offset * 5))} cubic cm`;
+    } else if (correctAnswer.includes("P")) {
+      fakeVal = `P${Math.max(10, Math.round(correctNum + offset * 10))}`;
+    } else if (correctAnswer.includes("/")) {
+      fakeVal = `${Math.max(1, Math.abs(Math.round(correctNum + offset)))}/4`;
+    } else if (correctAnswer.includes(".")) {
+      fakeVal = Math.max(
+        0.1,
+        parseFloat((correctNum + offset * 0.1).toFixed(2)),
+      ).toString();
+    } else {
+      fakeVal = Math.max(0, Math.round(correctNum + offset)).toString();
+    }
 
-  const shuffledCorrect = [...candidateRule.correctPool].sort(
-    () => Math.random() - 0.5,
-  );
+    if (fakeVal !== correctAnswer) {
+      wrongOptionsSet.add(fakeVal.toString());
+    }
+  }
 
-  const selectedCorrect = shuffledCorrect.slice(0, TARGET_QUOTA);
-
-  // Shuffle and pick 4 wrong answers (total 9 tiles: 5 correct + 4 wrong = 9 grid slots)
-
-  const shuffledWrong = [...candidateRule.wrongPool].sort(
-    () => Math.random() - 0.5,
-  );
-
-  const selectedWrong = shuffledWrong.slice(0, 4);
-
-  const combinedGrid = [...selectedCorrect, ...selectedWrong].sort(
+  optionsList = [correctAnswer, ...Array.from(wrongOptionsSet)].sort(
     () => Math.random() - 0.5,
   );
 
   return {
-    ruleText: candidateRule.ruleText,
-
-    targetMultiple: candidateRule.targetMultiple,
-
-    gridNumbers: combinedGrid,
+    questionText,
+    optionsList,
+    correctAnswer,
   };
 };
 
-export const QuizGame: React.FC<Props> = ({
-  grade,
+const generateCurricularWhackChallenge = (
+  grade: GradeLevel,
+  seenSet: React.MutableRefObject<string[]>,
+): WhackChallenge & { questionData?: QuizQuestion } => {
+  const questionObj = generateInfiniteCurricularQuestion(grade, seenSet);
 
-  onSuccess,
+  return {
+    ruleText: questionObj.questionText,
+    targetMultiple: 1,
+    gridNumbers: [0, 1, 2, 3] as any,
+    questionData: questionObj,
+  };
+};
 
-  onClose,
-}) => {
+export const QuizGame: React.FC<Props> = ({ grade, onSuccess, onClose }) => {
   const clickPlayer = useAudioPlayer(
     require("../../../../assets/BiosphereQuestSoundEffectsandMusic/BiosphereQuestSFX/Button_Click_SFX.mp3"),
   );
@@ -343,7 +260,6 @@ export const QuizGame: React.FC<Props> = ({
         if (typeof player.seekTo === "function") {
           await player.seekTo(0);
         }
-
         await player.play();
       }
     } catch (e) {
@@ -351,241 +267,153 @@ export const QuizGame: React.FC<Props> = ({
     }
   };
 
-  const seenChallenges = useRef(new Set<string>());
-
+  const seenChallenges = useRef<string[]>([]);
   const antiCheatClickLimit = useRef<{ count: number; time: number }>({
     count: 0,
-
     time: 0,
   });
 
-  const [challenge, setChallenge] = useState<WhackChallenge>(() => {
-    return generateCurricularWhackChallenge(grade, new Set<string>());
+  const [challenge, setChallenge] = useState<
+    WhackChallenge & { questionData?: QuizQuestion }
+  >(() => {
+    return generateCurricularWhackChallenge(grade, seenChallenges);
   });
 
   const [whacked, setWhacked] = useState<number[]>([]);
-
-  const [activeHammerIndex, setActiveHammerIndex] = useState<number | null>(
-    null,
-  );
-
   const [score, setScore] = useState(0);
-
-  const [lives, setLives] = useState(MAX_LIVES);
-
+  const [timeLeft, setTimeLeft] = useState(ROUND_TIME_SECONDS);
   const [feedback, setFeedback] = useState("");
-
   const [completedQuotas, setCompletedQuotas] = useState(0);
 
   const [tileScales] = useState(() =>
-    Array.from({ length: 9 }, () => new Animated.Value(1)),
+    Array.from({ length: 4 }, () => new Animated.Value(1)),
   );
 
-  const [hammerAnim] = useState(() => new Animated.Value(0));
-
   const currentDifficulty = getDifficulty(completedQuotas);
-
   const earnedXP = getXPForScore(score);
+  const isGameOver = timeLeft <= 0 || score >= TARGET_QUOTA;
 
-  const isGameOver = lives <= 0 || score >= TARGET_QUOTA;
+  // Timer countdown effect
+  useEffect(() => {
+    if (isGameOver) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isGameOver]);
 
   const startNextBoard = useCallback(
     (resetEntireGame = false) => {
       playSound("click");
-
       antiCheatClickLimit.current = { count: 0, time: Date.now() };
-
-      if (seenChallenges.current.size > 80) {
-        seenChallenges.current.clear();
-      }
 
       let nextChallenge = generateCurricularWhackChallenge(
         grade,
-        seenChallenges.current,
+        seenChallenges,
       );
 
-      let key = nextChallenge ? challengeKey(nextChallenge) : "";
-
-      if (!nextChallenge || (key && seenChallenges.current.has(key))) {
-        seenChallenges.current.clear();
-
-        nextChallenge = generateCurricularWhackChallenge(
-          grade,
-          seenChallenges.current,
-        );
-
-        key = nextChallenge ? challengeKey(nextChallenge) : "";
-      }
-
-      if (key) {
-        seenChallenges.current.add(key);
-      }
-
       tileScales.forEach((anim) => anim.setValue(1));
-
       setChallenge(nextChallenge);
-
       setWhacked([]);
-
       setFeedback("");
 
-      setActiveHammerIndex(null);
-
       if (resetEntireGame) {
-        setLives(MAX_LIVES);
-
+        setTimeLeft(ROUND_TIME_SECONDS);
         setCompletedQuotas(0);
-
         setScore(0);
+        seenChallenges.current = [];
       }
     },
-
     [grade, tileScales],
   );
 
-  const triggerHammerStrike = (index: number) => {
-    setActiveHammerIndex(index);
-
-    hammerAnim.setValue(0);
-
+  const triggerButtonPress = (index: number) => {
     const scaleAnim = tileScales[index] || new Animated.Value(1);
 
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(hammerAnim, {
-          toValue: 1,
-
-          duration: 120,
-
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(hammerAnim, {
-          toValue: 0,
-
-          duration: 150,
-
-          useNativeDriver: true,
-        }),
-      ]),
-
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 0.65,
-
-          duration: 100,
-
-          useNativeDriver: true,
-        }),
-
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-
-          friction: 3,
-
-          tension: 40,
-
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      setActiveHammerIndex(null);
-    });
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const whack = (index: number) => {
-    if (whacked.includes(index) || isGameOver) return;
+    if (whacked.includes(index) || isGameOver || !challenge.questionData)
+      return;
 
-    // This handler runs only in response to a player tap.
-    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
-
     if (now - antiCheatClickLimit.current.time < 1000) {
       antiCheatClickLimit.current.count += 1;
-
       if (antiCheatClickLimit.current.count > 15) {
         setFeedback("Anti-cheat: Tap frequency exceeded.");
-
         return;
       }
     } else {
       antiCheatClickLimit.current = { count: 1, time: now };
     }
 
-    triggerHammerStrike(index);
+    triggerButtonPress(index);
 
-    const isTarget =
-      challenge.gridNumbers[index] % challenge.targetMultiple === 0;
+    const selectedOption = challenge.questionData.optionsList[index];
+    const isTarget = selectedOption === challenge.questionData.correctAnswer;
 
     if (isTarget) {
       playSound("correct");
-
       const nextScore = score + 1;
-
       setScore(nextScore);
-
       const calculatedXp = getXPForScore(nextScore);
-
-      setFeedback(`🔨 💥 CORRECT! +30 XP (Total: +${calculatedXp}XP)`);
-
+      setFeedback(`✨ CORRECT! +30 XP (Total: +${calculatedXp}XP)`);
       setWhacked((current) => [...current, index]);
 
       if (nextScore >= TARGET_QUOTA) {
         onSuccess(calculatedXp);
-
         setCompletedQuotas((count) => count + 1);
+      } else {
+        setTimeout(() => {
+          startNextBoard(false);
+        }, 1200);
       }
     } else {
       playSound("wrong");
+      // Score and XP remain unchanged on incorrect answer (+0 XP added)
+      const currentXp = getXPForScore(score);
+      setFeedback(
+        `❌ INCORRECT! Correct answer: ${challenge.questionData.correctAnswer} (+0 XP)`,
+      );
+      setWhacked((current) => [...current, index]);
 
-      const remainingLives = lives - 1;
-
-      setLives(remainingLives);
-
-      const calculatedXp = getXPForScore(score);
-
-      setFeedback(`🔨 💔 INCORRECT! Lost 1 Life! (Total: +${calculatedXp}XP)`);
-
-      if (remainingLives <= 0) {
-        setWhacked((current) => [...current, index]);
-      }
+      setTimeout(() => {
+        startNextBoard(false);
+      }, 1600);
     }
-  };
-
-  const hammerRotation = hammerAnim.interpolate({
-    inputRange: [0, 1],
-
-    outputRange: ["0deg", "-45deg"],
-  });
-
-  const hammerTranslateY = hammerAnim.interpolate({
-    inputRange: [0, 1],
-
-    outputRange: [-20, 10],
-  });
-
-  const renderLives = () => {
-    const hearts = [];
-
-    for (let i = 0; i < MAX_LIVES; i++) {
-      hearts.push(i < lives ? "❤️" : "🖤");
-    }
-
-    return hearts.join(" ");
   };
 
   return (
     <LinearGradient colors={["#0a0b18", "#2b2b5c"]} style={styles.background}>
       <MinigameMotion
-        key={`${challengeKey(challenge)}-${completedQuotas}`}
-
+        key={`${challenge.ruleText}-${completedQuotas}`}
         style={styles.container}
       >
         <View style={styles.topBar}>
           <TouchableOpacity
             onPress={() => {
               playSound("click");
-
               onClose();
             }}
           >
@@ -596,7 +424,7 @@ export const QuizGame: React.FC<Props> = ({
             Grade {grade} • {currentDifficulty.toUpperCase()}
           </Text>
 
-          <Text style={styles.lives}>{renderLives()}</Text>
+          <Text style={styles.timerText}>⏳ {timeLeft}s</Text>
         </View>
 
         <View style={styles.content}>
@@ -605,7 +433,7 @@ export const QuizGame: React.FC<Props> = ({
             XP PER CORRECT ANSWER
           </Text>
 
-          <Text style={styles.title}>Whack-a-Number 🔨</Text>
+          <Text style={styles.title}>MATATAG Quiz Challenge 🧠</Text>
 
           <Text style={styles.rule}>{challenge.ruleText}</Text>
 
@@ -614,65 +442,38 @@ export const QuizGame: React.FC<Props> = ({
           </Text>
 
           <View style={styles.grid}>
-            {challenge.gridNumbers.map((number, index) => {
-              const isTarget = number % challenge.targetMultiple === 0;
-
+            {challenge.questionData?.optionsList.map((optionText, index) => {
+              const isTarget =
+                optionText === challenge.questionData?.correctAnswer;
               const selected = whacked.includes(index);
-
-              const isBeingHit = activeHammerIndex === index;
-
               const scaleAnim = tileScales[index] || 1;
 
               return (
                 <Animated.View
-                  key={`${index}-${number}`}
-
+                  key={`${index}-${optionText}`}
                   style={[
                     styles.holeWrapper,
-
                     { transform: [{ scale: scaleAnim }] },
                   ]}
                 >
                   <TouchableOpacity
                     style={[
                       styles.hole,
-
                       selected && (isTarget ? styles.hitHole : styles.missHole),
                     ]}
-
                     onPress={() => whack(index)}
-
                     disabled={selected || isGameOver}
-
                     activeOpacity={0.75}
                   >
-                    {isBeingHit && (
-                      <Animated.Text
-                        style={[
-                          styles.hammerIcon,
-
-                          {
-                            transform: [
-                              { translateY: hammerTranslateY },
-
-                              { rotate: hammerRotation },
-                            ],
-                          },
-                        ]}
-                      >
-                        🔨
-                      </Animated.Text>
-                    )}
-
                     <Text
                       style={[
                         styles.number,
-
                         selected &&
                           (isTarget ? styles.hitText : styles.missText),
                       ]}
+                      numberOfLines={2}
                     >
-                      {selected ? (isTarget ? "💥 ✓" : "💔 ❌") : number}
+                      {optionText}
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>
@@ -682,13 +483,13 @@ export const QuizGame: React.FC<Props> = ({
 
           <Text style={styles.feedback}>
             {feedback ||
-              "Tap the correct MATATAG curriculum numbers! Each correct answer earns +30 XP."}
+              "Select the correct answer based on the official MATATAG curriculum book!"}
           </Text>
 
           {isGameOver && (
             <View style={styles.expiredCard}>
               <Text style={styles.expiredTitle}>
-                {score >= TARGET_QUOTA ? "Round Complete! 🎉" : "Game Over! 💔"}
+                {score >= TARGET_QUOTA ? "Round Complete! 🎉" : "Time's Up! ⏱️"}
               </Text>
 
               <Text style={styles.expiredCopy}>
@@ -698,9 +499,7 @@ export const QuizGame: React.FC<Props> = ({
 
               <TouchableOpacity
                 style={styles.retryButton}
-
                 onPress={() => startNextBoard(true)}
-
                 activeOpacity={0.85}
               >
                 <Text style={styles.retryButtonText}>Play Again ↻</Text>
@@ -715,227 +514,128 @@ export const QuizGame: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   background: { flex: 1 } as ViewStyle,
-
   container: { flex: 1, backgroundColor: "transparent" } as ViewStyle,
-
   topBar: {
     paddingHorizontal: 16,
-
     paddingTop: 18,
-
     paddingBottom: 12,
-
     flexDirection: "row",
-
     alignItems: "center",
-
     justifyContent: "space-between",
   } as ViewStyle,
-
   backText: { color: "#38bdf8", fontSize: 14, fontWeight: "800" } as TextStyle,
-
   grade: { color: "#e2e8f0", fontSize: 11, fontWeight: "800" } as TextStyle,
-
-  lives: { fontSize: 13, letterSpacing: 1 } as TextStyle,
-
+  timerText: { color: "#facc15", fontSize: 13, fontWeight: "900" } as TextStyle,
   content: { flex: 1, justifyContent: "center", padding: 20 } as ViewStyle,
-
   eyebrow: {
     color: "#86efac",
-
     fontSize: 11,
-
     textAlign: "center",
-
     fontWeight: "900",
-
     letterSpacing: 0.8,
-
     marginBottom: 8,
   } as TextStyle,
-
   title: {
     color: "#fff",
-
     fontSize: 23,
-
     textAlign: "center",
-
     fontWeight: "900",
-
     marginBottom: 16,
   } as TextStyle,
-
   rule: {
     color: "#dbeafe",
-
     textAlign: "center",
-
-    fontSize: 17,
-
-    fontWeight: "900",
-
+    fontSize: 15,
+    fontWeight: "800",
     backgroundColor: "rgba(255, 255, 255, 0.08)",
-
     padding: 16,
-
     borderRadius: 14,
-
     marginBottom: 10,
   } as TextStyle,
-
   score: {
     color: "#facc15",
-
     textAlign: "center",
-
     fontWeight: "900",
-
     marginBottom: 16,
   } as TextStyle,
-
   grid: {
     flexDirection: "row",
-
     flexWrap: "wrap",
-
     justifyContent: "center",
-
     gap: 12,
   } as ViewStyle,
-
-  holeWrapper: { width: "28%", aspectRatio: 1 } as ViewStyle,
-
+  holeWrapper: { width: "47%", aspectRatio: 2 } as ViewStyle,
   hole: {
     flex: 1,
-
     width: "100%",
-
-    borderRadius: 24,
-
+    borderRadius: 16,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-
     borderWidth: 2,
-
     borderColor: "#38bdf8",
-
     alignItems: "center",
-
     justifyContent: "center",
-
-    overflow: "visible",
+    paddingHorizontal: 10,
+    overflow: "hidden",
   } as ViewStyle,
-
   hitHole: {
     backgroundColor: "rgba(34, 197, 94, 0.35)",
-
     borderColor: "#22c55e",
-
     borderStyle: "dashed",
   } as ViewStyle,
-
   missHole: {
     backgroundColor: "rgba(251, 113, 133, 0.35)",
-
     borderColor: "#fb7185",
-
     borderStyle: "dashed",
   } as ViewStyle,
-
-  number: { color: "#fff", fontSize: 24, fontWeight: "900" } as TextStyle,
-
-  hitText: { color: "#4ade80", fontSize: 18 } as TextStyle,
-
-  missText: { color: "#fb7185", fontSize: 18 } as TextStyle,
-
-  hammerIcon: {
-    position: "absolute",
-
-    top: -35,
-
-    fontSize: 36,
-
-    zIndex: 10,
+  number: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "center",
   } as TextStyle,
-
+  hitText: { color: "#4ade80", fontSize: 15 } as TextStyle,
+  missText: { color: "#fb7185", fontSize: 15 } as TextStyle,
   feedback: {
     color: "#cbd5e1",
-
     fontSize: 12,
-
     fontWeight: "700",
-
     textAlign: "center",
-
     marginTop: 18,
-
     minHeight: 18,
   } as TextStyle,
-
   expiredCard: {
     width: "100%",
-
     alignItems: "center",
-
     backgroundColor: "rgba(255, 255, 255, 0.08)",
-
     borderColor: "#fb7185",
-
     borderWidth: 1,
-
     borderRadius: 16,
-
     padding: 16,
-
     marginTop: 16,
   } as ViewStyle,
-
   expiredTitle: {
     color: "#fff",
-
     fontSize: 18,
-
     fontWeight: "900",
-
     textAlign: "center",
   } as TextStyle,
-
   expiredCopy: {
     color: "#cbd5e1",
-
     fontSize: 12,
-
     lineHeight: 18,
-
     textAlign: "center",
-
     marginTop: 6,
   } as TextStyle,
-
   retryButton: {
     backgroundColor: "#117a61",
-
     borderRadius: 12,
-
     paddingHorizontal: 18,
-
     paddingVertical: 11,
-
     marginTop: 12,
   } as ViewStyle,
-
   retryButtonText: {
     color: "#fff",
-
     fontSize: 13,
-
     fontWeight: "900",
   } as TextStyle,
 });
-
-const challengeKey = (challenge: WhackChallenge): string =>
-  `${challenge.targetMultiple}|${[...challenge.gridNumbers]
-
-    .sort((a, b) => a - b)
-
-    .join(",")}`;
