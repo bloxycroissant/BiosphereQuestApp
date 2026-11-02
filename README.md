@@ -79,8 +79,8 @@ BiosphereQuest/
 │   ├── components/
 │   │   ├── MinigameMotion.tsx             # Reusable motion wrapper for smooth scene entries
 │   │   ├── QuizGame.tsx                   # Core multi-choice quiz engine component
-│   │   ├── EcoSortGame.tsx                # Eco-Sort Swipe mini-game component
-│   │   ├── MemoryMatchGame.tsx            # Flora & Fauna Memory Match component
+│   │   ├── FlashCardGame.tsx              # Eco-Sort Swipe mini-game component
+│   │   ├── MemoryMatchGame.tsx            # Stella & Astro Memory Match component
 │   │   └── [Other Mini-Game Components]   # Remaining mini-game modules
 │   ├── screens/                           # Dashboard, Digital Notebook, and Level Selectors
 │   └── data/                              # Curriculum question generators and data sets
