@@ -1,56 +1,69 @@
-# Welcome to your Expo app 👋
+🌱 Biosphere Quest: Educational Mobile Game App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An immersive, curriculum-aligned educational mobile game built with React Native and Expo, designed to make mathematics and science engaging for elementary students.
 
-## Get started
+🚀 Overview
 
-1. Install dependencies
+Biosphere Quest is a gamified educational mobile application developed as part of our Mobile Computing coursework. It bridges software engineering principles with interactive pedagogy by aligning its learning modules and mini-games directly with the official MATATAG Curriculum (Grades 1 to 6). Players embark on a learning adventure guided by mascots Stella and Astro, utilizing interactive digital notebooks, study schedulers, dashboards, and dynamic quiz engines.
 
-   ```bash
-   npm install
-   ```
+✨ Key Features
 
-2. Start the app
+MATATAG Curriculum Alignment: Procedurally generated and curated math and science challenges tailored specifically for Grades 1 through 6.
 
-   ```bash
-   npx expo start
-   ```
+Infinite Quiz Engine (QuizGame.tsx): Features a timer-based, non-repeating question generator with multiple-choice mechanics, exact XP progression (+30 XP per correct answer), and anti-cheat constraints.
 
-In the output, you'll find options to open the app in a
+Engaging Mascots: Guided interactive elements featuring Stella and Astro to enhance student motivation.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Digital Notebook & Dashboard: Built-in productivity and study tools for tracking learning progress.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Cross-Platform Mobile Architecture: Built with React Native, Expo, and TypeScript for seamless performance across mobile devices.
 
-## Get a fresh project
+🛠️ Tech Stack
 
-When you're ready, run:
+Framework: React Native / Expo
 
-```bash
-npm run reset-project
-```
+Language: TypeScript / ES6 JavaScript
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Styling: StyleSheet & Linear Gradients (expo-linear-gradient)
 
-### Other setup steps
+Audio/SFX: expo-audio for interactive sound effects (Button clicks, correct/wrong answers)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Animations: React Native Animated API for responsive touch feedback
 
-## Learn more
+📂 Project Structure
 
-To learn more about developing your project with Expo, look at the following resources:
+BiosphereQuest/
+├── assets/                  # Sound effects, music, and mascot graphics
+├── src/
+│   ├── components/          # Reusable UI components & MinigameMotion wrapper
+│   ├── screens/             # Main game screens, dashboards, and digital notebooks
+│   └── data/                # Curriculum question generators and data sets
+├── App.tsx                  # Root application entry point
+└── README.md                # Project documentation
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Join the community
+⚙️ Getting Started & Installation
 
-Join our community of developers creating universal apps.
+Clone the repository:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+git clone https://github.com/your-username/biosphere-quest.git
+cd biosphere-quest
+
+
+Install dependencies:
+
+npm install
+
+
+Run the application:
+
+npx expo start
+
+
+Scan the generated QR code using the Expo Go app on your mobile device (iOS or Android).
+
+🎯 Academic & Development Context
+
+Developed as an undergraduate Computer Science capstone/course project for Mobile Computing. It demonstrates mastery over mobile computing fundamentals, JavaScript/ES6 logic, ReactJS component design, and React Native mobile deployment.
+
+© 2026 Biosphere Quest Team. All rights reserved.
